@@ -2226,3 +2226,19 @@ CI had zero errors after follow-up #30, but GitHub's own Annotations panel on ev
 - `pnpm check` green, 0 errors (71 pre-existing, now-explained warnings remain, down from 81).
 - `pnpm build` succeeds (both `apps/api` and `apps/web`).
 - Full local `CI=1` 80-spec Playwright run: 80/80 passed.
+
+## 2026-08-10 follow-up #32: deployment prep — finished single-origin serving, added fly.toml + DEPLOYMENT.md — done
+
+Asked to get the project ready for deployment. Found an in-progress, uncommitted change already sitting in the working tree (Dockerfile + `apps/api/src/index.ts` + `@fastify/static`) that makes the API process serve `apps/web`'s built SPA directly in production — single public origin, no reverse-proxy or cross-site cookie story. Both files' own comments already referenced a `fly.toml` that didn't exist yet. User confirmed scope: prep only, no live deploy (no Fly/Railway account access from here).
+
+- Verified the in-progress change is actually correct before building on it: `pnpm check`/`pnpm build`/`pnpm test` all green (335 API tests), and confirmed by hand that `apps/api/dist/index.js`'s `../../web/dist` resolution lands on the real `apps/web/dist` the turbo `build` pipeline produces.
+- **Added `fly.toml`** (two process groups sharing the one image — `app` for HTTP, `worker` for the BullMQ processor — per the Dockerfile's own comment; wires `/health` as the Fly health check since that route already checks DB + Redis, not just process liveness).
+- **Added `DEPLOYMENT.md`**: infra prerequisites (managed Postgres w/ pgvector, Redis, S3/R2), the required-secrets list cross-referenced against `env.ts`'s `assertProdNotLocalhost` (which refuses to boot on leftover dev defaults), the `WEB_URL`/`API_URL`-must-match note the single-origin change now implies, the migration step, and a `/health`-based post-deploy verification checklist. Points back at PROGRESS.md's existing "in-process pub/sub, not Redis" note as the one scaling caveat (single `app` machine only, matches `fly.toml`'s `min_machines_running = 1`).
+- **Closed a real gap DEPLOYMENT.md would otherwise have documented incorrectly**: `VITE_SENTRY_DSN` is Vite build-time-inlined, not a runtime var like every other secret here, and the Dockerfile had no way to receive it. Added a `VITE_SENTRY_DSN` `ARG`/`ENV` pair before the build stage, plus a commented `[build.args]` example in `fly.toml`.
+
+### Verified
+
+- `pnpm check` green, 0 errors (same 71 pre-existing warnings).
+- `pnpm build` succeeds (both `apps/api` and `apps/web`); manually confirmed the static-serving path resolution against real build output.
+- `pnpm test`: 335/335 API tests passing.
+- Did not run `pnpm test:e2e` or an actual `fly deploy` — out of scope for this pass (prep only, per user).

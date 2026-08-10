@@ -1,0 +1,61 @@
+# Starting point for `fly launch --no-deploy` / `fly deploy`, referenced by
+# Dockerfile's comment. `app` is a placeholder — Fly assigns/claims the real
+# name (and primary_region) on first `fly launch`; edit both before deploying.
+# Two process groups share the one image built by the root Dockerfile: `app`
+# serves HTTP (API + the web SPA, see apps/api/src/index.ts), `worker` runs
+# the BullMQ job processor. Neither has a Fly Postgres/Redis block — this
+# expects an external managed Postgres (with pgvector) and Redis, wired via
+# secrets (see DEPLOYMENT.md).
+app = "canvas-app"
+primary_region = "iad"
+
+[build]
+  # Uncomment to bake web-side Sentry into the build (see Dockerfile's
+  # VITE_SENTRY_DSN ARG) — `fly deploy` passes these as --build-arg.
+  # [build.args]
+  #   VITE_SENTRY_DSN = "https://...@sentry.io/..."
+
+[env]
+  NODE_ENV = "production"
+  API_PORT = "3001"
+
+[processes]
+  app = "pnpm start:api"
+  worker = "pnpm start:worker"
+
+[[services]]
+  processes = ["app"]
+  protocol = "tcp"
+  internal_port = 3001
+  auto_stop_machines = false
+  auto_start_machines = true
+  min_machines_running = 1
+
+  [[services.ports]]
+    port = 80
+    handlers = ["http"]
+    force_https = true
+
+  [[services.ports]]
+    port = 443
+    handlers = ["tls", "http"]
+
+  [[services.http_checks]]
+    interval = "15s"
+    timeout = "5s"
+    grace_period = "10s"
+    method = "get"
+    path = "/health"
+    protocol = "http"
+
+[[vm]]
+  processes = ["app"]
+  cpu_kind = "shared"
+  cpus = 1
+  memory_mb = 512
+
+[[vm]]
+  processes = ["worker"]
+  cpu_kind = "shared"
+  cpus = 1
+  memory_mb = 512

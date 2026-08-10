@@ -1,8 +1,11 @@
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 import cookie from "@fastify/cookie";
 import cors from "@fastify/cors";
 import formbody from "@fastify/formbody";
 import helmet from "@fastify/helmet";
 import multipart from "@fastify/multipart";
+import staticFiles from "@fastify/static";
 import websocket from "@fastify/websocket";
 import { fastifyTRPCPlugin } from "@trpc/server/adapters/fastify";
 import Fastify from "fastify";
@@ -91,6 +94,26 @@ registerBrainRealtimeRoutes(app);
 registerImageAssetRealtimeRoutes(app);
 registerCopyGenerationRealtimeRoutes(app);
 registerDocRealtimeRoutes(app);
+
+// Single-origin prod deploy (see Dockerfile / fly.toml): this API server
+// also serves apps/web's built SPA, so there's one public URL and no
+// cross-site cookie/CORS story to get right. `pnpm build` (turbo) builds
+// apps/web/dist as a sibling of this file's own build output
+// (apps/api/dist/index.js -> ../../web/dist). Dev keeps using Vite's own
+// dev server instead — apps/web/dist won't exist there, so this is a no-op.
+if (process.env.NODE_ENV === "production") {
+  const webDist = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../web/dist");
+  await app.register(staticFiles, { root: webDist });
+  // @fastify/static's own not-found fallback (wildcard: true, the default)
+  // only fires for unmatched GET requests that don't look like a static
+  // asset path, which is exactly what a client-side route (e.g.
+  // /workspace/abc/list/def) is — every real API route above already has
+  // its own handler and is matched before Fastify ever reaches this.
+  app.setNotFoundHandler((req, reply) => {
+    if (req.method === "GET") return reply.sendFile("index.html", webDist);
+    reply.code(404).send({ error: "not found" });
+  });
+}
 
 // Captures unhandled route errors when SENTRY_DSN is set (no-op otherwise).
 Sentry.setupFastifyErrorHandler(app);
