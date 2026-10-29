@@ -18,9 +18,9 @@ export default defineConfig({
     {
       // API + BullMQ worker together — Brain chat (and image jobs) need the
       // worker process. Health-check the API; the worker shares the same
-      // startup path and is up by the time /health responds.
-      command:
-        "sh -c 'pnpm --filter @canvas/api worker & worker_pid=$!; trap \"kill $worker_pid\" EXIT INT TERM; pnpm --filter @canvas/api dev'",
+      // startup path and is up by the time /health responds. Launched via a
+      // Node script rather than `sh -c` so it also works on Windows.
+      command: "node scripts/start-api.mjs",
       url: "http://localhost:3001/health",
       reuseExistingServer: !isCI,
       timeout: 30_000,

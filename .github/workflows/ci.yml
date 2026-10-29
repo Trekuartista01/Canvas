@@ -110,24 +110,18 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      # Plain `docker run`, not a `services:` container: GitHub Actions'
-      # services block has no way to override a container's command, and
-      # the official minio/minio image (same one docker-compose.yml uses
-      # locally) needs `server /data` passed explicitly — it doesn't run a
-      # server by default. Bucket creation is handled by the app itself
-      # (storage.ts's ensureBucketExists(), called on both api and worker
-      # startup), so no bucket-provisioning env var is needed here either.
-      # Was previously bitnami/minio:latest specifically because its image
-      # *did* default to running the server — but Bitnami retired free
-      # Docker Hub images in 2025, so that tag stopped resolving and this
-      # job's containers failed to even initialize. See PROGRESS.md.
-      - name: Start MinIO
+      # Same S3-compatible image docker-compose.yml uses locally (RustFS —
+      # MinIO pulled its public images, and bitnami/minio before that).
+      # Bucket creation is handled by the app itself (storage.ts's
+      # ensureBucketExists(), called on both api and worker startup), so no
+      # bucket-provisioning env var is needed here. See PROGRESS.md.
+      - name: Start S3 storage
         run: |
-          docker run -d --name minio \
+          docker run -d --name s3 \
             -p 9000:9000 -p 9001:9001 \
-            -e MINIO_ROOT_USER=canvas \
-            -e MINIO_ROOT_PASSWORD=canvas12345 \
-            minio/minio:latest server /data --console-address ":9001"
+            -e RUSTFS_ACCESS_KEY=canvas \
+            -e RUSTFS_SECRET_KEY=canvas12345 \
+            rustfs/rustfs:1.0.1
 
       - uses: pnpm/action-setup@v6
 
@@ -140,8 +134,8 @@ jobs:
 
       - run: pnpm db:migrate
 
-      - name: Wait for MinIO
-        run: until curl -sf http://localhost:9000/minio/health/live; do sleep 1; done
+      - name: Wait for S3 storage
+        run: until curl -sf http://localhost:9000/health; do sleep 1; done
 
       - run: pnpm --filter @canvas/e2e exec playwright install --with-deps chromium
 

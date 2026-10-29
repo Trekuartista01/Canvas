@@ -183,29 +183,45 @@ function handleMessage(docId: string, room: DocRoom, conn: WebSocket, message: W
   }
 }
 
-export async function attachDocConnection(docId: string, conn: WebSocket) {
-  conn.binaryType = "arraybuffer";
+export type EarlyMessages = { pending: WebSocket.RawData[]; stop: () => void };
 
-  // Buffer early frames while the room loads so we don't drop the client's
-  // SyncStep1 that can arrive before the async DB read finishes.
+/**
+ * Buffer frames until the connection is attached to its room. `ws` drops
+ * messages emitted while no listener is registered, and y-websocket sends
+ * its SyncStep1 exactly once, right on open — if that frame lands during
+ * the handler's auth/DB awaits, the server never answers with SyncStep2
+ * and the client sits on "Connecting…" forever. Must therefore be called
+ * synchronously at the top of the WS handler, before any `await`.
+ */
+export function bufferEarlyMessages(conn: WebSocket): EarlyMessages {
+  conn.binaryType = "arraybuffer";
   const pending: WebSocket.RawData[] = [];
-  const early = (message: WebSocket.RawData) => {
+  const listener = (message: WebSocket.RawData) => {
     pending.push(message);
   };
-  conn.on("message", early);
+  conn.on("message", listener);
+  return { pending, stop: () => conn.off("message", listener) };
+}
 
+export async function attachDocConnection(
+  docId: string,
+  conn: WebSocket,
+  early: EarlyMessages = bufferEarlyMessages(conn),
+) {
+  // Keep buffering while the room loads too — the async DB read is another
+  // window where frames could otherwise be dropped.
   const room = await getOrCreateRoom(docId);
   if (conn.readyState !== wsReadyStateConnecting && conn.readyState !== wsReadyStateOpen) {
-    conn.off("message", early);
+    early.stop();
     return;
   }
 
   room.conns.set(conn, new Set());
-  conn.off("message", early);
+  early.stop();
 
   const onMessage = (message: WebSocket.RawData) => handleMessage(docId, room, conn, message);
   conn.on("message", onMessage);
-  for (const message of pending) onMessage(message);
+  for (const message of early.pending) onMessage(message);
 
   const cleanup = () => {
     const controlled = room.conns.get(conn);

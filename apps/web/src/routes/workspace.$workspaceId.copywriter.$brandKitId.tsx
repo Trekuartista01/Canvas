@@ -89,10 +89,23 @@ function CopywriterWorkspacePage() {
     }
   });
 
+  // The row's own status is the source of truth for a generate — WS events
+  // are only a fast path. "queued" (published by the mutation) and usually
+  // "generating" (worker pickup) both fire before this page's socket has
+  // connected and been authorized, so polling covers any missed event.
   const generation = trpc.copywriter.get.useQuery(
     { generationId: generationId! },
-    { enabled: !!generationId },
+    {
+      enabled: !!generationId,
+      refetchInterval: (query) => (query.state.data?.status === "pending" ? 1500 : false),
+    },
   );
+
+  useEffect(() => {
+    if (generation.data?.status === "failed") {
+      setError(generation.data.errorMessage ?? "Something went wrong. Try again.");
+    }
+  }, [generation.data?.status, generation.data?.errorMessage]);
 
   const generate = trpc.copywriter.generate.useMutation({
     onSuccess: (row) => setGenerationId(row.id),
@@ -272,7 +285,11 @@ function CopywriterWorkspacePage() {
     setTimeout(() => setCopiedKey(null), 1500);
   }
 
-  const loading = generate.isPending || status === "queued" || status === "generating";
+  const loading =
+    generate.isPending ||
+    generation.data?.status === "pending" ||
+    status === "queued" ||
+    status === "generating";
   const variants = (generation.data?.variantsJson ?? []) as Variant[];
   const approvedVariants = (generation.data?.approvedJson ?? []) as Variant[];
   const hasResults = generation.data?.status === "completed" && variants.length > 0;

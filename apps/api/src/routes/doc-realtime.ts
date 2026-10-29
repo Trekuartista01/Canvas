@@ -3,7 +3,7 @@ import { and, eq, isNull } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
 import { can } from "../auth/can";
 import { getSessionUser } from "../auth/session";
-import { attachDocConnection } from "../lib/doc-collab";
+import { attachDocConnection, bufferEarlyMessages } from "../lib/doc-collab";
 import { getMembershipRole } from "../lib/membership";
 
 export function registerDocRealtimeRoutes(app: FastifyInstance) {
@@ -15,6 +15,8 @@ export function registerDocRealtimeRoutes(app: FastifyInstance) {
     "/ws/docs/:docId",
     { websocket: true },
     async (socket, req) => {
+      // Before any await: the client's SyncStep1 can arrive while auth runs.
+      const early = bufferEarlyMessages(socket);
       try {
         const user = await getSessionUser(req);
         const docId = req.params.docId;
@@ -38,7 +40,7 @@ export function registerDocRealtimeRoutes(app: FastifyInstance) {
           return;
         }
 
-        await attachDocConnection(docId, socket);
+        await attachDocConnection(docId, socket, early);
       } catch (err) {
         console.error("[docs] WS handshake failed:", err);
         socket.close(1011, "Internal error");

@@ -36,13 +36,11 @@ export async function ensureBucketExists() {
   // bucket itself allows cross-origin PUTs from the web app's origin.
   // Fastify's own CORS registration (index.ts) is unrelated; this is a
   // bucket-level policy the S3/MinIO server enforces on direct requests.
-  // MinIO (local dev) doesn't implement the S3 PutBucketCors API at all —
-  // confirmed live, it 501s "NotImplemented" — and is configured instead
-  // via the MINIO_API_CORS_ALLOW_ORIGIN server env var in docker-compose.yml.
-  // Real S3/R2 do support this call, so it's still attempted and only
-  // swallowed on failure rather than skipped outright — a provider that
-  // supports it gets it applied for real; one that doesn't (MinIO) falls
-  // back to however its own CORS is configured, without crashing startup.
+  // RustFS (local dev, docker-compose.yml), S3 and R2 all support this call.
+  // It's still only swallowed on failure rather than required, so an
+  // S3-compatible server that doesn't implement it (e.g. MinIO, which 501s
+  // "NotImplemented") falls back to its own server-level CORS config
+  // without crashing startup.
   try {
     await s3.send(
       new PutBucketCorsCommand({
@@ -62,7 +60,7 @@ export async function ensureBucketExists() {
     );
   } catch (err) {
     console.warn(
-      "storage: bucket-level CORS not supported by this S3 endpoint, skipping (fine for MinIO — see docker-compose.yml's MINIO_API_CORS_ALLOW_ORIGIN instead):",
+      "storage: bucket-level CORS not supported by this S3 endpoint, skipping (direct browser uploads need the server's own CORS config instead):",
       err instanceof Error ? err.message : err,
     );
   }

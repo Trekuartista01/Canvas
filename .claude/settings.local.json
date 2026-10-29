@@ -1,0 +1,33 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git -C \"/Users/olsisopi/Desktop/canvas-app\" status)",
+      "Bash(pnpm -v)",
+      "Bash(docker -v)",
+      "Bash(pnpm install *)",
+      "Bash(npx tsr *)",
+      "Bash(pnpm typecheck *)",
+      "Bash(pnpm build *)",
+      "Bash(npm view *)",
+      "Bash(pnpm test *)",
+      "Bash(pnpm lint *)",
+      "Bash(pnpm format:check)",
+      "Bash(npx prettier *)",
+      "Bash(docker compose *)",
+      "Bash(open -a Docker)",
+      "Bash(pnpm --filter @canvas/api dev)",
+      "Bash(disown)",
+      "Read(//tmp/**)",
+      "Bash(curl -s http://localhost:3001/health)",
+      "Bash(curl -s \"http://localhost:3001/trpc/health\")",
+      "Bash(curl -s http://localhost:5183/)",
+      "Bash(curl -s \"http://localhost:5183/trpc/health\")",
+      "Bash(pkill -f \"tsx watch src/index.ts\")",
+      "Bash(pkill -f \"vite$\")",
+      "Bash(jobs -l)",
+      "Bash(xargs ls)",
+      "Bash(xargs -I{} basename {})",
+      "Bash(pnpm check *)"
+    ]
+  }
+}

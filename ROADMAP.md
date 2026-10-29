@@ -60,3 +60,19 @@ Rule: **do not start a phase until the previous phase's acceptance criteria pass
 
 ## Sizing reality check
 Phases 0–2 ≈ 6–8 weeks part-time — that's your usable product. Phases 3–5 ≈ 3–4 months more. Phase 6 as needed. "All ClickUp features" at enterprise polish is a multi-year surface — the phase gates keep you shipping something real the whole way.
+
+## Phase 7 — People (HR) + slim-down (current phase)
+Replaces the separate Seri HR app. Full prompts per milestone: `PHASE7_PROMPTS.md`. Timezone Europe/Belgrade; Kosovo holidays.
+- M7.0a Remove SSO/SCIM, public API/keys/webhooks, importers, GitHub PR links, desktop app, Goals, Chat.
+- M7.0b Drop Docker: Neon + Upstash/Redis + R2 for dev/prod; PM2 + Caddy VPS deploy.
+- M7.1 People roles (super_admin/hr/operation_manager/staff_manager/staff), reports-to, staff profiles, role-based landing + My Tasks.
+- M7.2 Task approval flow (pending → in progress → awaiting approval → completed), proof photo, transfer, collaborators, due time.
+- M7.3 Daily reports + read receipts + 16:45 weekday reminder.
+- M7.4 Kosovo public holidays calendar + notifications + working-days helper.
+- M7.5 Leave management (types, approval, balance rules, carry-over, PDF).
+- M7.6 Contracts (expiry alerts, My Contract) + company document library.
+- M7.7 Payroll (encrypted ID/IBAN, HR-only, audited, Excel/PDF export).
+- M7.8 Performance report, Employee of the Month, Engagements board.
+- M7.9 Seri import (mongodump → Canvas, dry-run first).
+- M7.10 Production deploy.
+- ✅ Accept: staff submits daily report and a proof-backed task, manager approves; leave request deducts working days correctly around a Kosovo holiday; payroll export works for HR only; app runs in prod without Docker.

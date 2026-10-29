@@ -2242,3 +2242,20 @@ Asked to get the project ready for deployment. Found an in-progress, uncommitted
 - `pnpm build` succeeds (both `apps/api` and `apps/web`); manually confirmed the static-serving path resolution against real build output.
 - `pnpm test`: 335/335 API tests passing.
 - Did not run `pnpm test:e2e` or an actual `fly deploy` — out of scope for this pass (prep only, per user).
+
+## 2026-10-19 follow-up #33: local Docker Desktop stack — MinIO image gone, swapped to RustFS — done
+
+Asked to connect the project to Docker Desktop. Docker Desktop (29.8.2, `desktop-linux` context) was running, but `docker compose up` failed: `minio/minio` now 404s on Docker Hub and `quay.io/minio/minio` returns 401 (MinIO stopped publishing public images). CI's e2e job pulls the same image, so it would have been broken too.
+
+- **Replaced the `minio` compose service with `s3` → `rustfs/rustfs:1.0.1`** (S3-compatible, Apache-2.0, same 9000 API / 9001 console ports, same `canvas`/`canvas12345` creds — so `.env`, `env.ts` defaults and `DEPLOYMENT.md`'s dev-default guard are unchanged). Pinned rather than `latest`.
+- Verified against a throwaway container with the app's own `@aws-sdk/client-s3` before switching: create/head bucket, put/get, presigned PUT, and a browser-style CORS preflight from `http://localhost:5183` all pass. **RustFS implements `PutBucketCors`** (MinIO 501'd), so `storage.ts`'s `ensureBucketExists()` now applies the `WEB_URL` CORS rule for real — the old `MINIO_API_CORS_ALLOW_ORIGIN` server env var is gone, no replacement needed.
+- `ci.yml` e2e job: same image + `/health` wait endpoint (was `/minio/health/live`).
+- Volume renamed `minio-data` → `s3-data` (old volume never existed on this machine).
+- Environment note, not a code change: `node_modules` had been corrupted by OneDrive sync (every pnpm junction replaced with a 0-byte file) — fixed with `pnpm install --frozen-lockfile`. Keeping the repo inside a OneDrive folder will likely keep doing this.
+
+### Verified
+
+- `docker compose up -d --wait`: postgres, redis, s3 all healthy.
+- `pnpm db:migrate` applied cleanly to the fresh DB (59 tables).
+- API booted against the stack: `/health` → `{"api":"ok","database":"ok","redis":"ok"}`, `canvas-dev` bucket auto-created, no CORS-skip warning.
+- CI change not verified on GitHub Actions (no push).
