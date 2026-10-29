@@ -1,18 +1,22 @@
-import {
-  boolean,
-  index,
-  jsonb,
-  pgEnum,
-  pgTable,
-  text,
-  timestamp,
-  unique,
-  uuid,
-} from "drizzle-orm/pg-core";
+import { index, jsonb, pgEnum, pgTable, text, timestamp, unique, uuid } from "drizzle-orm/pg-core";
 import { uuidv7 } from "uuidv7";
 import { users } from "./auth";
 
 export const membershipRole = pgEnum("membership_role", ["owner", "admin", "member", "guest"]);
+
+// M7.1 People (HR) role — orthogonal to `membership_role`, which keeps
+// governing workspace/content permissions (rank + custom roles). This one
+// governs the HR side: directory, staff management, leave, payroll, team
+// reporting. Hand-synced with PEOPLE_ROLES in packages/shared. The
+// workspace owner is always treated as super_admin regardless of the value
+// stored here (see effectivePeopleRole).
+export const peopleRole = pgEnum("people_role", [
+  "super_admin",
+  "hr",
+  "operation_manager",
+  "staff_manager",
+  "staff",
+]);
 
 export const workspaces = pgTable("workspaces", {
   id: uuid("id")
@@ -76,10 +80,12 @@ export const memberships = pgTable(
     // of `role`'s rank alone — see can().  `role` stays required regardless
     // (still the floor, and still what owner-protection/invites read).
     customRoleId: uuid("custom_role_id").references(() => customRoles.id, { onDelete: "set null" }),
-    // Who gets notified when a task in this workspace reaches a done-kind
-    // status (task.ts's notifyOperationsManagers) — a flag rather than a
-    // role, since the person doing that job isn't necessarily the owner.
-    isOperationsManager: boolean("is_operations_manager").notNull().default(false),
+    // M7.1: replaces the old is_operations_manager flag — people_role
+    // 'operation_manager' is who task.ts's notifyOperationsManagers reaches.
+    peopleRole: peopleRole("people_role").notNull().default("staff"),
+    // "Reports to" — the direct manager. Staff managers act only on members
+    // whose managerUserId is themselves (can()'s team-scoped people actions).
+    managerUserId: uuid("manager_user_id").references(() => users.id, { onDelete: "set null" }),
   },
   (table) => [
     unique().on(table.workspaceId, table.userId),

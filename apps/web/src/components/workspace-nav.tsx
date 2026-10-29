@@ -1,9 +1,12 @@
+import { useMyAccess } from "@/hooks/use-my-access";
 import { cn } from "@/lib/utils";
-import { trpc } from "@/lib/trpc";
+import type { PeopleAction, WorkspaceAction } from "@canvas/shared";
 import { Link, useRouterState } from "@tanstack/react-router";
 import {
+  CheckSquare,
   ClipboardList,
   Clock3,
+  Contact,
   FileText,
   Gauge,
   Home,
@@ -18,35 +21,90 @@ import {
   type LucideIcon,
 } from "lucide-react";
 
-type NavEntry = { label: string; to: string; icon: LucideIcon };
+// `requires`: shown only when people.myAccess grants that action (M7.1 —
+// each role only sees the sections it can use). No `requires` = everyone.
+type NavEntry = {
+  label: string;
+  to: string;
+  icon: LucideIcon;
+  requires?: WorkspaceAction | PeopleAction;
+};
 
 const NAV_GROUPS: { label: string; entries: NavEntry[] }[] = [
   {
     label: "Work",
     entries: [
-      { label: "Home", to: "/w/$workspaceId", icon: Home },
-      { label: "Dashboards", to: "/w/$workspaceId/dashboards", icon: LayoutGrid },
-      { label: "Workload", to: "/w/$workspaceId/workload", icon: Users },
+      // Home is the team task view managers land on; staff land on My Tasks.
+      { label: "Home", to: "/w/$workspaceId", icon: Home, requires: "report:viewTeam" },
+      { label: "My Tasks", to: "/w/$workspaceId/my-tasks", icon: CheckSquare },
+      {
+        label: "Dashboards",
+        to: "/w/$workspaceId/dashboards",
+        icon: LayoutGrid,
+        requires: "dashboard:view",
+      },
+      {
+        label: "Workload",
+        to: "/w/$workspaceId/workload",
+        icon: Users,
+        requires: "report:viewTeam",
+      },
       { label: "Timesheet", to: "/w/$workspaceId/timesheet", icon: Clock3 },
-      { label: "Automations", to: "/w/$workspaceId/automations", icon: Zap },
-      { label: "Smart Search", to: "/w/$workspaceId/semantic-search", icon: Sparkles },
+      {
+        label: "Automations",
+        to: "/w/$workspaceId/automations",
+        icon: Zap,
+        requires: "automation:view",
+      },
+      {
+        label: "Smart Search",
+        to: "/w/$workspaceId/semantic-search",
+        icon: Sparkles,
+        requires: "task:view",
+      },
+    ],
+  },
+  {
+    label: "People",
+    entries: [
+      {
+        label: "Directory",
+        to: "/w/$workspaceId/people",
+        icon: Contact,
+        requires: "people:viewDirectory",
+      },
     ],
   },
   {
     label: "Collaborate",
     entries: [
-      { label: "Docs", to: "/w/$workspaceId/docs", icon: FileText },
-      { label: "Forms", to: "/w/$workspaceId/forms", icon: ClipboardList },
-      { label: "Brand Kits", to: "/w/$workspaceId/brand-kits", icon: Palette },
-      { label: "Library", to: "/w/$workspaceId/library", icon: Images },
-      { label: "Copywriter", to: "/w/$workspaceId/copywriter", icon: PenSquare },
+      { label: "Docs", to: "/w/$workspaceId/docs", icon: FileText, requires: "doc:view" },
+      { label: "Forms", to: "/w/$workspaceId/forms", icon: ClipboardList, requires: "form:view" },
+      {
+        label: "Brand Kits",
+        to: "/w/$workspaceId/brand-kits",
+        icon: Palette,
+        requires: "brandSettings:view",
+      },
+      {
+        label: "Library",
+        to: "/w/$workspaceId/library",
+        icon: Images,
+        requires: "imageAsset:view",
+      },
+      {
+        label: "Copywriter",
+        to: "/w/$workspaceId/copywriter",
+        icon: PenSquare,
+        requires: "copyGeneration:create",
+      },
     ],
   },
   {
     label: "Platform",
     entries: [
-      { label: "Admin", to: "/w/$workspaceId/admin", icon: Gauge },
-      { label: "Roles", to: "/w/$workspaceId/roles", icon: UserCog },
+      { label: "Admin", to: "/w/$workspaceId/admin", icon: Gauge, requires: "workspace:manage" },
+      { label: "Roles", to: "/w/$workspaceId/roles", icon: UserCog, requires: "customRole:view" },
     ],
   },
 ];
@@ -54,15 +112,7 @@ const NAV_GROUPS: { label: string; entries: NavEntry[] }[] = [
 export function WorkspaceNav({ workspaceId }: { workspaceId: string }) {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const base = `/w/${workspaceId}`;
-
-  // Reuses WorkspaceShell's already-fetched `listMine` cache entry (same
-  // query key, no args) — no extra network request from calling it again
-  // here.
-  const workspaces = trpc.workspace.listMine.useQuery();
-  const myRole = workspaces.data?.find((w) => w.workspace.id === workspaceId)?.role;
-  // Platform (Admin, Roles) — owner/admin only.
-  // Regular members and guests never see this group.
-  const canSeePlatform = myRole === "owner" || myRole === "admin";
+  const access = useMyAccess(workspaceId);
 
   function isActive(to: string) {
     const target = to.replace("$workspaceId", workspaceId);
@@ -70,7 +120,10 @@ export function WorkspaceNav({ workspaceId }: { workspaceId: string }) {
     return pathname === target || pathname.startsWith(`${target}/`);
   }
 
-  const visibleGroups = NAV_GROUPS.filter((group) => group.label !== "Platform" || canSeePlatform);
+  const visibleGroups = NAV_GROUPS.map((group) => ({
+    ...group,
+    entries: group.entries.filter((entry) => !entry.requires || access.can(entry.requires)),
+  })).filter((group) => group.entries.length > 0);
 
   return (
     <nav className="flex flex-col gap-4">

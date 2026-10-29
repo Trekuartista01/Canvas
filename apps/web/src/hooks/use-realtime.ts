@@ -43,6 +43,7 @@ export function useRealtime(workspaceId: string | undefined) {
           if (event.entity === "task") {
             utils.task.get.invalidate({ taskId: event.id });
             utils.task.highlights.invalidate();
+            utils.task.listMine.invalidate();
             // attachment.list is a separate query from task.get/task.list
             // (attachments-section.tsx, clips-section.tsx) — a new
             // attachment publishes a plain "task updated" event (see

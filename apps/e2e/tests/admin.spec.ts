@@ -47,7 +47,8 @@ test("Admin is hidden from regular members (nav + deep link)", async ({ page, br
   expect(match).toBeTruthy();
   await staff.goto(`/w/${match![1]}/admin`);
   await expect(staff.getByTestId("admin-page")).toHaveCount(0);
-  await expect(staff).toHaveURL(new RegExp(`/w/${match![1]}/?$`));
+  // Bounced Home — which in turn sends staff on to My Tasks (M7.1 landing).
+  await expect(staff).toHaveURL(new RegExp(`/w/${match![1]}/my-tasks$`));
 
   await staffCtx.close();
 });

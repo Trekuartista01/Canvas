@@ -1,3 +1,4 @@
+import { PEOPLE_ACTIONS, PEOPLE_ROLES, type PeopleAction, type PeopleRole } from "@canvas/shared";
 import { describe, expect, it } from "vitest";
 import { can, isGrantable } from "./can";
 import type { SessionUser } from "./session";
@@ -233,5 +234,77 @@ describe("can", () => {
       expect(isGrantable("task:create")).toBe(true);
       expect(isGrantable("automation:create")).toBe(true);
     });
+  });
+});
+
+describe("can() — People (M7.1)", () => {
+  const people = (
+    peopleRole: PeopleRole | null,
+    target?: { isSelf: boolean; isDirectReport: boolean },
+  ) => ({ type: "people" as const, peopleRole, target });
+  const report = { isSelf: false, isDirectReport: true };
+  const stranger = { isSelf: false, isDirectReport: false };
+  const self = { isSelf: true, isDirectReport: false };
+
+  // Expected outcome per role for a list-level check (no target).
+  const MATRIX: Record<PeopleAction, PeopleRole[]> = {
+    "people:viewDirectory": ["super_admin", "hr", "operation_manager", "staff_manager"],
+    "people:viewProfile": ["super_admin", "hr", "operation_manager", "staff_manager"],
+    "people:manageStaff": ["super_admin", "hr"],
+    "people:assignSuperAdmin": ["super_admin"],
+    "leave:approve": ["super_admin", "hr", "operation_manager", "staff_manager"],
+    "leave:recordForOthers": ["super_admin", "hr"],
+    "payroll:view": ["super_admin", "hr"],
+    "payroll:manage": ["super_admin", "hr"],
+    "contract:manage": ["super_admin", "hr"],
+    "report:viewTeam": ["super_admin", "hr", "operation_manager", "staff_manager"],
+    "performance:view": ["super_admin", "hr", "operation_manager", "staff_manager"],
+    "holiday:manage": ["super_admin", "hr"],
+    "tasks:manageTeam": ["super_admin", "operation_manager", "staff_manager"],
+  };
+
+  for (const action of PEOPLE_ACTIONS) {
+    it(`${action}: allowed exactly for ${MATRIX[action].join(", ")}`, () => {
+      for (const role of PEOPLE_ROLES) {
+        expect(can(user, action, people(role)), `${role} → ${action}`).toBe(
+          MATRIX[action].includes(role),
+        );
+      }
+    });
+  }
+
+  it("denies everything to a non-member / deactivated member", () => {
+    for (const action of PEOPLE_ACTIONS) {
+      expect(can(user, action, people(null))).toBe(false);
+      expect(can(user, action, people(null, self))).toBe(false);
+    }
+  });
+
+  it("limits a staff manager's team actions to their direct reports", () => {
+    for (const action of [
+      "people:viewProfile",
+      "leave:approve",
+      "report:viewTeam",
+      "performance:view",
+      "tasks:manageTeam",
+    ] as const) {
+      expect(can(user, action, people("staff_manager", report))).toBe(true);
+      expect(can(user, action, people("staff_manager", stranger))).toBe(false);
+    }
+  });
+
+  it("doesn't let a staff manager act on themselves through a team action", () => {
+    expect(can(user, "leave:approve", people("staff_manager", self))).toBe(false);
+  });
+
+  it("doesn't apply the direct-report limit to roles above staff manager", () => {
+    expect(can(user, "leave:approve", people("operation_manager", stranger))).toBe(true);
+    expect(can(user, "people:viewProfile", people("hr", stranger))).toBe(true);
+  });
+
+  it("lets anyone, including staff, view their own profile but nobody else's", () => {
+    expect(can(user, "people:viewProfile", people("staff", self))).toBe(true);
+    expect(can(user, "people:viewProfile", people("staff", stranger))).toBe(false);
+    expect(can(user, "people:viewProfile", people("staff", report))).toBe(false);
   });
 });

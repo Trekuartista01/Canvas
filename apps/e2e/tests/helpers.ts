@@ -14,6 +14,15 @@ export async function signUp(page: Page, name = "E2E Tester", email = uniqueEmai
   return email;
 }
 
+/** Logs in an existing account (e.g. one HR created) and lands on the workspace list. */
+export async function logIn(page: Page, email: string, password: string) {
+  await page.goto("/login");
+  await page.locator("#email").fill(email);
+  await page.locator("#password").fill(password);
+  await page.getByRole("button", { name: "Log in" }).click();
+  await expect(page.getByText(email)).toBeVisible();
+}
+
 export async function createWorkspaceAndOpen(page: Page, name: string) {
   await page.getByRole("link", { name: "New workspace" }).click();
   await page.getByLabel("Workspace name").fill(name);
@@ -63,4 +72,19 @@ export async function createSpaceAndList(page: Page, spaceName: string, listName
   await expect(listLink).toBeVisible();
   await listLink.click();
   await expect(page.getByRole("heading", { name: `# ${listName}` })).toBeVisible();
+}
+
+/**
+ * From inside a workspace: sets a member's people role from their People
+ * profile (M7.1 — e.g. "operation_manager", who hears about finished tasks),
+ * then returns to Home.
+ */
+export async function setPeopleRole(page: Page, memberEmail: string, peopleRole: string) {
+  await page.getByRole("link", { name: "Directory" }).click();
+  await page.getByTestId(`person-row-${memberEmail}`).click();
+  const roleSet = page.waitForResponse((res) => res.url().includes("people.setRole"));
+  await page.locator("#person-role").selectOption(peopleRole);
+  await roleSet;
+  await expect(page.locator("#person-role")).toHaveValue(peopleRole);
+  await page.getByRole("link", { name: "Home", exact: true }).click();
 }

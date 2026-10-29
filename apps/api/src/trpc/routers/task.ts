@@ -35,6 +35,7 @@ import {
   notifyUsers,
   notifyWorkspace,
 } from "../../lib/notify";
+import { getMembershipRole } from "../../lib/membership";
 import { nextOrderKey } from "../../lib/order";
 import { assertCan } from "../../lib/permissions";
 import { computeNextRunAt } from "../../lib/recurrence";
@@ -85,14 +86,9 @@ async function enqueueTaskEmbedding(
   });
 }
 
+// Active members only (M7.1): a deactivated member can't be assigned new work.
 async function requireWorkspaceMember(workspaceId: string, userId: string) {
-  const membership = await db.query.memberships.findFirst({
-    where: and(
-      eq(schema.memberships.workspaceId, workspaceId),
-      eq(schema.memberships.userId, userId),
-    ),
-  });
-  if (!membership) {
+  if (!(await getMembershipRole(workspaceId, userId))) {
     throw new TRPCError({ code: "BAD_REQUEST", message: "User is not a member of this workspace" });
   }
 }
@@ -273,6 +269,40 @@ export const taskRouter = router({
   // always shown together. "Top priority" is urgent tasks OR tasks
   // assigned to the caller (an EXISTS subquery, not a join, so a
   // multi-assignee task doesn't come back as duplicate rows).
+  // M7.1 My Tasks: every task (and subtask) assigned to the caller across
+  // the workspace, any status, soonest due first (undated last). The page
+  // groups these by status kind client-side.
+  listMine: protectedProcedure.input(taskHighlightsSchema).query(async ({ ctx, input }) => {
+    await assertCan(ctx.user, input.workspaceId, "task:view");
+
+    return db
+      .select({
+        id: schema.tasks.id,
+        title: schema.tasks.title,
+        priority: schema.tasks.priority,
+        dueDate: schema.tasks.dueDate,
+        listId: schema.tasks.listId,
+        listName: schema.lists.name,
+        spaceName: schema.spaces.name,
+        statusName: schema.statuses.name,
+        statusKind: schema.statuses.kind,
+        statusColor: schema.statuses.color,
+      })
+      .from(schema.tasks)
+      .innerJoin(schema.taskAssignees, eq(schema.taskAssignees.taskId, schema.tasks.id))
+      .innerJoin(schema.lists, eq(schema.lists.id, schema.tasks.listId))
+      .innerJoin(schema.spaces, eq(schema.spaces.id, schema.lists.spaceId))
+      .innerJoin(schema.statuses, eq(schema.statuses.id, schema.tasks.statusId))
+      .where(
+        and(
+          eq(schema.spaces.workspaceId, input.workspaceId),
+          eq(schema.taskAssignees.userId, ctx.user.id),
+          isNull(schema.tasks.deletedAt),
+        ),
+      )
+      .orderBy(sql`${schema.tasks.dueDate} asc nulls last`, desc(schema.tasks.createdAt));
+  }),
+
   highlights: protectedProcedure.input(taskHighlightsSchema).query(async ({ ctx, input }) => {
     await assertCan(ctx.user, input.workspaceId, "task:view");
 

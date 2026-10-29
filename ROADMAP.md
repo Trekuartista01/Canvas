@@ -65,7 +65,7 @@ Phases 0–2 ≈ 6–8 weeks part-time — that's your usable product. Phases 3�
 Replaces the separate Seri HR app. Full prompts per milestone: `PHASE7_PROMPTS.md`. Timezone Europe/Belgrade; Kosovo holidays.
 - M7.0a Remove SSO/SCIM, public API/keys/webhooks, importers, GitHub PR links, desktop app, Goals, Chat. ✅ Done — these Phase 4–6 items are removed.
 - M7.0b Drop Docker: Supabase Postgres + Cloudflare R2 + local Redis; PM2 + Caddy on an Oracle Always Free VM; nightly DB backup to R2. ✅ Done.
-- M7.1 People roles (super_admin/hr/operation_manager/staff_manager/staff), reports-to, staff profiles, role-based landing + My Tasks.
+- M7.1 People roles (super_admin/hr/operation_manager/staff_manager/staff), reports-to, staff profiles, role-based landing + My Tasks. ✅ Done.
 - M7.2 Task approval flow (pending → in progress → awaiting approval → completed), proof photo, transfer, collaborators, due time.
 - M7.3 Daily reports + read receipts + 16:45 weekday reminder.
 - M7.4 Kosovo public holidays calendar + notifications + working-days helper.

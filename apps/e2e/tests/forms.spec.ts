@@ -1,6 +1,12 @@
 import { expect, test } from "@playwright/test";
 import { fileURLToPath } from "node:url";
-import { createSpaceAndList, createWorkspaceAndOpen, inviteAndGetLink, signUp } from "./helpers";
+import {
+  createSpaceAndList,
+  createWorkspaceAndOpen,
+  inviteAndGetLink,
+  setPeopleRole,
+  signUp,
+} from "./helpers";
 
 const DOC_FIXTURE = fileURLToPath(new URL("../fixtures/test-doc.txt", import.meta.url));
 
@@ -97,9 +103,7 @@ test("task-completion forms: bind a form to a task, an anonymous submitter attac
   await expect(bobPage.getByLabel("Notifications")).toBeVisible();
 
   await page.getByRole("link", { name: "Open" }).click();
-  const opsSet = page.waitForResponse((res) => res.url().includes("setOperationsManager"));
-  await page.getByLabel("Operations Manager: Bob Forms").click();
-  await opsSet;
+  await setPeopleRole(page, bobEmail, "operation_manager");
 
   await createSpaceAndList(page, "Delivery", "Assets");
   await page.getByRole("button", { name: "Board", exact: true }).click();

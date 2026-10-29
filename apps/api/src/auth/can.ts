@@ -1,7 +1,13 @@
-import { ROLE_RANK, type MembershipRole, type WorkspaceAction } from "@canvas/shared";
+import {
+  ROLE_RANK,
+  type MembershipRole,
+  type PeopleAction,
+  type PeopleRole,
+  type WorkspaceAction,
+} from "@canvas/shared";
 import type { SessionUser } from "./session";
 
-export type { WorkspaceAction };
+export type { PeopleAction, WorkspaceAction };
 
 const MIN_ROLE: Record<WorkspaceAction, MembershipRole> = {
   "workspace:invite": "admin",
@@ -154,11 +160,84 @@ export interface WorkspaceResource {
   spaceOverride?: boolean | null;
 }
 
+// M7.1 People (HR) permissions — decided by the member's effective people
+// role (owner ⇒ super_admin), not membership rank, and not grantable through
+// custom roles. `team` marks actions a staff_manager may take only for their
+// own direct reports (memberships.manager_user_id = them): the resource-level
+// half of the check, same "role here, ownership in the caller" split private
+// resources use elsewhere.
+const PEOPLE_MATRIX: Record<PeopleAction, { roles: readonly PeopleRole[]; team?: true }> = {
+  "people:viewDirectory": { roles: ["super_admin", "hr", "operation_manager", "staff_manager"] },
+  // Everyone may also view their own profile — see the isSelf branch below.
+  "people:viewProfile": {
+    roles: ["super_admin", "hr", "operation_manager", "staff_manager"],
+    team: true,
+  },
+  "people:manageStaff": { roles: ["super_admin", "hr"] },
+  // Granting or removing super_admin (or deactivating one) — HR can't mint
+  // a peer above themselves.
+  "people:assignSuperAdmin": { roles: ["super_admin"] },
+  "leave:approve": {
+    roles: ["super_admin", "hr", "operation_manager", "staff_manager"],
+    team: true,
+  },
+  "leave:recordForOthers": { roles: ["super_admin", "hr"] },
+  "payroll:view": { roles: ["super_admin", "hr"] },
+  "payroll:manage": { roles: ["super_admin", "hr"] },
+  "contract:manage": { roles: ["super_admin", "hr"] },
+  "report:viewTeam": {
+    roles: ["super_admin", "hr", "operation_manager", "staff_manager"],
+    team: true,
+  },
+  "performance:view": {
+    roles: ["super_admin", "hr", "operation_manager", "staff_manager"],
+    team: true,
+  },
+  "holiday:manage": { roles: ["super_admin", "hr"] },
+  "tasks:manageTeam": { roles: ["super_admin", "operation_manager", "staff_manager"], team: true },
+};
+
+export interface PeopleResource {
+  type: "people";
+  /** The acting user's effective people role, or null if not an active member. */
+  peopleRole: PeopleRole | null;
+  /**
+   * The member being acted on, when the action targets one person. Omitted
+   * for list-level checks (e.g. "may view team reports at all") — a
+   * staff_manager passes those, and the caller must then scope its query to
+   * their direct reports (see teamScopeFor in lib/permissions.ts).
+   */
+  target?: { isSelf: boolean; isDirectReport: boolean };
+}
+
 export function can(
-  _user: SessionUser,
+  user: SessionUser,
   action: WorkspaceAction,
   resource: WorkspaceResource,
+): boolean;
+export function can(user: SessionUser, action: PeopleAction, resource: PeopleResource): boolean;
+export function can(
+  _user: SessionUser,
+  action: WorkspaceAction | PeopleAction,
+  resource: WorkspaceResource | PeopleResource,
 ): boolean {
+  if (resource.type === "people") {
+    return canPeople(action as PeopleAction, resource);
+  }
+  return canWorkspace(action as WorkspaceAction, resource);
+}
+
+function canPeople(action: PeopleAction, resource: PeopleResource): boolean {
+  if (!resource.peopleRole) return false;
+  if (action === "people:viewProfile" && resource.target?.isSelf) return true;
+
+  const rule = PEOPLE_MATRIX[action];
+  if (!rule.roles.includes(resource.peopleRole)) return false;
+  if (resource.peopleRole !== "staff_manager" || !resource.target) return true;
+  return rule.team === true && resource.target.isDirectReport;
+}
+
+function canWorkspace(action: WorkspaceAction, resource: WorkspaceResource): boolean {
   if (!resource.role) return false;
   if (resource.spaceOverride !== undefined && resource.spaceOverride !== null) {
     return resource.spaceOverride;

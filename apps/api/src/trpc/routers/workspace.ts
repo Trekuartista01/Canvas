@@ -1,16 +1,16 @@
 import { db, schema } from "@canvas/db";
 import {
   acceptInviteSchema,
+  effectivePeopleRole,
   createWorkspaceSchema,
   inviteMemberSchema,
   listMembersSchema,
   removeMemberSchema,
-  setOperationsManagerSchema,
   updateMemberRoleSchema,
 } from "@canvas/shared";
 import { TRPCError } from "@trpc/server";
 import { and, eq, isNull } from "drizzle-orm";
-import { getMembershipRole } from "../../lib/membership";
+import { activeMembershipCondition, findMembership } from "../../lib/membership";
 import { assertCan } from "../../lib/permissions";
 import { isRoleVisibleInWorkspace } from "../../lib/space-overrides";
 import { protectedProcedure, publicProcedure, router } from "../trpc";
@@ -28,19 +28,34 @@ function slugify(name: string) {
 }
 
 export const workspaceRouter = router({
+  // Workspaces where the user is deactivated (M7.1) are left out entirely —
+  // that's the "blocks login for that workspace" half the UI sees.
   listMine: protectedProcedure.query(async ({ ctx }) => {
     const rows = await db
-      .select({ workspace: schema.workspaces, role: schema.memberships.role })
+      .select({
+        workspace: schema.workspaces,
+        role: schema.memberships.role,
+        storedPeopleRole: schema.memberships.peopleRole,
+      })
       .from(schema.memberships)
       .innerJoin(schema.workspaces, eq(schema.workspaces.id, schema.memberships.workspaceId))
-      .where(eq(schema.memberships.userId, ctx.user.id));
-    return rows;
+      .leftJoin(
+        schema.employeeProfiles,
+        eq(schema.employeeProfiles.membershipId, schema.memberships.id),
+      )
+      .where(and(eq(schema.memberships.userId, ctx.user.id), activeMembershipCondition));
+    return rows.map(({ storedPeopleRole, ...row }) => ({
+      ...row,
+      peopleRole: effectivePeopleRole(row.role, storedPeopleRole),
+    }));
   }),
 
+  // Active members only — this feeds every member picker (assignees,
+  // mentions, reports-to), which must not offer a deactivated member.
   members: protectedProcedure.input(listMembersSchema).query(async ({ ctx, input }) => {
     await assertCan(ctx.user, input.workspaceId, "hierarchy:view");
 
-    return db
+    const rows = await db
       .select({
         userId: schema.users.id,
         name: schema.users.name,
@@ -49,12 +64,20 @@ export const workspaceRouter = router({
         role: schema.memberships.role,
         customRoleId: schema.memberships.customRoleId,
         customRoleName: schema.customRoles.name,
-        isOperationsManager: schema.memberships.isOperationsManager,
+        storedPeopleRole: schema.memberships.peopleRole,
       })
       .from(schema.memberships)
       .innerJoin(schema.users, eq(schema.users.id, schema.memberships.userId))
       .leftJoin(schema.customRoles, eq(schema.customRoles.id, schema.memberships.customRoleId))
-      .where(eq(schema.memberships.workspaceId, input.workspaceId));
+      .leftJoin(
+        schema.employeeProfiles,
+        eq(schema.employeeProfiles.membershipId, schema.memberships.id),
+      )
+      .where(and(eq(schema.memberships.workspaceId, input.workspaceId), activeMembershipCondition));
+    return rows.map(({ storedPeopleRole, ...row }) => ({
+      ...row,
+      peopleRole: effectivePeopleRole(row.role, storedPeopleRole),
+    }));
   }),
 
   create: protectedProcedure.input(createWorkspaceSchema).mutation(async ({ ctx, input }) => {
@@ -169,7 +192,9 @@ export const workspaceRouter = router({
       });
     }
 
-    const existingMembership = await getMembershipRole(invite.workspaceId, ctx.user.id);
+    // Raw lookup: a deactivated member re-accepting an old invite stays
+    // deactivated rather than hitting the unique constraint.
+    const existingMembership = await findMembership(invite.workspaceId, ctx.user.id);
     if (!existingMembership) {
       await db.insert(schema.memberships).values({
         workspaceId: invite.workspaceId,
@@ -203,7 +228,7 @@ export const workspaceRouter = router({
     .mutation(async ({ ctx, input }) => {
       await assertCan(ctx.user, input.workspaceId, "workspace:manage");
 
-      const targetRole = await getMembershipRole(input.workspaceId, input.userId);
+      const targetRole = (await findMembership(input.workspaceId, input.userId))?.role;
       if (!targetRole) throw new TRPCError({ code: "NOT_FOUND" });
       if (targetRole === "owner") {
         throw new TRPCError({
@@ -233,34 +258,10 @@ export const workspaceRouter = router({
       return { userId: input.userId, role: input.role };
     }),
 
-  // Who task.ts's notifyOperationsManagers reaches when a task hits a
-  // done-kind status — same admin-tier gate as updateMemberRole/removeMember
-  // since it's changing another member's standing in the workspace.
-  setOperationsManager: protectedProcedure
-    .input(setOperationsManagerSchema)
-    .mutation(async ({ ctx, input }) => {
-      await assertCan(ctx.user, input.workspaceId, "workspace:manage");
-
-      const targetRole = await getMembershipRole(input.workspaceId, input.userId);
-      if (!targetRole) throw new TRPCError({ code: "NOT_FOUND" });
-
-      await db
-        .update(schema.memberships)
-        .set({ isOperationsManager: input.isOperationsManager })
-        .where(
-          and(
-            eq(schema.memberships.workspaceId, input.workspaceId),
-            eq(schema.memberships.userId, input.userId),
-          ),
-        );
-
-      return { userId: input.userId, isOperationsManager: input.isOperationsManager };
-    }),
-
   removeMember: protectedProcedure.input(removeMemberSchema).mutation(async ({ ctx, input }) => {
     await assertCan(ctx.user, input.workspaceId, "workspace:manage");
 
-    const targetRole = await getMembershipRole(input.workspaceId, input.userId);
+    const targetRole = (await findMembership(input.workspaceId, input.userId))?.role;
     if (!targetRole) throw new TRPCError({ code: "NOT_FOUND" });
     if (targetRole === "owner") {
       throw new TRPCError({ code: "BAD_REQUEST", message: "The workspace owner can't be removed" });

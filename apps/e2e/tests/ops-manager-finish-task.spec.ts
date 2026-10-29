@@ -1,7 +1,13 @@
 import { expect, test } from "@playwright/test";
-import { createSpaceAndList, createWorkspaceAndOpen, inviteAndGetLink, signUp } from "./helpers";
+import {
+  createSpaceAndList,
+  createWorkspaceAndOpen,
+  inviteAndGetLink,
+  setPeopleRole,
+  signUp,
+} from "./helpers";
 
-test("marking a member Operations Manager notifies them when a task is finished via the Finish button", async ({
+test("making a member an Operations Manager notifies them when a task is finished via the Finish button", async ({
   page,
   browser,
 }) => {
@@ -21,12 +27,10 @@ test("marking a member Operations Manager notifies them when a task is finished 
   await bobPage.getByRole("link", { name: "Open" }).click();
   await expect(bobPage.getByLabel("Notifications")).toBeVisible();
 
-  // Nia flags Bob as Operations Manager from the workspace home's Members panel.
+  // Nia makes Bob an Operations Manager (M7.1: a people role, set from his
+  // People profile) — that's who hears about finished tasks.
   await page.getByRole("link", { name: "Open" }).click();
-  const opsSet = page.waitForResponse((res) => res.url().includes("setOperationsManager"));
-  await page.getByLabel("Operations Manager: Bob Ops").click();
-  await opsSet;
-  await expect(page.getByLabel("Operations Manager: Bob Ops")).toBeChecked();
+  await setPeopleRole(page, bobEmail, "operation_manager");
 
   await createSpaceAndList(page, "Ops", "Sprint");
   await page.getByRole("button", { name: "Board", exact: true }).click();

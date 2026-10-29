@@ -2327,3 +2327,36 @@ Developers no longer need Docker. Dev runs `pnpm dev` (api + web + worker via tu
 - Against a live Supabase project (TLS handshake, Session pooler, `CREATE EXTENSION` there) and live R2 (presigned PUT/GET, CORS). Both are covered by config and docs only. First real run will be when `.env` is pointed at `canvas-dev`.
 - PM2 itself and Caddy (not installed on this machine); Oracle VM steps are M7.10.
 - CI changes on GitHub Actions (push still blocked).
+
+## 2026-10-29 M7.1: People roles, reporting lines, staff profiles — done
+
+### Built
+
+- **Schema** (migrations `0055` + `0056`, split in two so drizzle-kit didn't need an interactive "rename or create?" prompt): `people_role` enum (`super_admin`/`hr`/`operation_manager`/`staff_manager`/`staff`) on `memberships`, default `staff`; `memberships.manager_user_id` ("reports to", FK users, `on delete set null`); new `employee_profiles` table (1:1 with membership: phone, address, date of birth, job title, department, employment start, emergency contact name/phone, `status` active/inactive, `deactivated_at`). `0055` copies every `is_operations_manager = true` (non-owner) membership into `people_role = 'operation_manager'`; `0056` drops the flag. Local DB: 10 flagged → 10 operation managers.
+- **Owner ⇒ super_admin** always, via `effectivePeopleRole()` (shared), whatever is stored. It's computed rather than stored so ownership transfer can't leave a stale role behind.
+- **Permissions**: `can()` takes a second resource type, `{ type: "people", peopleRole, target? }`, with its own closed action set `PEOPLE_ACTIONS` (people:viewDirectory/viewProfile/manageStaff/assignSuperAdmin, leave:approve/recordForOthers, payroll:view/manage, contract:manage, report:viewTeam, performance:view, holiday:manage, tasks:manageTeam). These are decided by people role, not membership rank, and are **not** grantable via custom roles. Team-scoped actions let a `staff_manager` act only when `target.isDirectReport` (`assertCanPeople` resolves this from `manager_user_id`); a list-level check passes them, and the caller scopes with `teamScopeFor()`. A staff manager can't use a team action on themselves; anyone can view their own profile. `people:assignSuperAdmin` (super_admin only) guards granting/removing/deactivating a super admin, so HR can't mint a peer above themselves. Full role × action matrix unit-tested (`can.test.ts`, 18 new tests) plus `wouldCreateReportingCycle`/`effectivePeopleRole` (shared).
+- **Deactivation**: `lib/membership.ts`'s active-only helpers (`getMembershipRole`/`getMembershipContext`/`getPeopleContext`) treat an inactive profile as a non-member, so every `assertCan`/`can()` fails for that workspace. `workspace.listMine` hides the workspace, `workspace.members` (every picker) hides the member, assigning them is refused, notifications (`notifyWorkspace`, ops managers) skip them. Membership, tasks, comments and activity are untouched; reactivating restores access as before. Raw `findMembership()` is used only where an inactive member must still be found (HR actions, invite re-accept, owner/removal guards). The owner and yourself can't be deactivated.
+- **`people` router**: `myAccess` (every workspace + people action the caller holds, which drives the UI), `directory`, `profile` (personal fields only for HR-side roles and the person themselves), `createStaff`, `updateProfile`, `setRole`, `setManager` (active member, no reporting loops), `setStatus`. Every mutation writes an `activity` row (`person.created/profile_updated/role_changed/manager_changed/deactivated/reactivated`, entity type `person`).
+- **HR creates accounts directly** (name, email, initial password, role, reports-to, profile fields). An email that already has an account is refused with "invite them instead": attaching someone's existing account without their consent is the takeover shape follow-up #29 closed for SSO.
+- **`is_operations_manager` → people role**: `notifyOperationsManagers` now reads `people_role = 'operation_manager'`. The Members panel's Ops Manager checkbox and `workspace.setOperationsManager` are gone; the panel shows a people-role badge instead. Roles are set on the People profile.
+- **UI**: "People" nav group → Directory (virtualized, search, active/all filter, Add staff form for HR). Profile page shows details; for HR it also has the role + reports-to editor, profile edit form and deactivate/reactivate. Nav entries are now filtered by `people.myAccess` (each role only sees sections it can use: Home/Workload need `report:viewTeam`, Admin `workspace:manage`, Roles `customRole:view`, Directory `people:viewDirectory`, content sections their `*:view` action). The server still checks every call.
+- **Landing**: Home is the team view. Managers (super_admin/hr/operation_manager/staff_manager) land there; `staff` are redirected to the new **My Tasks** page (`task.listMine`: every task/subtask assigned to me across the workspace, grouped by status kind, soonest due first, virtualized, live via realtime). My Tasks links to the user's own profile (staff have no Directory).
+
+### Decisions
+
+- Landing applies when a workspace is opened (`/w/:id`), not on the post-login workspace list. The list stays the multi-workspace hub; "Open" then lands each role correctly.
+- Existing members all start as `staff` (the default the brief specifies), so existing non-owner admins/members now land on My Tasks until HR gives them a manager-side role.
+- My Tasks groups by status **kind** (In progress / To do / Done / Closed): statuses are per list, so a cross-list page can't group by status name meaningfully.
+- Directory is visible to every manager-side role (it's a phone book); personal fields (phone, address, DOB, emergency contact) are limited to HR/super admin and the person themselves.
+- Existing specs updated for the new model: `ops-manager-finish-task` and `forms` set the operation-manager role via the People profile (new `setPeopleRole` e2e helper) instead of the removed checkbox. `admin.spec`'s deep-link bounce now ends on My Tasks, since the invited member is staff.
+
+### Verified
+
+- `pnpm check` green; `pnpm test`: API 296 (+18 People matrix), shared 65 (+5), db 7, web 15.
+- New `people.spec.ts`: owner adds an HR account → HR signs in with the initial password (lands on the team view) → creates a staff manager and a staff member → sets the staff member's reports-to from their profile → staff signs in and lands on **My Tasks** with no Directory/Home in the nav → HR deactivates them → the workspace disappears from their list.
+- Full Playwright run at CI parity (`CI=1`, retries off): **68/68 passed**.
+- `0055`/`0056` applied to the local DB with data: 10 Ops Manager flags → 10 `operation_manager` roles.
+
+### TODO / next
+
+- `teamScopeFor()` is in place but no list-level team view consumes it yet. The leave/report/performance milestones (7.3, 7.5, 7.8) are its first users.

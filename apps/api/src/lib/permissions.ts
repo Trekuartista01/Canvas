@@ -1,10 +1,10 @@
 import { db, schema } from "@canvas/db";
 import { TRPCError } from "@trpc/server";
-import { eq } from "drizzle-orm";
-import type { WorkspaceAction } from "../auth/can";
+import { and, eq } from "drizzle-orm";
+import type { PeopleAction, WorkspaceAction } from "../auth/can";
 import { can } from "../auth/can";
 import type { SessionUser } from "../auth/session";
-import { getMembershipContext } from "./membership";
+import { findMembership, getMembershipContext, getPeopleContext } from "./membership";
 import { getCustomRoleDeltas, getSpaceOverrideForMembership } from "./space-overrides";
 
 /**
@@ -49,6 +49,8 @@ export async function assertCanInAnyWorkspace(user: SessionUser, action: Workspa
   });
 
   for (const membership of memberships) {
+    // A deactivated member (M7.1) has no standing in that workspace.
+    if (!(await findMembership(membership.workspaceId, user.id))?.active) continue;
     const customRole = membership.customRoleId
       ? await getCustomRoleDeltas(membership.customRoleId)
       : null;
@@ -58,4 +60,53 @@ export async function assertCanInAnyWorkspace(user: SessionUser, action: Workspa
   }
 
   throw new TRPCError({ code: "FORBIDDEN" });
+}
+
+/**
+ * M7.1 People actions. With `targetUserId`, resolves the resource-level half
+ * of the check — whether the target is the caller themselves or one of their
+ * direct reports — so a staff manager only passes for their own team. Without
+ * it, it's a list-level check: a staff manager passes, and the caller must
+ * scope its query with teamScopeFor().
+ */
+export async function assertCanPeople(
+  user: SessionUser,
+  workspaceId: string,
+  action: PeopleAction,
+  opts?: { targetUserId?: string },
+) {
+  const people = await getPeopleContext(workspaceId, user.id);
+  let target: { isSelf: boolean; isDirectReport: boolean } | undefined;
+  if (opts?.targetUserId) {
+    const targetMembership = await findMembership(workspaceId, opts.targetUserId);
+    if (!targetMembership) throw new TRPCError({ code: "NOT_FOUND" });
+    target = {
+      isSelf: opts.targetUserId === user.id,
+      isDirectReport: targetMembership.managerUserId === user.id,
+    };
+  }
+
+  if (!can(user, action, { type: "people", peopleRole: people?.peopleRole ?? null, target })) {
+    throw new TRPCError({ code: "FORBIDDEN" });
+  }
+  return people!;
+}
+
+/**
+ * For a list-level team action the caller already passed: null means "the
+ * whole workspace", otherwise only these members (a staff manager's direct
+ * reports) may be shown.
+ */
+export async function teamScopeFor(workspaceId: string, userId: string, peopleRole: string) {
+  if (peopleRole !== "staff_manager") return null;
+  const reports = await db
+    .select({ userId: schema.memberships.userId })
+    .from(schema.memberships)
+    .where(
+      and(
+        eq(schema.memberships.workspaceId, workspaceId),
+        eq(schema.memberships.managerUserId, userId),
+      ),
+    );
+  return reports.map((r) => r.userId);
 }

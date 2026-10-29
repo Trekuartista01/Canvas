@@ -3,8 +3,10 @@ import { MembersPanel } from "@/components/members-panel";
 import { TaskHighlightRow } from "@/components/task-highlight-row";
 import { TemplatesPanel } from "@/components/templates-panel";
 import { Card } from "@/components/ui/card";
+import { useMyAccess } from "@/hooks/use-my-access";
 import { trpc } from "@/lib/trpc";
-import { createRoute, Link } from "@tanstack/react-router";
+import { MANAGER_PEOPLE_ROLES } from "@canvas/shared";
+import { createRoute, Link, Navigate } from "@tanstack/react-router";
 import type { inferRouterOutputs } from "@trpc/server";
 import { ChevronRight, ListChecks, Palette, Sparkles } from "lucide-react";
 import { useMemo } from "react";
@@ -70,6 +72,14 @@ function WorkspaceHome() {
     () => new Map((members.data ?? []).map((m) => [m.userId, m.name])),
     [members.data],
   );
+  const access = useMyAccess(workspaceId);
+
+  // M7.1 role-based landing: this Home page is the team task view managers
+  // land on; staff go straight to their own My Tasks.
+  if (access.isLoading) return null;
+  if (access.peopleRole && !MANAGER_PEOPLE_ROLES.includes(access.peopleRole)) {
+    return <Navigate to="/w/$workspaceId/my-tasks" params={{ workspaceId }} replace />;
+  }
 
   return (
     <div className="space-y-8 p-6">

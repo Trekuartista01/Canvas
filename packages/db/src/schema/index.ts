@@ -19,3 +19,4 @@ export * from "./automations";
 export * from "./dashboards";
 export * from "./embeddings";
 export * from "./copywriter";
+export * from "./people";

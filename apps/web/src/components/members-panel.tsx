@@ -1,5 +1,5 @@
 import type { AppRouter } from "@canvas/api";
-import { MEMBERSHIP_ROLES, type MembershipRole } from "@canvas/shared";
+import { MEMBERSHIP_ROLES, PEOPLE_ROLE_LABELS, type MembershipRole } from "@canvas/shared";
 import { trpc } from "@/lib/trpc";
 import type { inferRouterOutputs } from "@trpc/server";
 
@@ -28,7 +28,6 @@ export function MembersPanel({ workspaceId }: { workspaceId: string }) {
   const updateRole = trpc.workspace.updateMemberRole.useMutation({ onSuccess: invalidate });
   const removeMember = trpc.workspace.removeMember.useMutation({ onSuccess: invalidate });
   const assignCustomRole = trpc.role.assignToMember.useMutation({ onSuccess: invalidate });
-  const setOpsManager = trpc.workspace.setOperationsManager.useMutation({ onSuccess: invalidate });
 
   return (
     <div className="w-full max-w-md space-y-2 p-6">
@@ -85,24 +84,6 @@ export function MembersPanel({ workspaceId }: { workspaceId: string }) {
                     )}
                   </>
                 )}
-                <label
-                  className="flex items-center gap-1 text-xs whitespace-nowrap"
-                  title="Gets notified when a task is finished"
-                >
-                  <input
-                    type="checkbox"
-                    checked={m.isOperationsManager}
-                    aria-label={`Operations Manager: ${m.name}`}
-                    onChange={(e) =>
-                      setOpsManager.mutate({
-                        workspaceId,
-                        userId: m.userId,
-                        isOperationsManager: e.target.checked,
-                      })
-                    }
-                  />
-                  Ops Manager
-                </label>
                 {m.role !== "owner" && (
                   <button
                     type="button"
@@ -117,12 +98,9 @@ export function MembersPanel({ workspaceId }: { workspaceId: string }) {
               </div>
             ) : (
               <span className="flex shrink-0 items-center gap-1.5 text-xs">
-                {m.isOperationsManager && (
-                  <span
-                    className="bg-accent-soft text-accent rounded-full px-1.5 py-0.5 text-[10px] font-medium"
-                    title="Gets notified when a task is finished"
-                  >
-                    Ops
+                {m.peopleRole !== "staff" && (
+                  <span className="bg-accent-soft text-accent rounded-full px-1.5 py-0.5 text-[10px] font-medium">
+                    {PEOPLE_ROLE_LABELS[m.peopleRole]}
                   </span>
                 )}
                 <span className="text-muted-foreground uppercase">
