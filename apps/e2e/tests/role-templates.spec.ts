@@ -53,8 +53,7 @@ test("Role templates: Staff can't create tasks or see Platform pages; Finance Ma
   await bobPage.getByRole("link", { name: "Open" }).click();
   await expect(bobPage.getByRole("link", { name: "Brand Kits", exact: true })).toBeVisible();
   await expect(bobPage.getByRole("link", { name: "Roles" })).not.toBeVisible();
-  await expect(bobPage.getByRole("link", { name: "Developer" })).not.toBeVisible();
-  await expect(bobPage.getByRole("link", { name: "Import" })).not.toBeVisible();
+  await expect(bobPage.getByRole("link", { name: "Admin", exact: true })).not.toBeVisible();
 
   await bobPage.getByRole("link", { name: "Sprint" }).click();
   await bobPage.getByRole("button", { name: "Board", exact: true }).click();

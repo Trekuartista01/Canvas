@@ -155,18 +155,6 @@ describe("can", () => {
     expect(can(user, "doc:delete", { type: "workspace", role: "guest" })).toBe(false);
   });
 
-  it("allows guests to view channels and post messages, but only members can create channels", () => {
-    expect(can(user, "channel:view", { type: "workspace", role: "guest" })).toBe(true);
-    expect(can(user, "channel:create", { type: "workspace", role: "guest" })).toBe(false);
-    expect(can(user, "channel:create", { type: "workspace", role: "member" })).toBe(true);
-    expect(can(user, "message:create", { type: "workspace", role: "guest" })).toBe(true);
-  });
-
-  it("allows guests to start a DM, same tier as posting a message", () => {
-    expect(can(user, "dm:create", { type: "workspace", role: "guest" })).toBe(true);
-    expect(can(user, "dm:create", { type: "workspace", role: null })).toBe(false);
-  });
-
   describe("custom role grants/revokes (Phase 6)", () => {
     it("grants a guest an action their base rank would normally deny", () => {
       const resource = {
@@ -239,15 +227,11 @@ describe("can", () => {
   describe("isGrantable", () => {
     it("excludes owner-tier actions from being grantable via custom role or space override", () => {
       expect(isGrantable("workspace:delete")).toBe(false);
-      expect(isGrantable("sso:update")).toBe(false);
-      expect(isGrantable("scimToken:create")).toBe(false);
-      expect(isGrantable("scimToken:delete")).toBe(false);
     });
 
     it("allows admin-tier-and-below actions to be granted", () => {
       expect(isGrantable("task:create")).toBe(true);
       expect(isGrantable("automation:create")).toBe(true);
-      expect(isGrantable("apiKey:create")).toBe(true);
     });
   });
 });

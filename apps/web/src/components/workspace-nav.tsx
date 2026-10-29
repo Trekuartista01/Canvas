@@ -4,19 +4,14 @@ import { Link, useRouterState } from "@tanstack/react-router";
 import {
   ClipboardList,
   Clock3,
-  Code2,
   FileText,
   Gauge,
   Home,
   Images,
   LayoutGrid,
-  MessageSquare,
   Palette,
   PenSquare,
-  ShieldCheck,
   Sparkles,
-  Target,
-  UploadCloud,
   UserCog,
   Users,
   Zap,
@@ -31,7 +26,6 @@ const NAV_GROUPS: { label: string; entries: NavEntry[] }[] = [
     entries: [
       { label: "Home", to: "/w/$workspaceId", icon: Home },
       { label: "Dashboards", to: "/w/$workspaceId/dashboards", icon: LayoutGrid },
-      { label: "Goals", to: "/w/$workspaceId/goals", icon: Target },
       { label: "Workload", to: "/w/$workspaceId/workload", icon: Users },
       { label: "Timesheet", to: "/w/$workspaceId/timesheet", icon: Clock3 },
       { label: "Automations", to: "/w/$workspaceId/automations", icon: Zap },
@@ -42,7 +36,6 @@ const NAV_GROUPS: { label: string; entries: NavEntry[] }[] = [
     label: "Collaborate",
     entries: [
       { label: "Docs", to: "/w/$workspaceId/docs", icon: FileText },
-      { label: "Chat", to: "/w/$workspaceId/chat", icon: MessageSquare },
       { label: "Forms", to: "/w/$workspaceId/forms", icon: ClipboardList },
       { label: "Brand Kits", to: "/w/$workspaceId/brand-kits", icon: Palette },
       { label: "Library", to: "/w/$workspaceId/library", icon: Images },
@@ -53,9 +46,6 @@ const NAV_GROUPS: { label: string; entries: NavEntry[] }[] = [
     label: "Platform",
     entries: [
       { label: "Admin", to: "/w/$workspaceId/admin", icon: Gauge },
-      { label: "Import", to: "/w/$workspaceId/import", icon: UploadCloud },
-      { label: "Developer", to: "/w/$workspaceId/developer", icon: Code2 },
-      { label: "Security", to: "/w/$workspaceId/security", icon: ShieldCheck },
       { label: "Roles", to: "/w/$workspaceId/roles", icon: UserCog },
     ],
   },
@@ -70,7 +60,7 @@ export function WorkspaceNav({ workspaceId }: { workspaceId: string }) {
   // here.
   const workspaces = trpc.workspace.listMine.useQuery();
   const myRole = workspaces.data?.find((w) => w.workspace.id === workspaceId)?.role;
-  // Platform (Admin, Import, Developer, Security, Roles) — owner/admin only.
+  // Platform (Admin, Roles) — owner/admin only.
   // Regular members and guests never see this group.
   const canSeePlatform = myRole === "owner" || myRole === "admin";
 

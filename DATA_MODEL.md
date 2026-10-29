@@ -1,5 +1,7 @@
 # DATA_MODEL.md — Postgres schema (Drizzle-ready)
 
+> **Removed in M7.0a (Phase 7):** SAML SSO + SCIM, public REST API + API keys + webhooks, importers, GitHub PR links, Tauri desktop app, Goals/OKRs, and Chat (channels, threads, DMs, chat attachments, Brain-in-chat). Mentions of these below are historical.
+
 Conventions: UUIDv7 PKs (`id`), `created_at`/`updated_at` timestamptz on all tables, `deleted_at` for soft-deletable entities. FKs `on delete cascade` unless noted.
 
 ## Core

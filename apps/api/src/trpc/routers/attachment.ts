@@ -11,7 +11,6 @@ import { asc, eq } from "drizzle-orm";
 import { uuidv7 } from "uuidv7";
 import { logActivity } from "../../lib/activity";
 import { requireAttachmentTarget } from "../../lib/attachment-auth";
-import { isChannelMember, requireChannel, requireMessage } from "../../lib/chat-queries";
 import { parseDriveLink } from "../../lib/drive-link";
 import { processImage } from "../../lib/image-processing";
 import { sanitizeFilenameForKey } from "../../lib/filename";
@@ -34,24 +33,7 @@ async function bufferFromStream(body: unknown): Promise<Buffer> {
 }
 
 export const attachmentRouter = router({
-  // Exactly one of taskId/messageId — see listAttachmentsSchema.
   list: protectedProcedure.input(listAttachmentsSchema).query(async ({ ctx, input }) => {
-    if (input.messageId) {
-      const message = await requireMessage(input.messageId);
-      const channel = await requireChannel(message.channelId);
-      await assertCan(ctx.user, channel.workspaceId, "channel:view");
-      if (channel.isPrivate && !(await isChannelMember(channel.id, ctx.user.id))) {
-        throw new TRPCError({ code: "FORBIDDEN" });
-      }
-      return db.query.attachments.findMany({
-        where: eq(schema.attachments.messageId, input.messageId),
-        orderBy: asc(schema.attachments.createdAt),
-      });
-    }
-
-    if (!input.taskId) {
-      throw new TRPCError({ code: "BAD_REQUEST", message: "taskId or messageId is required" });
-    }
     const workspaceId = await workspaceIdForTask(input.taskId);
     await assertCan(ctx.user, workspaceId, "attachment:view");
 
@@ -81,23 +63,15 @@ export const attachmentRouter = router({
       "attachment.deleted",
     );
 
-    // Same reuse-the-task/message-event trick confirmUpload below uses —
-    // without this, a deleted attachment stays visible to every other
-    // connected client until they reload.
+    // Same reuse-the-task-event trick confirmUpload below uses — without
+    // this, a deleted attachment stays visible to every other connected
+    // client until they reload.
     if (attachment.taskId) {
       const task = await requireTask(attachment.taskId);
       await publish(attachment.workspaceId, {
         entity: "task",
         id: attachment.taskId,
         listId: task.listId,
-        kind: "updated",
-      });
-    } else if (attachment.messageId) {
-      const message = await requireMessage(attachment.messageId);
-      await publish(attachment.workspaceId, {
-        entity: "message",
-        id: attachment.messageId,
-        channelId: message.channelId,
         kind: "updated",
       });
     }
@@ -110,10 +84,7 @@ export const attachmentRouter = router({
   // unreferenced (harmless, cheap) object in the bucket, not a phantom
   // attachment row.
   presignUpload: protectedProcedure.input(presignUploadSchema).mutation(async ({ ctx, input }) => {
-    const { workspaceId } = await requireAttachmentTarget(ctx.user, {
-      taskId: input.taskId,
-      messageId: input.messageId,
-    });
+    const { workspaceId } = await requireAttachmentTarget(ctx.user, { taskId: input.taskId });
 
     const attachmentId = uuidv7();
     const key = `attachments/${workspaceId}/${attachmentId}/${sanitizeFilenameForKey(input.fileName)}`;
@@ -131,10 +102,7 @@ export const attachmentRouter = router({
   // buffered-upload route used inline — a cost only image uploads pay;
   // the large 3D/video files this flow exists for never hit this branch.
   confirmUpload: protectedProcedure.input(confirmUploadSchema).mutation(async ({ ctx, input }) => {
-    const { workspaceId } = await requireAttachmentTarget(ctx.user, {
-      taskId: input.taskId,
-      messageId: input.messageId,
-    });
+    const { workspaceId } = await requireAttachmentTarget(ctx.user, { taskId: input.taskId });
 
     const head = await headObject(input.key);
     if (!head) {
@@ -161,8 +129,7 @@ export const attachmentRouter = router({
       .values({
         id: input.attachmentId,
         workspaceId,
-        taskId: input.taskId ?? null,
-        messageId: input.messageId ?? null,
+        taskId: input.taskId,
         uploaderId: ctx.user.id,
         fileKey: input.key,
         fileName: input.fileName,
@@ -181,30 +148,17 @@ export const attachmentRouter = router({
     // Pre-existing gap this touches while it's here: neither the old
     // /uploads route nor this one ever published a realtime event, so
     // an attachment only ever showed up for the person who uploaded it
-    // — anyone else viewing the same task/message needed a manual
-    // reload. Reusing the task/message entity types rather than
-    // inventing an "attachment" one: both client invalidation branches
-    // already exist (use-realtime.ts), so a task event here also
-    // refreshes attachment.list, and a message event refreshes
-    // chat.message.list, which already embeds each message's
-    // attachments.
-    if (input.taskId) {
-      const task = await requireTask(input.taskId);
-      await publish(workspaceId, {
-        entity: "task",
-        id: input.taskId,
-        listId: task.listId,
-        kind: "updated",
-      });
-    } else if (input.messageId) {
-      const message = await requireMessage(input.messageId);
-      await publish(workspaceId, {
-        entity: "message",
-        id: input.messageId,
-        channelId: message.channelId,
-        kind: "updated",
-      });
-    }
+    // — anyone else viewing the same task needed a manual reload. Reusing
+    // the task entity type rather than inventing an "attachment" one: the
+    // client's task invalidation branch (use-realtime.ts) also refreshes
+    // attachment.list.
+    const task = await requireTask(input.taskId);
+    await publish(workspaceId, {
+      entity: "task",
+      id: input.taskId,
+      listId: task.listId,
+      kind: "updated",
+    });
 
     return attachment;
   }),

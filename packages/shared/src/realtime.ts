@@ -3,7 +3,7 @@ import { z } from "zod";
 // ARCHITECTURE.md: "server emits { entity: 'task', id, listId, kind:
 // 'updated' }; clients invalidate queries. No payloads over WS in Phase 1."
 // A discriminated union so each entity carries only the scoping id its
-// invalidation actually needs — M4.3's chat messages scope by channelId,
+// invalidation actually needs — comments/checklists scope by taskId,
 // not listId.
 export const REALTIME_KINDS = ["created", "updated", "deleted"] as const;
 
@@ -15,12 +15,6 @@ export const realtimeEventSchema = z.discriminatedUnion("entity", [
     entity: z.literal("status"),
     id: z.string().uuid(),
     listId: z.string().uuid(),
-    kind,
-  }),
-  z.object({
-    entity: z.literal("message"),
-    id: z.string().uuid(),
-    channelId: z.string().uuid(),
     kind,
   }),
   z.object({

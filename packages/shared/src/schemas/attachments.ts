@@ -1,10 +1,7 @@
 import { z } from "zod";
 
-// Exactly one of taskId/messageId — an attachment belongs to a task or a
-// chat message, never both (enforced server-side in attachment.ts).
 export const listAttachmentsSchema = z.object({
-  taskId: z.string().uuid().optional(),
-  messageId: z.string().uuid().optional(),
+  taskId: z.string().uuid(),
 });
 
 // A sanity ceiling on the presigned-upload flow below, not a technical
@@ -22,30 +19,20 @@ export const MAX_ATTACHMENT_UPLOAD_BYTES = 20 * 1024 ** 3;
 // (via a HEAD request — never trusts the client's say-so), and only then
 // creates the `attachments` row. No file bytes ever pass through a tRPC
 // procedure; those are both plain JSON in/out.
-export const presignUploadSchema = z
-  .object({
-    taskId: z.string().uuid().optional(),
-    messageId: z.string().uuid().optional(),
-    fileName: z.string().trim().min(1).max(300),
-    mime: z.string().trim().min(1).max(200),
-    sizeBytes: z.number().int().positive().max(MAX_ATTACHMENT_UPLOAD_BYTES),
-  })
-  .refine((v) => !!v.taskId !== !!v.messageId, {
-    message: "Provide exactly one of taskId or messageId",
-  });
+export const presignUploadSchema = z.object({
+  taskId: z.string().uuid(),
+  fileName: z.string().trim().min(1).max(300),
+  mime: z.string().trim().min(1).max(200),
+  sizeBytes: z.number().int().positive().max(MAX_ATTACHMENT_UPLOAD_BYTES),
+});
 
-export const confirmUploadSchema = z
-  .object({
-    attachmentId: z.string().uuid(),
-    key: z.string().min(1),
-    taskId: z.string().uuid().optional(),
-    messageId: z.string().uuid().optional(),
-    fileName: z.string().trim().min(1).max(300),
-    mime: z.string().trim().min(1).max(200),
-  })
-  .refine((v) => !!v.taskId !== !!v.messageId, {
-    message: "Provide exactly one of taskId or messageId",
-  });
+export const confirmUploadSchema = z.object({
+  attachmentId: z.string().uuid(),
+  key: z.string().min(1),
+  taskId: z.string().uuid(),
+  fileName: z.string().trim().min(1).max(300),
+  mime: z.string().trim().min(1).max(200),
+});
 
 export const deleteAttachmentSchema = z.object({
   attachmentId: z.string().uuid(),

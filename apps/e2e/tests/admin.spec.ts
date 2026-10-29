@@ -40,7 +40,7 @@ test("Admin is hidden from regular members (nav + deep link)", async ({ page, br
   await staff.getByRole("link", { name: "Open" }).click();
 
   await expect(staff.getByRole("link", { name: "Admin", exact: true })).toHaveCount(0);
-  await expect(staff.getByRole("link", { name: "Developer", exact: true })).toHaveCount(0);
+  await expect(staff.getByRole("link", { name: "Roles", exact: true })).toHaveCount(0);
 
   const url = staff.url();
   const match = url.match(/\/w\/([^/]+)/);

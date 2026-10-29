@@ -1,1 +1,0 @@
-Canvas chat attachment fixture — used by chat-attachments.spec.ts.

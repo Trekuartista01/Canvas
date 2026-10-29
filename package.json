@@ -10,8 +10,6 @@
   "scripts": {
     "dev": "docker compose up -d && turbo run dev worker",
     "build": "turbo run build",
-    "dev:desktop": "docker compose up -d && (turbo run dev worker &) && pnpm --filter @canvas/desktop tauri:dev",
-    "build:desktop": "turbo run build --filter=@canvas/web && CI=true pnpm --filter @canvas/desktop tauri:build",
     "check": "turbo run typecheck lint && pnpm format:check",
     "typecheck": "turbo run typecheck",
     "lint": "turbo run lint",

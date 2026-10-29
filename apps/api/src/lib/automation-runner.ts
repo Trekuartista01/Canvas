@@ -140,7 +140,7 @@ async function executeAction(
 
     case "slack_notify": {
       // Never fetch() inline here — same "never block the request handler
-      // on an external call" rule M5.4's webhook delivery follows (this
+      // on an external call" rule (this
       // action runs synchronously inside task.create/update's request
       // handler via runAutomationsForTrigger). The queued job is
       // fire-and-forget from this action's point of view: a failed Slack

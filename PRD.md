@@ -1,5 +1,7 @@
 # PRD — "Canvas" (working name): Work OS with an Image-Native AI Brain
 
+> **Removed in M7.0a (Phase 7):** SAML SSO + SCIM, public REST API + API keys + webhooks, importers, GitHub PR links, Tauri desktop app, Goals/OKRs, and Chat (channels, threads, DMs, chat attachments, Brain-in-chat). Mentions of these below are historical.
+
 ## 1. Vision
 
 A ClickUp-class work platform (tasks, docs, chat, views, automations) that is **image-native at its core**. Where ClickUp bolted AI onto text, our AI brain treats images as first-class citizens: every task, doc, and chat can generate images from a prompt and iteratively edit any image through conversation ("make the background darker", "remove the person on the left", "turn this into a banner version").

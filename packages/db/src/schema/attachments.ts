@@ -1,7 +1,6 @@
 import { index, integer, pgEnum, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
 import { uuidv7 } from "uuidv7";
 import { users } from "./auth";
-import { messages } from "./chat";
 import { comments } from "./comments";
 import { imageAssets } from "./image-brain";
 import { tasks } from "./tasks";
@@ -33,10 +32,6 @@ export const attachments = pgTable(
       .references(() => workspaces.id, { onDelete: "cascade" }),
     taskId: uuid("task_id").references(() => tasks.id, { onDelete: "cascade" }),
     commentId: uuid("comment_id").references(() => comments.id, { onDelete: "cascade" }),
-    // Chat attachments: a file attached to a channel message rather than a
-    // task. Same nullable-FK shape as taskId/commentId — an attachment
-    // belongs to exactly one of the three.
-    messageId: uuid("message_id").references(() => messages.id, { onDelete: "cascade" }),
     uploaderId: uuid("uploader_id")
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
@@ -64,8 +59,5 @@ export const attachments = pgTable(
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
-  (table) => [
-    index("attachments_task_id_idx").on(table.taskId),
-    index("attachments_message_id_idx").on(table.messageId),
-  ],
+  (table) => [index("attachments_task_id_idx").on(table.taskId)],
 );

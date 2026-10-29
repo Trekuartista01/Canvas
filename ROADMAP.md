@@ -63,8 +63,8 @@ Phases 0–2 ≈ 6–8 weeks part-time — that's your usable product. Phases 3�
 
 ## Phase 7 — People (HR) + slim-down (current phase)
 Replaces the separate Seri HR app. Full prompts per milestone: `PHASE7_PROMPTS.md`. Timezone Europe/Belgrade; Kosovo holidays.
-- M7.0a Remove SSO/SCIM, public API/keys/webhooks, importers, GitHub PR links, desktop app, Goals, Chat.
-- M7.0b Drop Docker: Neon + Upstash/Redis + R2 for dev/prod; PM2 + Caddy VPS deploy.
+- M7.0a Remove SSO/SCIM, public API/keys/webhooks, importers, GitHub PR links, desktop app, Goals, Chat. ✅ Done — these Phase 4–6 items are removed.
+- M7.0b Drop Docker: Supabase Postgres + Cloudflare R2 + local Redis; PM2 + Caddy on an Oracle Always Free VM; nightly DB backup to R2.
 - M7.1 People roles (super_admin/hr/operation_manager/staff_manager/staff), reports-to, staff profiles, role-based landing + My Tasks.
 - M7.2 Task approval flow (pending → in progress → awaiting approval → completed), proof photo, transfer, collaborators, due time.
 - M7.3 Daily reports + read receipts + 16:45 weekday reminder.
@@ -74,5 +74,5 @@ Replaces the separate Seri HR app. Full prompts per milestone: `PHASE7_PROMPTS.m
 - M7.7 Payroll (encrypted ID/IBAN, HR-only, audited, Excel/PDF export).
 - M7.8 Performance report, Employee of the Month, Engagements board.
 - M7.9 Seri import (mongodump → Canvas, dry-run first).
-- M7.10 Production deploy.
+- M7.10 Production deploy (Oracle Always Free + Supabase + R2, €0).
 - ✅ Accept: staff submits daily report and a proof-backed task, manager approves; leave request deducts working days correctly around a Kosovo holiday; payroll export works for HR only; app runs in prod without Docker.

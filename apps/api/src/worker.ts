@@ -1,6 +1,6 @@
 import { db, schema } from "@canvas/db";
 import { Worker } from "bullmq";
-import { asc, and, eq, isNull, ne } from "drizzle-orm";
+import { asc, and, eq, isNull } from "drizzle-orm";
 import { getChatClient, type ProviderMessage, type ToolCall } from "./brain";
 import { executeTool } from "./brain/execute-tool";
 import { BRAIN_TOOLS } from "./brain/tools";
@@ -15,21 +15,17 @@ import { publishCopyGenerationJob } from "./lib/copy-generation-realtime";
 import { runEmbedding } from "./lib/embedding-runner";
 import { publishImageAssetJob } from "./lib/image-asset-realtime";
 import { processImageJob } from "./lib/image-job-processor";
-import { runCsvImport } from "./lib/import-runner";
 import { runSchedulerTick } from "./lib/scheduler";
 import { captureException, initSentry } from "./lib/sentry";
 import { ensureBucketExists, getObject } from "./lib/storage";
-import { signWebhookPayload } from "./lib/webhook-signature";
 import { safeFetch } from "./lib/safe-outbound-url";
 import { BRAIN_QUEUE_NAME, type BrainJobData } from "./queues/brain-queue";
 import { redisConnection } from "./queues/connection";
 import { COPYWRITER_QUEUE_NAME, type CopywriterJobData } from "./queues/copywriter-queue";
 import { EMBEDDING_QUEUE_NAME, type EmbeddingJobData } from "./queues/embedding-queue";
 import { IMAGE_QUEUE_NAME, type ImageJobData } from "./queues/image-queue";
-import { IMPORT_QUEUE_NAME, type ImportJobData } from "./queues/import-queue";
 import { scheduleRecurringTick, SCHEDULER_QUEUE_NAME } from "./queues/scheduler-queue";
 import { SLACK_QUEUE_NAME, type SlackJobData } from "./queues/slack-queue";
-import { WEBHOOK_QUEUE_NAME, type WebhookJobData } from "./queues/webhook-queue";
 
 initSentry("worker");
 
@@ -204,38 +200,6 @@ async function buildDocSystemPrompt(docId: string, brand: BrandContext | null): 
   );
 }
 
-async function buildChannelSystemPrompt(
-  channelId: string,
-  requestingUserId: string,
-  brand: BrandContext | null,
-): Promise<string> {
-  const channel = await db.query.channels.findFirst({
-    where: and(eq(schema.channels.id, channelId), isNull(schema.channels.deletedAt)),
-  });
-  if (!channel) return buildSystemPrompt({ type: "global" }, brand);
-
-  if (channel.isDm) {
-    const otherMember = await db
-      .select({ name: schema.users.name })
-      .from(schema.channelMembers)
-      .innerJoin(schema.users, eq(schema.users.id, schema.channelMembers.userId))
-      .where(
-        and(
-          eq(schema.channelMembers.channelId, channelId),
-          ne(schema.channelMembers.userId, requestingUserId),
-        ),
-      )
-      .limit(1);
-    const otherUserName = otherMember[0]?.name ?? "another member";
-    return buildSystemPrompt({ type: "dm", otherUserName }, brand);
-  }
-
-  // Only DM channels ever have a null name (see channels.dmKey/isDm in
-  // packages/db/src/schema/chat.ts) — the branch above always returns first
-  // for those, so `channel.name` here is guaranteed non-null.
-  return buildSystemPrompt({ type: "channel", name: channel.name as string }, brand);
-}
-
 const brainWorker = new Worker<BrainJobData>(
   BRAIN_QUEUE_NAME,
   async (job) => {
@@ -266,9 +230,7 @@ const brainWorker = new Worker<BrainJobData>(
         ? await buildTaskSystemPrompt(conversation.contextId, brand)
         : conversation.contextType === "doc" && conversation.contextId
           ? await buildDocSystemPrompt(conversation.contextId, brand)
-          : conversation.contextType === "channel" && conversation.contextId
-            ? await buildChannelSystemPrompt(conversation.contextId, conversation.createdBy, brand)
-            : buildSystemPrompt({ type: "global" }, brand);
+          : buildSystemPrompt({ type: "global" }, brand);
 
     const chatClient = getChatClient();
     let lastAssistantMessageId: string | null = null;
@@ -416,91 +378,9 @@ schedulerWorker.on("failed", (job, err) => {
   console.error(`[worker] scheduler tick ${job?.id} failed:`, err);
 });
 
-// M5.4 webhooks: signs and POSTs the payload, retried by BullMQ's own
-// attempts/backoff (see webhook-queue.ts). Each attempt is written to
-// webhook_deliveries so admins can see success/failure in Developer → Webhooks.
-const WEBHOOK_DELIVERY_TIMEOUT_MS = 10_000;
-
-const webhookWorker = new Worker<WebhookJobData>(
-  WEBHOOK_QUEUE_NAME,
-  async (job) => {
-    const { webhookId, url, secret, event, payload } = job.data;
-    const attempt = job.attemptsMade + 1;
-
-    async function record(
-      status: "success" | "failed",
-      httpStatus: number | null,
-      error: string | null,
-    ) {
-      await db.insert(schema.webhookDeliveries).values({
-        webhookId,
-        event,
-        status,
-        httpStatus,
-        error,
-        attempt,
-      });
-    }
-
-    try {
-      const body = JSON.stringify(payload);
-      const signature = signWebhookPayload(secret, body);
-
-      const response = await safeFetch(url, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "X-Canvas-Event": event,
-          "X-Canvas-Signature": signature,
-        },
-        body,
-        signal: AbortSignal.timeout(WEBHOOK_DELIVERY_TIMEOUT_MS),
-      });
-      if (!response.ok) {
-        await record("failed", response.status, `HTTP ${response.status}`);
-        throw new Error(`Webhook delivery to ${url} failed with status ${response.status}`);
-      }
-      await record("success", response.status, null);
-    } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
-      // Avoid double-insert when we already recorded an HTTP failure above.
-      if (!message.startsWith("Webhook delivery to ")) {
-        await record("failed", null, message).catch(() => undefined);
-      }
-      throw err;
-    }
-  },
-  { connection: redisConnection },
-);
-
-webhookWorker.on("failed", (job, err) => {
-  captureException(err);
-  console.error(`[worker] webhook delivery ${job?.id} failed:`, err);
-});
-
-// runCsvImport owns its own try/catch and writes status="failed" + the
-// error message onto the `imports` row itself (see import-runner.ts), so a
-// malformed CSV row shows up in the import history UI rather than as a
-// bare BullMQ job failure — this handler never throws, and the queue's own
-// `attempts: 1` (see import-queue.ts) means a partially-applied import is
-// never silently retried and duplicated.
-const importWorker = new Worker<ImportJobData>(
-  IMPORT_QUEUE_NAME,
-  async (job) => {
-    await runCsvImport(job.data.importId);
-  },
-  { connection: redisConnection },
-);
-
-importWorker.on("failed", (job, err) => {
-  captureException(err);
-  console.error(`[worker] import ${job?.data.importId} failed:`, err);
-});
-
 // M5.6 integrations: Slack notify. A Slack Incoming Webhook expects a bare
-// `{text}` JSON body (no signature, unlike M5.4's own webhooks — Slack's
-// own endpoint, not one of ours), delivered off the request path for the
-// same reason webhookWorker above is.
+// `{text}` JSON body, delivered off the request path so a slow Slack
+// endpoint never blocks the triggering request.
 const SLACK_DELIVERY_TIMEOUT_MS = 10_000;
 
 const slackWorker = new Worker<SlackJobData>(
@@ -716,5 +596,5 @@ copywriterWorker.on("failed", (job, err) => {
 });
 
 console.log(
-  `[worker] listening on queues "${IMAGE_QUEUE_NAME}", "${BRAIN_QUEUE_NAME}", "${SCHEDULER_QUEUE_NAME}", "${WEBHOOK_QUEUE_NAME}", "${IMPORT_QUEUE_NAME}", "${SLACK_QUEUE_NAME}", "${EMBEDDING_QUEUE_NAME}", "${COPYWRITER_QUEUE_NAME}"`,
+  `[worker] listening on queues "${IMAGE_QUEUE_NAME}", "${BRAIN_QUEUE_NAME}", "${SCHEDULER_QUEUE_NAME}", "${SLACK_QUEUE_NAME}", "${EMBEDDING_QUEUE_NAME}", "${COPYWRITER_QUEUE_NAME}"`,
 );

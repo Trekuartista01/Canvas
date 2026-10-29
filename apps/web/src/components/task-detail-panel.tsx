@@ -16,7 +16,6 @@ import { CommentsSection } from "@/components/comments-section";
 import { CustomFieldsSection } from "@/components/custom-fields-section";
 import { Field, Section } from "@/components/detail-field";
 import { GenerationPanel } from "@/components/generation-panel";
-import { PrLinksSection } from "@/components/pr-links-section";
 import { TagsSection } from "@/components/tags-section";
 import { TimeTrackingSection } from "@/components/time-tracking-section";
 import { Input } from "@/components/ui/input";
@@ -376,8 +375,6 @@ export function TaskDetailPanel({
               <AttachmentsSection taskId={taskId} />
 
               <ClipsSection taskId={taskId} />
-
-              <PrLinksSection taskId={taskId} />
 
               <Section label="Generate image">
                 <GenerationPanel

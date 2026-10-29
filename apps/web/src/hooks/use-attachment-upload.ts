@@ -1,7 +1,7 @@
 import { trpc } from "@/lib/trpc";
 import { useState } from "react";
 
-export type AttachmentTarget = { taskId: string } | { messageId: string };
+export type AttachmentTarget = { taskId: string };
 
 function putWithProgress(
   url: string,
@@ -32,8 +32,8 @@ function putWithProgress(
  * anything in memory. Tracks per-file percent progress via XHR (`fetch`
  * has no upload-progress event), since a multi-GB upload can take minutes
  * and a bare "Uploading…" label isn't enough feedback at that size.
- * Shared by task attachments, clips, and chat message attachments — the
- * three places that used to hit the old buffered `POST /uploads` route.
+ * Shared by task attachments and clips — the two places that used to hit
+ * the old buffered `POST /uploads` route.
  */
 export function useAttachmentUpload() {
   const presign = trpc.attachment.presignUpload.useMutation();

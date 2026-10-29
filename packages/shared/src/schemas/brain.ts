@@ -1,9 +1,10 @@
 import { z } from "zod";
 
-// contextId required for 'task', 'doc', and 'channel'; omitted for 'global'.
+// contextId required for 'task' and 'doc'; omitted for 'global'. The DB
+// enum still has 'channel' (Chat was removed in M7.0a); nothing creates it.
 export const getOrCreateBrainConversationSchema = z.object({
   workspaceId: z.string().uuid(),
-  contextType: z.enum(["task", "doc", "channel", "global"]),
+  contextType: z.enum(["task", "doc", "global"]),
   contextId: z.string().uuid().optional(),
 });
 

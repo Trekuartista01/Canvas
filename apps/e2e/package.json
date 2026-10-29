@@ -16,8 +16,6 @@
   "devDependencies": {
     "@playwright/test": "^1.49.1",
     "@types/node": "^22.10.2",
-    "@xmldom/xmldom": "^0.9.10",
-    "typescript": "^5.7.2",
-    "xml-crypto": "^6.1.2"
+    "typescript": "^5.7.2"
   }
 }

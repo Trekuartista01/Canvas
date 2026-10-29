@@ -21,14 +21,13 @@ import type { SessionUser } from "../../auth/session";
 
 type ConversationContextInput = {
   workspaceId: string;
-  contextType: "task" | "doc" | "channel" | "global";
+  contextType: "task" | "doc" | "global";
   contextId?: string;
 };
 
 // Shared by getOrCreateConversation and newConversation — both need the
-// context (task/doc/channel) to exist, belong to this workspace, and (for
-// private channels) the user to actually be a member before a conversation
-// can be opened against it.
+// context (task/doc) to exist and belong to this workspace before a
+// conversation can be opened against it.
 async function validateConversationContext(user: SessionUser, input: ConversationContextInput) {
   await assertCan(user, input.workspaceId, "brain:view");
 
@@ -59,34 +58,6 @@ async function validateConversationContext(user: SessionUser, input: Conversatio
         code: "BAD_REQUEST",
         message: "Doc does not belong to this workspace",
       });
-    }
-  }
-
-  if (input.contextType === "channel") {
-    if (!input.contextId) {
-      throw new TRPCError({
-        code: "BAD_REQUEST",
-        message: "contextId is required for channel",
-      });
-    }
-    const channel = await db.query.channels.findFirst({
-      where: and(eq(schema.channels.id, input.contextId), isNull(schema.channels.deletedAt)),
-    });
-    if (!channel) throw new TRPCError({ code: "NOT_FOUND" });
-    if (channel.workspaceId !== input.workspaceId) {
-      throw new TRPCError({
-        code: "BAD_REQUEST",
-        message: "Channel does not belong to this workspace",
-      });
-    }
-    if (channel.isPrivate) {
-      const membership = await db.query.channelMembers.findFirst({
-        where: and(
-          eq(schema.channelMembers.channelId, channel.id),
-          eq(schema.channelMembers.userId, user.id),
-        ),
-      });
-      if (!membership) throw new TRPCError({ code: "FORBIDDEN" });
     }
   }
 }

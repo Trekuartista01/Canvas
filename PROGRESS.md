@@ -2259,3 +2259,40 @@ Asked to connect the project to Docker Desktop. Docker Desktop (29.8.2, `desktop
 - `pnpm db:migrate` applied cleanly to the fresh DB (59 tables).
 - API booted against the stack: `/health` → `{"api":"ok","database":"ok","redis":"ok"}`, `canvas-dev` bucket auto-created, no CORS-skip warning.
 - CI change not verified on GitHub Actions (no push).
+
+## 2026-10-29 M7.0a: remove features — done
+
+Phase 7 starts by slimming the app down to what the team will actually use. Fully removed (code, routers, REST routes, pages, nav entries, shared schemas, `can()` actions + tests, queues/workers, env vars, e2e specs, deps):
+
+1. **SAML SSO + SCIM**: `auth/saml.ts`, `routes/saml.ts`, `routes/scim.ts`, `lib/scim*.ts`, `sso`/`scimToken` routers, Security page, `findOrCreateSsoUser`/`ensureMembership` (SSO-only helpers), `@node-saml/node-saml`, `@fastify/formbody` (only existed for SAML's POST binding), e2e's `xml-crypto`/`@xmldom/xmldom`. `API_URL` env var dropped too — SAML ACS/metadata URLs were its only consumer.
+2. **Public REST API v1 + API keys + webhooks**: `routes/api-v1.ts`, `lib/api-key.ts`, `lib/webhook-*.ts`, webhook queue + worker, `apiKey`/`webhook` routers, Developer page. `lib/task-mutations.ts` existed only for REST v1, so it went too; `triggerWebhooksForEvent` calls removed from `task.ts`.
+3. **Importers**: CSV import lib/runner/queue/worker, `routes/imports.ts`, `import` router, Import page.
+4. **GitHub PR links**: `pr-link` router, `github-client.ts`, task-panel PR section, `GITHUB_API_BASE_URL` env var and the e2e GitHub mock server.
+5. **Tauri desktop app**: `apps/desktop` deleted, `dev:desktop`/`build:desktop` scripts and `.prettierignore` entries removed (CI never built it).
+6. **Goals/OKRs**: `goal` router, `goal-progress.ts`, Goals pages/components, goal invalidations in `use-realtime.ts`.
+7. **Chat**: channels, private channels, threads, DMs, DM sound/toast, chat attachments, Brain-in-chat (channel/DM system prompts), `message` realtime entity, `message.created` notification label, `useRealtime`'s `onEvent` hook (DM-only consumer).
+
+Kept, as specified: Slack notify, automations, Google Drive picker, docs + Brain in docs, Copywriter, Library, dashboards, all task features.
+
+### Decisions
+
+- **Data export moved to the Admin page.** It lived on the Developer page, which is gone; export is admin-tier (`export:run`) like Admin, so it's now an "Export data" section there (`data-testid="admin-export"`, same `export-tasks-csv`/`export-workspace-json` links). `data-export.spec.ts` now navigates via Admin.
+- **Attachments are task-only again.** `attachments.message_id` dropped; `presignUpload`/`confirmUpload`/`list` schemas now require `taskId`; `requireAttachmentTarget` takes `{ taskId }`.
+- **Migration `0054_polite_elektra.sql`** (new, hand-ordered — drizzle-kit's generated version dropped `messages` CASCADE _before_ dropping the `attachments` FK, which would have failed on the now-missing constraint):
+  - deletes chat-attachment rows (`message_id IS NOT NULL`) before dropping the column — **their S3 objects are left orphaned** in the bucket (harmless, no row references them);
+  - deletes notifications for `message.created` activity (they'd link to channels that no longer exist); the `activity` rows themselves stay as audit history;
+  - soft-deletes (`deleted_at = now()`) Brain conversations with `context_type = 'channel'`;
+  - strips removed actions (`channel:*`, `message:*`, `dm:*`, `goal:*`, `apiKey:*`, `webhook:*`, `import:*`, `prLink:*`, `sso:*`, `scimToken:*`) from `custom_roles.grants/revokes` and deletes matching `space_permission_overrides` rows — otherwise editing an old custom role would 400 on the now-closed `WORKSPACE_ACTIONS` enum;
+  - drops the 12 tables and the `import_source`/`import_status`/`task_pr_link_state` enums.
+- **Postgres enum value `brain_context_type 'channel'` left in place** (per the 7.0a brief — dropping an enum value means recreating the type). The tRPC schema (`getOrCreateBrainConversationSchema`) now only accepts `task`/`doc`/`global`, so nothing creates it; `BRAIN_CONTEXT_TYPES` and `execute-tool.ts`'s context type still mirror the DB enum.
+- `task.pr_linked` stays in the activity-label map so existing task history still reads correctly.
+- Removed the PR-link half of `integrations.spec.ts` (Drive half kept as its own test); `profile.spec.ts` now checks the avatar in the workspace shell badge instead of in a chat message; `admin.spec.ts`/`role-templates.spec.ts` assert Roles/Admin instead of Developer/Import.
+- Spec docs (PRD/ARCHITECTURE/DATA_MODEL) got a one-line "Removed in M7.0a" note under the title; ROADMAP's M7.0a line marked done.
+
+### Verified
+
+- `pnpm check` green (0 errors; web lint warnings down to 54 — fewer route files).
+- `pnpm test`: shared 60, web 15, API 278 — all passing (API down from 335: the removed features' own unit tests went with them).
+- `pnpm db:migrate` applied `0054` cleanly to an existing local DB with data: 59 → 47 tables, `attachments.message_id` gone.
+- Full local Playwright run at CI parity (`CI=1`): **67/67 passed**, no retries/flakes (down from 80 specs — the removed features' specs went with them). Phase-2 smoke test green.
+- Not verified on GitHub Actions (push is blocked — this machine's GitHub login lacks write access to the repo).

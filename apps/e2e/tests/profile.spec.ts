@@ -4,7 +4,7 @@ import { createWorkspaceAndOpen, signUp } from "./helpers";
 
 const IMAGE_FIXTURE = fileURLToPath(new URL("../fixtures/test-image.png", import.meta.url));
 
-test("profile: edit name/bio/title, upload an avatar, and see it render as an image in chat", async ({
+test("profile: edit name/bio/title, upload an avatar, and see it render in the workspace", async ({
   page,
 }) => {
   test.setTimeout(60_000);
@@ -33,23 +33,9 @@ test("profile: edit name/bio/title, upload an avatar, and see it render as an im
   await page.getByTestId("profile-avatar-file").setInputFiles(IMAGE_FIXTURE);
   await expect(page.locator('img[src*="/avatars/"]')).toBeVisible({ timeout: 15_000 });
 
-  // Create a channel, send a message, and confirm the message's avatar
-  // renders as a real image instead of the initials fallback.
+  // Back in the workspace, the shell's own user badge renders the avatar as
+  // a real image instead of the initials fallback.
   await page.getByRole("link", { name: "← Back" }).click();
   await page.getByRole("link", { name: "Open" }).click();
-  await page.getByRole("link", { name: "Chat", exact: true }).click();
-  await page.getByTestId("chat-new-channel").click();
-  await page.getByTestId("chat-new-channel-name").fill("general");
-  await page.getByTestId("chat-create-channel").click();
-  await expect(page.getByTestId("chat-channel-page")).toBeVisible({ timeout: 15_000 });
-
-  await page.getByTestId("message-composer").click();
-  await page.keyboard.type("Hello with a new avatar");
-  await page.getByTestId("message-send").click();
-  await expect(
-    page.getByTestId("channel-messages").getByText("Hello with a new avatar"),
-  ).toBeVisible();
-  await expect(page.getByTestId("channel-messages").locator('img[src*="/avatars/"]')).toBeVisible({
-    timeout: 15_000,
-  });
+  await expect(page.locator('img[src*="/avatars/"]').first()).toBeVisible({ timeout: 15_000 });
 });

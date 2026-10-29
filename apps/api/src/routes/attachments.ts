@@ -6,7 +6,6 @@ import { uuidv7 } from "uuidv7";
 import { can } from "../auth/can";
 import { getSessionUser } from "../auth/session";
 import { logActivity } from "../lib/activity";
-import { isChannelMember, requireChannel, requireMessage } from "../lib/chat-queries";
 import { sanitizeFilenameForKey, sanitizeForHeader } from "../lib/filename";
 import { processImage } from "../lib/image-processing";
 import { isInlineSafeMimeType, safeContentType } from "../lib/mime-safety";
@@ -22,7 +21,7 @@ import { requireTask } from "../lib/task-queries";
 
 // Downloads stay a plain streaming REST route (not tRPC — no native
 // file-transport support there), permission-checked on every request per
-// M1.9's original decision. Task/chat-message *uploads* moved to
+// M1.9's original decision. Task *uploads* moved to
 // attachment.presignUpload/confirmUpload (a direct-to-storage flow for
 // multi-GB files) and no longer live here — see that router file's
 // comments for why. The public, session-less form-completion upload below
@@ -159,18 +158,6 @@ async function streamAttachment(
   if (!can(user, "attachment:view", { type: "workspace", role })) {
     return reply.code(403).send({ error: "Forbidden" });
   }
-  // A workspace-level "can view attachments" pass isn't enough on its own
-  // for a message attachment — it would let any workspace member fetch a
-  // private channel's files by attachment id alone, bypassing the same
-  // channel-membership gate every other message-reading path enforces.
-  if (attachment.messageId) {
-    const message = await requireMessage(attachment.messageId);
-    const channel = await requireChannel(message.channelId);
-    if (channel.isPrivate && !(await isChannelMember(channel.id, user.id))) {
-      return reply.code(403).send({ error: "Forbidden" });
-    }
-  }
-
   const key = kind === "thumb" ? attachment.thumbKey : attachment.fileKey;
   if (!key) return reply.code(404).send({ error: "Not found" });
 

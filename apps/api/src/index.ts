@@ -2,7 +2,6 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import cookie from "@fastify/cookie";
 import cors from "@fastify/cors";
-import formbody from "@fastify/formbody";
 import helmet from "@fastify/helmet";
 import multipart from "@fastify/multipart";
 import staticFiles from "@fastify/static";
@@ -16,7 +15,6 @@ import { initSentry, Sentry } from "./lib/sentry";
 import { ensureBucketExists } from "./lib/storage";
 import { redisConnection } from "./queues/connection";
 import { registerAiReferenceRoutes } from "./routes/ai-references";
-import { registerApiV1Routes } from "./routes/api-v1";
 import { registerAttachmentRoutes } from "./routes/attachments";
 import { registerAuthRoutes } from "./routes/auth";
 import { registerAvatarRoutes } from "./routes/avatars";
@@ -26,10 +24,7 @@ import { registerDocRealtimeRoutes } from "./routes/doc-realtime";
 import { registerExportRoutes } from "./routes/export";
 import { registerImageAssetRealtimeRoutes } from "./routes/image-asset-realtime";
 import { registerImageAssetRoutes } from "./routes/image-assets";
-import { registerImportRoutes } from "./routes/imports";
 import { registerRealtimeRoutes } from "./routes/realtime";
-import { registerSamlRoutes } from "./routes/saml";
-import { registerScimRoutes } from "./routes/scim";
 import { createContext } from "./trpc/context";
 import { appRouter } from "./trpc/router";
 
@@ -48,8 +43,8 @@ export type { AppRouter } from "./trpc/router";
 // error log (the request never reaches the tRPC handler at all).
 const app = Fastify({
   logger: true,
-  // Required behind a TLS terminator so req.protocol / hostname (SCIM, SAML
-  // absolute URLs) reflect the public origin rather than the internal hop.
+  // Required behind a TLS terminator so req.protocol / hostname (and
+  // req.ip, for rate limiting) reflect the client rather than the internal hop.
   trustProxy: true,
   routerOptions: { maxParamLength: 5000 },
 });
@@ -69,10 +64,6 @@ await app.register(cors, { origin: env.WEB_URL, credentials: true });
 await app.register(cookie);
 await app.register(multipart, { limits: { fileSize: MAX_UPLOAD_BYTES } });
 await app.register(websocket);
-// SAML's HTTP-POST binding delivers SAMLResponse as a browser-submitted
-// application/x-www-form-urlencoded form (routes/saml.ts) — Fastify has no
-// built-in parser for that content type, unlike JSON.
-await app.register(formbody);
 
 await app.register(fastifyTRPCPlugin, {
   prefix: "/trpc",
@@ -80,15 +71,11 @@ await app.register(fastifyTRPCPlugin, {
 });
 
 registerAuthRoutes(app);
-registerApiV1Routes(app);
 registerAttachmentRoutes(app);
 registerAvatarRoutes(app);
 registerImageAssetRoutes(app);
 registerAiReferenceRoutes(app);
-registerImportRoutes(app);
 registerExportRoutes(app);
-registerSamlRoutes(app);
-registerScimRoutes(app);
 registerRealtimeRoutes(app);
 registerBrainRealtimeRoutes(app);
 registerImageAssetRealtimeRoutes(app);

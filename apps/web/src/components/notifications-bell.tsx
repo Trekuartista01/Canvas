@@ -5,8 +5,7 @@ import { useNavigate } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 
 // Verbs whose payloadJson carries {taskId, listId} — clicking navigates
-// straight to the task. message.created's payload shape (channelId, no
-// task) is different and isn't wired to a click-through yet.
+// straight to the task.
 const TASK_LINK_VERBS = new Set([
   "comment.created",
   "reminder.fired",

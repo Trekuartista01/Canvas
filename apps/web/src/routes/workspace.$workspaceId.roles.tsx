@@ -20,16 +20,10 @@ export const rolesRoute = createRoute({
   component: RolesPage,
 });
 
-// Owner-tier actions (workspace:delete, sso:update, scimToken:create/delete)
-// are rejected server-side (can.ts's isGrantable) if granted via a custom
-// role or space override — hidden here too so the checkbox list only offers
-// what will actually save.
-const NON_GRANTABLE = new Set<WorkspaceAction>([
-  "workspace:delete",
-  "sso:update",
-  "scimToken:create",
-  "scimToken:delete",
-]);
+// Owner-tier actions (workspace:delete) are rejected server-side (can.ts's
+// isGrantable) if granted via a custom role or space override — hidden here
+// too so the checkbox list only offers what will actually save.
+const NON_GRANTABLE = new Set<WorkspaceAction>(["workspace:delete"]);
 const GRANTABLE_ACTIONS = WORKSPACE_ACTIONS.filter((a) => !NON_GRANTABLE.has(a));
 
 // Only actions actually wired to consult a space override (hierarchy/status/

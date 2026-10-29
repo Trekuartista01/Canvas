@@ -73,7 +73,7 @@ test("Library: uploading an image directly, nav lives under Collaborate, and gue
   await signUp(page, "Library Owner");
   await createWorkspaceAndOpen(page, "Library Upload Workspace");
 
-  // Moved out of "Work" into "Collaborate", alongside Docs/Chat/Forms/Brand Kits.
+  // Moved out of "Work" into "Collaborate", alongside Docs/Forms/Brand Kits.
   const collaborateGroup = page.locator("nav > div").filter({ hasText: "Collaborate" });
   const libraryLink = collaborateGroup.getByRole("link", { name: "Library", exact: true });
   await expect(libraryLink).toBeVisible();

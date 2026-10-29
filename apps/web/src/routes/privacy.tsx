@@ -47,8 +47,8 @@ function PrivacyPage() {
           name/email/profile picture Google provides.
         </p>
         <p>
-          <strong>Content you create:</strong> tasks, docs, comments, chat messages, images you
-          upload or generate, and anything else you add to a workspace, including:
+          <strong>Content you create:</strong> tasks, docs, comments, images you upload or generate,
+          and anything else you add to a workspace, including:
         </p>
         <ul>
           <li>
@@ -112,10 +112,8 @@ function PrivacyPage() {
         <h2>Other Third-Party Integrations (opt-in)</h2>
         <p>
           If a workspace owner connects them, these integrations may share data with third parties
-          as part of their normal function: Slack (notifications), GitHub (linking pull requests to
-          tasks), Google Drive (attaching files), and SAML/SCIM identity providers (enterprise
-          sign-in and provisioning). These only activate if a workspace admin explicitly configures
-          them.
+          as part of their normal function: Slack (notifications) and Google Drive (attaching
+          files). These only activate if a workspace admin explicitly configures them.
         </p>
 
         <h2>Data Storage &amp; Security</h2>

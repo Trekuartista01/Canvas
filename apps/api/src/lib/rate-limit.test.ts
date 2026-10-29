@@ -10,19 +10,19 @@ describe("rateLimitBucketKey", () => {
   it("returns the same key for two instants in the same window", () => {
     const a = new Date("2026-07-22T12:00:00.000Z");
     const b = new Date("2026-07-22T12:00:59.999Z");
-    expect(rateLimitBucketKey("apikey:key-1", a)).toBe(rateLimitBucketKey("apikey:key-1", b));
+    expect(rateLimitBucketKey("bucket:key-1", a)).toBe(rateLimitBucketKey("bucket:key-1", b));
   });
 
   it("returns a different key once the window rolls over", () => {
     const a = new Date("2026-07-22T12:00:59.999Z");
     const b = new Date("2026-07-22T12:01:00.000Z");
-    expect(rateLimitBucketKey("apikey:key-1", a)).not.toBe(rateLimitBucketKey("apikey:key-1", b));
+    expect(rateLimitBucketKey("bucket:key-1", a)).not.toBe(rateLimitBucketKey("bucket:key-1", b));
   });
 
   it("scopes the key per bucket id", () => {
     const now = new Date("2026-07-22T12:00:00.000Z");
-    expect(rateLimitBucketKey("apikey:key-1", now)).not.toBe(
-      rateLimitBucketKey("apikey:key-2", now),
+    expect(rateLimitBucketKey("bucket:key-1", now)).not.toBe(
+      rateLimitBucketKey("bucket:key-2", now),
     );
   });
 });

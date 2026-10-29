@@ -74,7 +74,7 @@ export const memberships = pgTable(
     // Optional: when set, this membership's effective permissions are the
     // custom role's grants/revokes layered on top of `role`'s rank instead
     // of `role`'s rank alone — see can().  `role` stays required regardless
-    // (still the floor, and still what owner-protection/SCIM/invites read).
+    // (still the floor, and still what owner-protection/invites read).
     customRoleId: uuid("custom_role_id").references(() => customRoles.id, { onDelete: "set null" }),
     // Who gets notified when a task in this workspace reaches a done-kind
     // status (task.ts's notifyOperationsManagers) — a flag rather than a

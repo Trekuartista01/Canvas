@@ -6,9 +6,17 @@ Every prompt inherits CLAUDE.md's hard rules (can(), activity rows, UUIDv7, soft
 applied migrations, `pnpm check` before commit, PROGRESS.md entry per milestone).
 
 Decisions already made (do not re-ask):
+
 - Timezone for every schedule/date rule: **Europe/Belgrade** (Kosovo time, CET/CEST). Never hard-code UTC offsets.
 - Public holidays: **Kosovo**.
-- Hosting: no Docker, no Vercel. Dev + prod use Neon (Postgres + pgvector), Upstash Redis (or local Redis), Cloudflare R2. Prod = a small VPS running api + worker under PM2.
+- Hosting: €0, no Docker, no Vercel.
+  - Database: **Supabase** Postgres (free tier, pgvector). Two projects: `canvas-dev` and `canvas-prod`.
+    Use the **Session pooler** connection string (IPv4, port 5432, SSL) — NOT the Transaction pooler (port 6543).
+  - Files: **Cloudflare R2** (free 10 GB, no egress fees). Two buckets: `canvas-dev`, `canvas-prod`.
+  - Redis: installed directly — dev on Windows via WSL (`sudo apt install redis-server`); prod on the server.
+  - Server: **Oracle Cloud Always Free** Ubuntu VM (ARM) running api + worker under PM2, Redis, Caddy for HTTPS.
+  - Domain: a subdomain of a Trekuartista domain (e.g. canvas.trekuartista.com).
+  - Backups: nightly `pg_dump` of the Supabase DB uploaded to R2 (Supabase free has no backups).
 - Removed features: SSO/SAML + SCIM, public REST API + API keys + webhooks, importers, GitHub PR links, Tauri desktop app, Goals/OKRs, Chat (channels, threads, DMs, Brain-in-chat, DM sound, chat attachments). Slack notify + automations STAY.
 
 ---
@@ -41,25 +49,38 @@ Keep the Phase-2 smoke test green. Update PRD.md/ARCHITECTURE.md/DATA_MODEL.md/R
 as removed (one line each, not rewrites). PROGRESS.md entry, then commit "7.0a: remove features".
 ```
 
-## 7.0b — No Docker: hosted services for dev, PM2 for prod
+## 7.0b — No Docker: Supabase + R2 + local Redis for dev, PM2 on Oracle for prod
 
 ```
-Milestone 7.0b (read ROADMAP.md Phase 7). Remove Docker from the workflow.
+Milestone 7.0b (read ROADMAP.md Phase 7 and the "Decisions" header of PHASE7_PROMPTS.md). Remove Docker.
 - package.json "dev": stop running `docker compose`; just run api + web + worker (turbo).
-- Delete docker-compose.yml, Dockerfile, fly.toml; remove the Docker services from .github/workflows/ci.yml
-  and instead use GitHub Actions `services:` containers for postgres(pgvector)/redis in CI only, plus a local
-  S3-compatible fake if e2e needs storage (or mock storage in e2e) — CI may use containers, devs do not.
-- .env.example: document Neon (DATABASE_URL, needs pgvector), Upstash or local Redis (REDIS_URL, note
-  BullMQ needs a TCP redis:// / rediss:// URL, not the REST URL), Cloudflare R2 (S3_ENDPOINT etc.,
-  S3_FORCE_PATH_STYLE=false). Make storage.ts bucket-CORS logic work with R2.
-- env.ts production guard: keep rejecting localhost/dev defaults.
-- Add ecosystem.config.cjs for PM2 with two apps: `canvas-api` (serves API + built web SPA, single origin)
-  and `canvas-worker`. Add `pnpm start` / `pnpm start:worker` scripts that run the built output.
-- Rewrite DEPLOYMENT.md for: Ubuntu VPS → install Node 20+ & pnpm & PM2 → git clone → .env → pnpm build →
-  pnpm db:migrate → pm2 start ecosystem.config.cjs → pm2 save/startup → Caddy as HTTPS reverse proxy
-  (WebSocket-friendly) with a sample Caddyfile. Write it for someone who has never used a VPS.
-- Update CLAUDE.md "Commands" + ARCHITECTURE.md deploy row.
-pnpm check + pnpm test pass. PROGRESS.md entry. Commit "7.0b: drop Docker, PM2 deploy".
+- Delete docker-compose.yml, Dockerfile, fly.toml. In .github/workflows/ci.yml use GitHub Actions
+  `services:` containers (pgvector postgres, redis) for CI only, and mock/fake S3 in e2e if needed —
+  containers in CI are fine, developers never need Docker.
+- Database = Supabase Postgres via packages/db/src/client.ts (node-postgres Pool):
+  * enable SSL when the URL isn't localhost (`ssl: { rejectUnauthorized: false }` is acceptable for Supabase's
+    pooler cert, or load Supabase's CA via SUPABASE_CA_CERT if set — prefer the CA when provided);
+  * keep the pool small (max ~5 api, ~3 worker; env DB_POOL_MAX) — Supabase free has a low connection cap;
+  * migrations must work against Supabase: the pgvector migration's `CREATE EXTENSION vector` must be
+    `IF NOT EXISTS` and work in Supabase's `extensions` schema (check the existing migration; if it breaks,
+    add a NEW migration rather than editing the applied one, and document it).
+  * README/DEPLOYMENT note: use the Session pooler string, never the Transaction pooler (port 6543 breaks
+    prepared statements / session features); Supabase free pauses a project after 7 days of no activity.
+- Storage = Cloudflare R2: S3_ENDPOINT=https://<accountid>.r2.cloudflarestorage.com, S3_REGION=auto,
+  S3_FORCE_PATH_STYLE=false. Make storage.ts work with R2 (bucket must be pre-created; don't try to create
+  it at boot in production; apply/document CORS for WEB_URL; presigned PUT/GET must work).
+- Redis: local (WSL on Windows for dev, apt on the server). REDIS_URL=redis://127.0.0.1:6379.
+- .env.example: document every var above with where to find it in the Supabase / Cloudflare dashboards.
+  env.ts production guard: keep rejecting localhost DB/S3 and dev creds (Redis on 127.0.0.1 IS allowed in prod).
+- Add ecosystem.config.cjs for PM2 with two apps: `canvas-api` (serves API + built web SPA, single
+  origin) and `canvas-worker`. Add `pnpm start` / `pnpm start:worker` that run the built output.
+- Add scripts/backup-db.sh: pg_dump (custom format) of DATABASE_URL → gzip → upload to the R2 bucket under
+  backups/YYYY-MM-DD.dump (using the aws CLI or a tiny node script with the existing S3 client), keep the
+  last 14; documented as a nightly cron on the server.
+- Write docs/LOCAL_SETUP.md for Windows: install WSL + Redis, create Supabase canvas-dev + R2 canvas-dev,
+  fill .env, pnpm db:migrate, pnpm dev. Assume the reader has never done this.
+- Update CLAUDE.md "Commands" and ARCHITECTURE.md's stack/deploy rows (Supabase, R2, PM2, Oracle).
+pnpm check + pnpm test pass. PROGRESS.md entry. Commit "7.0b: drop Docker; Supabase + R2 + PM2".
 ```
 
 ## 7.1 — People roles, reporting lines, staff profiles
@@ -212,11 +233,28 @@ target_table, target_id). Passwords are NOT imported — after commit, send each
 "set your password" email. Files: download from Seri's storage URLs into R2. PROGRESS.md, commit.
 ```
 
-## 7.10 — Deploy
+## 7.10 — Deploy (Oracle Always Free + Supabase + R2, €0)
 
 ```
-Milestone 7.10. Walk me (non-expert) through deploying with DEPLOYMENT.md: create Neon project
-(enable pgvector), Upstash Redis (TCP URL), R2 bucket + CORS, VPS + domain, Caddy, PM2. Generate the
-production .env checklist with every required value, run migrations, verify /health, then run the
-Phase-0 and Phase-7 smoke paths against production. Fix anything that breaks, PROGRESS.md, commit.
+Milestone 7.10. Walk me step by step (I've never used a server) and rewrite DEPLOYMENT.md to match exactly
+what we do:
+1. Supabase: create project `canvas-prod` (EU region, e.g. Frankfurt), copy the Session pooler URL,
+   make sure the pgvector extension is enabled.
+2. Cloudflare R2: bucket `canvas-prod`, API token (Object Read & Write, this bucket only), CORS rule for
+   the production domain.
+3. Oracle Cloud Always Free: create an Ubuntu ARM (Ampere A1) VM in an EU region (if "out of capacity",
+   try another availability domain/region or smaller shape), SSH key, open ports 80/443 in BOTH the VCN
+   security list and the VM firewall (iptables/ufw — Oracle's Ubuntu image blocks them by default).
+4. On the VM: install Node 20 LTS, pnpm, PM2, Redis (bind 127.0.0.1 only, requirepass), Caddy, git;
+   clone the repo; create .env from my answers (generate a checklist of every required value with where
+   to get it, incl. PAYROLL_ENCRYPTION_KEY generated with openssl); pnpm install; pnpm build;
+   pnpm db:migrate; pm2 start ecosystem.config.cjs; pm2 save; pm2 startup.
+5. DNS: A record for canvas.<trekuartista domain> → the VM's public IP; Caddyfile reverse-proxying to the
+   api port with WebSocket support; HTTPS via Caddy's automatic certificates.
+6. Cron: nightly scripts/backup-db.sh at 02:00 Europe/Belgrade; test one restore into canvas-dev.
+7. Verify: /health all green, sign up → create workspace → invite, then the Phase-7 smoke path
+   (daily report, proof task approval, leave request, HR-only payroll export).
+8. Write an "updating the app" section: git pull → pnpm install → pnpm build → pnpm db:migrate →
+   pm2 reload all.
+Fix anything that breaks. PROGRESS.md, commit.
 ```

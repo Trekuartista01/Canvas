@@ -1,5 +1,7 @@
 # ARCHITECTURE.md
 
+> **Removed in M7.0a (Phase 7):** SAML SSO + SCIM, public REST API + API keys + webhooks, importers, GitHub PR links, Tauri desktop app, Goals/OKRs, and Chat (channels, threads, DMs, chat attachments, Brain-in-chat). Mentions of these below are historical.
+
 ## 1. Stack (chosen for Claude Code velocity)
 
 | Layer | Choice | Why |

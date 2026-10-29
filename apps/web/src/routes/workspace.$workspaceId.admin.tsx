@@ -1,9 +1,10 @@
 import { Button } from "@/components/ui/button";
+import { buttonVariants } from "@/components/ui/button-variants";
 import { formatRelativeTime } from "@/lib/format";
 import { trpc } from "@/lib/trpc";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { createRoute, Navigate } from "@tanstack/react-router";
-import { Activity, DatabaseBackup, Gauge, HeartPulse } from "lucide-react";
+import { Activity, DatabaseBackup, Download, Gauge, HeartPulse } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { workspaceShellRoute } from "./workspace.$workspaceId";
 
@@ -52,6 +53,7 @@ function AdminPage() {
       <StatusSection workspaceId={workspaceId} />
       <AiQuotaSection workspaceId={workspaceId} />
       <BackupSection workspaceId={workspaceId} />
+      <ExportSection workspaceId={workspaceId} />
       <AuditSection workspaceId={workspaceId} />
     </div>
   );
@@ -168,6 +170,43 @@ function BackupSection({ workspaceId }: { workspaceId: string }) {
           </p>
         </>
       )}
+    </section>
+  );
+}
+
+// Phase 6: data export (moved here from the removed Developer page in
+// M7.0a). Plain <a> links to REST routes (not tRPC — a file download needs
+// real Content-Disposition headers), authenticated the same way image
+// thumbnails already are: the browser sends the session cookie on
+// same-origin navigation, no separate token needed.
+function ExportSection({ workspaceId }: { workspaceId: string }) {
+  return (
+    <section className="space-y-2" data-testid="admin-export">
+      <div className="flex items-center gap-2">
+        <Download className="text-muted-foreground h-4 w-4" aria-hidden />
+        <h2 className="text-sm font-semibold">Export data</h2>
+      </div>
+      <p className="text-muted-foreground text-xs">
+        Download this workspace's tasks as a spreadsheet, or the full task/hierarchy graph as JSON.
+      </p>
+      <div className="flex gap-2">
+        <a
+          href={`/export/${workspaceId}/tasks.csv`}
+          data-testid="export-tasks-csv"
+          download
+          className={buttonVariants({ variant: "outline", size: "sm" })}
+        >
+          Download tasks (CSV)
+        </a>
+        <a
+          href={`/export/${workspaceId}/workspace.json`}
+          data-testid="export-workspace-json"
+          download
+          className={buttonVariants({ variant: "outline", size: "sm" })}
+        >
+          Download workspace (JSON)
+        </a>
+      </div>
     </section>
   );
 }

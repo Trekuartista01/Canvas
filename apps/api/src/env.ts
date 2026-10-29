@@ -15,9 +15,6 @@ const optionalString = z.string().optional();
 
 const envSchema = z.object({
   API_PORT: z.coerce.number().default(3001),
-  // Phase 6: this API server's own externally-reachable origin, used to
-  // build SAML ACS/metadata URLs (routes/saml.ts).
-  API_URL: isProd ? z.string().url() : z.string().default("http://localhost:3001"),
   DATABASE_URL: isProd
     ? z.string().min(1)
     : z.string().default("postgres://canvas:canvas@localhost:5432/canvas"),
@@ -52,13 +49,12 @@ const envSchema = z.object({
   SMTP_PASSWORD: optionalString,
   EMAIL_FROM: z.string().default("Canvas <notifications@canvas.local>"),
   DIGEST_INTERVAL_MS: z.coerce.number().default(24 * 60 * 60 * 1000),
-  GITHUB_API_BASE_URL: z.string().default("https://api.github.com"),
   // Optional — leave unset locally; paste the real project DSN in prod.
   SENTRY_DSN: optionalString,
   // safe-outbound-url.ts's SSRF guard blocks every private/loopback
-  // address unconditionally — correct for real webhook/Slack URLs, but it
-  // also blocks the local mock HTTP servers the webhook/Slack e2e specs
-  // stand in for a real receiver with. Set only by the e2e webServer env
+  // address unconditionally — correct for real Slack URLs, but it
+  // also blocks the local mock HTTP server the Slack e2e spec
+  // stands in for a real receiver with. Set only by the e2e webServer env
   // (never a real deployment — see assertProdNotLocalhost below).
   SAFE_OUTBOUND_ALLOW_PRIVATE: z.coerce.boolean().default(false),
 });
@@ -70,7 +66,6 @@ function assertProdNotLocalhost(parsed: z.infer<typeof envSchema>) {
     ["DATABASE_URL", parsed.DATABASE_URL],
     ["REDIS_URL", parsed.REDIS_URL],
     ["WEB_URL", parsed.WEB_URL],
-    ["API_URL", parsed.API_URL],
     ["S3_ENDPOINT", parsed.S3_ENDPOINT],
     ["GOOGLE_REDIRECT_URI", parsed.GOOGLE_REDIRECT_URI],
   ] as const) {

@@ -39,13 +39,12 @@ fly secrets set \
   S3_ACCESS_KEY_ID=... \
   S3_SECRET_ACCESS_KEY=... \
   WEB_URL=https://your-domain \
-  API_URL=https://your-domain \
   GOOGLE_REDIRECT_URI=https://your-domain/auth/google/callback
 ```
 
 Notes:
 
-- **`WEB_URL` and `API_URL` should be the same public origin.** The API
+- **`WEB_URL` is the single public origin.** The API
   process now also serves the built web SPA (single-origin, see
   `apps/api/src/index.ts` and the Dockerfile) — there's no separate web
   deployment or cross-site cookie story to configure.

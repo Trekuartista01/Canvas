@@ -4,10 +4,6 @@ dist
 node_modules
 packages/db/drizzle
 
-# Rust build output / generated schemas — not ours to format
-apps/desktop/src-tauri/target
-apps/desktop/src-tauri/gen
-
 # spec docs — source of truth, not ours to reformat
 PRD.md
 ARCHITECTURE.md

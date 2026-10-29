@@ -74,21 +74,6 @@ const MIN_ROLE: Record<WorkspaceAction, MembershipRole> = {
   "doc:create": "member",
   "doc:update": "member",
   "doc:delete": "member",
-  // This is the workspace-role floor only. Private channels add a
-  // resource-level channel_members check on top (see chat.ts's
-  // requireChannelAccess) — the same "role check here, ownership/membership
-  // check in the router" split doc.ts already uses for doc_task_links.
-  "channel:view": "guest",
-  "channel:create": "member",
-  // Same reasoning as comment:create: posting in a channel you can already
-  // see is participation, not a workspace mutation.
-  "message:create": "guest",
-  // Starting a DM just opens a conversation with someone already visible in
-  // this workspace's member list (workspace.members, guest-tier
-  // hierarchy:view) — same "participation, not workspace mutation"
-  // reasoning as message:create/comment:create, not channel:create's
-  // member tier (which mutates a shared, named, discoverable resource).
-  "dm:create": "guest",
   // Same tiers as doc:* — a form is ordinary workspace content, not a
   // shared cross-cutting resource like a tag or template. (Public,
   // unauthenticated submission goes through form.submitPublic, which has
@@ -114,49 +99,10 @@ const MIN_ROLE: Record<WorkspaceAction, MembershipRole> = {
   "dashboard:create": "member",
   "dashboard:update": "member",
   "dashboard:delete": "member",
-  // Same tiers as doc:*/form:* — a goal is ordinary workspace content, not
-  // a financial-reporting surface like dashboard:* (which can show AI
-  // cost) or a blast-radius concern like automation:*.
-  "goal:view": "guest",
-  "goal:create": "member",
-  "goal:update": "member",
-  "goal:delete": "member",
-  // Admin tier — an API key grants ongoing programmatic access to the
-  // whole workspace (scoped only by its creator's own role, see
-  // schema/api-platform.ts), and a webhook forwards event data plus a
-  // signing secret to an arbitrary external URL. Both are credential-
-  // shaped, same blast-radius tier as automation:create.
-  "apiKey:view": "admin",
-  "apiKey:create": "admin",
-  "apiKey:delete": "admin",
-  "webhook:view": "admin",
-  "webhook:create": "admin",
-  "webhook:delete": "admin",
-  // Admin tier — an import can bulk-create an entire workspace's worth of
-  // spaces/lists/tasks in one run. Same blast-radius reasoning as
-  // apiKey:create/webhook:create.
-  "import:run": "admin",
-  // Same tiers as attachment:* — linking a PR to a task is a task edit,
-  // not a workspace-wide credential or bulk-mutation concern.
-  "prLink:view": "guest",
-  "prLink:create": "member",
-  "prLink:delete": "member",
-  // Owner tier for the mutating actions — enabling/editing SSO changes how
-  // *every* member of the workspace authenticates, and a SCIM token is a
-  // standing grant for an external system to add/remove members. Bigger
-  // blast radius than an admin-tier credential like an API key or webhook
-  // (those only grant what their creator could already do); this changes
-  // who can get in at all. Viewing the current config is lower-risk,
-  // admin tier, same as apiKey:view/webhook:view.
-  "sso:view": "admin",
-  "sso:update": "owner",
-  "scimToken:view": "admin",
-  "scimToken:create": "owner",
-  "scimToken:delete": "owner",
-  // Admin tier, same as automation:create/apiKey:create — defining or
+  // Admin tier, same as automation:create — defining or
   // assigning a custom role changes what OTHER members can do, a bigger
-  // blast radius than ordinary content but not an authentication/standing-
-  // access concern like sso:update/scimToken:*. Privilege escalation is
+  // blast radius than ordinary content but not a workspace-destroying
+  // concern like workspace:delete. Privilege escalation is
   // capped structurally instead (see isGrantable/NON_GRANTABLE below): an
   // admin can never grant an owner-only action through a custom role or
   // space override, so this tier can't be used to mint a second owner.
@@ -166,10 +112,8 @@ const MIN_ROLE: Record<WorkspaceAction, MembershipRole> = {
   "customRole:delete": "admin",
   "spaceOverride:view": "admin",
   "spaceOverride:manage": "admin",
-  // Admin tier, same reasoning as import:run — a bulk export is the read-
-  // side mirror of a bulk import (an entire workspace's worth of content
-  // leaving the app in one file, rather than entering it), same blast-
-  // radius tier as any other whole-workspace bulk operation.
+  // Admin tier — a bulk export is an entire workspace's worth of content
+  // leaving the app in one file — same tier as any whole-workspace bulk operation.
   "export:run": "admin",
   // Admin tier — seeing every member's individual time entries and AI
   // spend across the whole workspace is a bigger blast radius than
@@ -184,10 +128,10 @@ const MIN_ROLE: Record<WorkspaceAction, MembershipRole> = {
 };
 
 // Actions a custom role's grants or a space override's `allow: true` can
-// never include — same reasoning as sso:update/scimToken:* themselves:
-// these change who has standing, workspace-wide destructive/authentication
-// power, and must stay strictly rank-gated so an admin can't use
-// customRole:create (its own admin-tier action) to mint a second owner.
+// never include — owner-only actions like workspace:delete carry
+// workspace-wide destructive power and must stay strictly rank-gated so an
+// admin can't use customRole:create (its own admin-tier action) to mint a
+// second owner.
 export function isGrantable(action: WorkspaceAction): boolean {
   return MIN_ROLE[action] !== "owner";
 }

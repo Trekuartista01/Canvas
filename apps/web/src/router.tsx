@@ -15,9 +15,6 @@ import { timesheetRoute } from "./routes/workspace.$workspaceId.timesheet";
 import { workloadRoute } from "./routes/workspace.$workspaceId.workload";
 import { docsListRoute } from "./routes/workspace.$workspaceId.docs";
 import { docEditorRoute } from "./routes/workspace.$workspaceId.docs.$docId";
-import { chatChannelListRoute, chatIndexRoute } from "./routes/workspace.$workspaceId.chat";
-import { chatChannelRoute } from "./routes/workspace.$workspaceId.chat.$channelId";
-import { chatDmRoute } from "./routes/workspace.$workspaceId.chat.dm.$channelId";
 import { formsListRoute } from "./routes/workspace.$workspaceId.forms";
 import { formEditorRoute } from "./routes/workspace.$workspaceId.forms.$formId";
 import { automationsListRoute } from "./routes/workspace.$workspaceId.automations";
@@ -28,13 +25,8 @@ import { copywriterWorkspaceRoute } from "./routes/workspace.$workspaceId.copywr
 import { copywriterHistoryRoute } from "./routes/workspace.$workspaceId.copywriter.history";
 import { dashboardsListRoute } from "./routes/workspace.$workspaceId.dashboards";
 import { dashboardEditorRoute } from "./routes/workspace.$workspaceId.dashboards.$dashboardId";
-import { goalsListRoute } from "./routes/workspace.$workspaceId.goals";
-import { goalEditorRoute } from "./routes/workspace.$workspaceId.goals.$goalId";
-import { developerRoute } from "./routes/workspace.$workspaceId.developer";
-import { importRoute } from "./routes/workspace.$workspaceId.import";
 import { libraryRoute } from "./routes/workspace.$workspaceId.library";
 import { rolesRoute } from "./routes/workspace.$workspaceId.roles";
-import { securityRoute } from "./routes/workspace.$workspaceId.security";
 import { adminRoute } from "./routes/workspace.$workspaceId.admin";
 import { semanticSearchRoute } from "./routes/workspace.$workspaceId.semantic-search";
 import { newWorkspaceRoute } from "./routes/workspaces.new";
@@ -56,18 +48,12 @@ const routeTree = rootRoute.addChildren([
     workloadRoute,
     docsListRoute,
     docEditorRoute,
-    chatChannelListRoute.addChildren([chatIndexRoute, chatChannelRoute, chatDmRoute]),
     formsListRoute,
     formEditorRoute,
     automationsListRoute,
     automationEditorRoute,
     dashboardsListRoute,
     dashboardEditorRoute,
-    goalsListRoute,
-    goalEditorRoute,
-    developerRoute,
-    importRoute,
-    securityRoute,
     adminRoute,
     rolesRoute,
     brandKitsRoute,

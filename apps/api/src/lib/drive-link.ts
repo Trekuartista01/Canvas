@@ -2,8 +2,8 @@
 // webViewLink and the underlying file id. Accepts the two share-link
 // shapes Drive actually produces ("/file/d/{id}/view..." for a single
 // file, "?id={id}" for a folder/legacy link) — pure and unit-testable,
-// same "parse, don't just store the raw string" precedent as
-// github-client.ts's parsePullRequestUrl.
+// same "parse, don't just store the raw string" approach the rest of the
+// codebase takes with external URLs.
 const FILE_D_PATTERN = /^https:\/\/drive\.google\.com\/file\/d\/([^/]+)/;
 const OPEN_ID_PATTERN = /^https:\/\/drive\.google\.com\/open\?id=([^&]+)/;
 

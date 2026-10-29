@@ -45,13 +45,13 @@ export default defineConfig({
       // repro that failed 27/53 specs, 23 of them on the literal "Too many
       // attempts" error at signUp(). Raised, not disabled, so a genuine
       // runaway retry loop in a spec still gets caught eventually.
-      // 2026-08-04: the webhook (M5.4) and Slack-notify (M5.6) specs each
-      // stand in a real receiver with a local `http.createServer` on
+      // 2026-08-04: the Slack-notify (M5.6) spec stands
+      // in a real receiver with a local `http.createServer` on
       // 127.0.0.1 — safe-outbound-url.ts's SSRF guard blocks every private
-      // address unconditionally, which silently broke both specs' actual
+      // address unconditionally, which silently broke the spec's actual
       // delivery assertion the moment that guard was added (2026-07-29).
       // Found via the same 5-worker repro as the auth-rate-limit fix above:
-      // once that noisier failure mode was gone, these two were the only
+      // once that noisier failure mode was gone, it was one of the only
       // consistent (not flaky) failures left in a 38-spec batch.
       // Only takes effect when this webServer entry actually spawns a fresh
       // process (reuseExistingServer skips it if one's already listening —
@@ -59,7 +59,6 @@ export default defineConfig({
       env: {
         SCHEDULER_TICK_MS: "3000",
         DIGEST_INTERVAL_MS: "3000",
-        GITHUB_API_BASE_URL: "http://127.0.0.1:4011",
         OPENAI_API_KEY: "",
         ANTHROPIC_API_KEY: "",
         GEMINI_API_KEY: "",

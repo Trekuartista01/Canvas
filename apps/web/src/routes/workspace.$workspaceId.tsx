@@ -1,6 +1,5 @@
 import { BrainChatPanel } from "@/components/brain-chat-panel";
 import { CanvasLogo } from "@/components/canvas-logo";
-import { DmToastContainer } from "@/components/dm-toast-container";
 import { GenerationPanel } from "@/components/generation-panel";
 import { HierarchySidebar } from "@/components/hierarchy-sidebar";
 import { LoginSummaryPanel } from "@/components/login-summary-panel";
@@ -10,12 +9,10 @@ import { RunningTimerWidget } from "@/components/running-timer-widget";
 import { SearchBox } from "@/components/search-box";
 import { Button } from "@/components/ui/button";
 import { WorkspaceNav } from "@/components/workspace-nav";
-import { useDmNotifications } from "@/hooks/use-dm-notifications";
 import { useModalA11y } from "@/hooks/use-modal-a11y";
 import { useRealtime } from "@/hooks/use-realtime";
 import { useSession } from "@/hooks/use-session";
 import { Avatar } from "@/lib/avatar";
-import { primeDmSoundOnFirstInteraction } from "@/lib/dm-sound";
 import { trpc } from "@/lib/trpc";
 import {
   createRoute,
@@ -66,11 +63,7 @@ function WorkspaceShell() {
     setMobileNavOpen(false);
   }, [pathname]);
 
-  const handleDmNotificationEvent = useDmNotifications(workspaceId);
-  useRealtime(workspaceId, handleDmNotificationEvent);
-  useEffect(() => {
-    primeDmSoundOnFirstInteraction();
-  }, []);
+  useRealtime(workspaceId);
 
   return (
     <div className="flex h-svh flex-col md:flex-row">
@@ -212,7 +205,6 @@ function WorkspaceShell() {
         <Outlet />
       </main>
       {workspaceId && <LoginSummaryPanel workspaceId={workspaceId} />}
-      <DmToastContainer />
       {brainOpen && workspaceId && (
         <BrainChatPanel
           workspaceId={workspaceId}

@@ -1,7 +1,7 @@
 import { env } from "../env";
 import { redisConnection } from "../queues/connection";
 
-// Fixed-window limiter. API keys use 60/min; auth (login/signup) uses a
+// Fixed-window limiter, 60/min by default; auth (login/signup) uses a
 // tighter per-IP (and per-email for login) budget to blunt credential stuffing.
 export const RATE_LIMIT_MAX_REQUESTS = 60;
 export const RATE_LIMIT_WINDOW_MS = 60_000;
@@ -40,7 +40,7 @@ export function isOverRateLimit(
 
 /**
  * Increments the bucket's window counter and reports whether this request
- * is over the limit. `bucket` should already be scoped (e.g. `apikey:${id}`,
+ * is over the limit. `bucket` should already be scoped (e.g. `upload:ip:${ip}`,
  * `auth:ip:${ip}`, `auth:email:${email}`).
  */
 export async function checkRateLimit(

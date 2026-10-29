@@ -6,7 +6,6 @@
  */
 export const NOTIFICATION_VERB_LABELS: Record<string, string> = {
   "comment.created": "mentioned you in a comment",
-  "message.created": "mentioned you in a message",
   "reminder.fired": "Reminder",
   "task.assigned": "assigned you a task",
   "task.priority_urgent": "flagged a task as urgent",

@@ -17,7 +17,7 @@ test("Phase 6: data export downloads a workspace's tasks as CSV and as JSON", as
 
   const workspaceId = new URL(page.url()).pathname.split("/")[2]!;
 
-  await page.getByRole("link", { name: "Developer" }).click();
+  await page.getByRole("link", { name: "Admin", exact: true }).click();
   const csvLink = page.getByTestId("export-tasks-csv");
   const jsonLink = page.getByTestId("export-workspace-json");
   await expect(csvLink).toHaveAttribute("href", `/export/${workspaceId}/tasks.csv`);

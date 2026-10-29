@@ -55,8 +55,6 @@ export default defineConfig({
       "/image-versions": "http://localhost:3001",
       "/image-assets": "http://localhost:3001",
       "/ai-references": "http://localhost:3001",
-      "/imports": "http://localhost:3001",
-      "/scim": "http://localhost:3001",
       "/export": "http://localhost:3001",
       "/ws": { target: "ws://localhost:3001", ws: true },
     },

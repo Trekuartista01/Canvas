@@ -37,34 +37,10 @@ export function buildSystemPrompt(
   context:
     | { type: "global" }
     | { type: "task"; title: string; listName: string; descriptionJson: unknown }
-    | { type: "doc"; title: string; linkedTasks: { id: string; title: string }[] }
-    | { type: "channel"; name: string }
-    | { type: "dm"; otherUserName: string },
+    | { type: "doc"; title: string; linkedTasks: { id: string; title: string }[] },
   brand?: BrandContext | null,
 ): string {
   if (context.type === "global") return [BASE_PROMPT, ...brandLines(brand)].join("\n");
-
-  if (context.type === "channel") {
-    return [
-      BASE_PROMPT,
-      "",
-      `You are currently focused on the #${context.name} chat channel.`,
-      "You do not have access to that channel's message history — only what the user tells you in this conversation.",
-      "attach_to_task requires an explicit task_id here, since a channel has no linked tasks.",
-      ...brandLines(brand),
-    ].join("\n");
-  }
-
-  if (context.type === "dm") {
-    return [
-      BASE_PROMPT,
-      "",
-      `You are currently focused on a direct message conversation with ${context.otherUserName}.`,
-      "You do not have access to that conversation's message history — only what the user tells you here.",
-      "attach_to_task requires an explicit task_id here, since a direct message has no linked tasks.",
-      ...brandLines(brand),
-    ].join("\n");
-  }
 
   if (context.type === "doc") {
     const linked =
