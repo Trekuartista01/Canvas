@@ -13,10 +13,11 @@ You are building a work-management platform with an image-native AI brain. The s
 4. If the spec is ambiguous, choose the simplest option consistent with ARCHITECTURE.md and note the decision in `PROGRESS.md` — don't invent new scope.
 
 ## Commands
-- `pnpm dev` — full stack (web + api + docker services)
+- `pnpm dev` — full stack (web + api + worker); needs Redis running in WSL and `.env` pointing at Supabase `canvas-dev` + R2 `canvas-dev` — no Docker (see `docs/LOCAL_SETUP.md`)
 - `pnpm db:generate` / `pnpm db:migrate` — Drizzle migrations (never edit applied migrations)
 - `pnpm test` — vitest; `pnpm test:e2e` — Playwright
 - `pnpm check` — typecheck + lint + format (must pass before every commit)
+- `pnpm build` then `pnpm start` / `pnpm start:worker` — run the built output; prod runs these under PM2 via `ecosystem.config.cjs` (see `DEPLOYMENT.md`)
 
 ## Repo layout
 ```

@@ -153,10 +153,10 @@ function BackupSection({ workspaceId }: { workspaceId: string }) {
     <section className="space-y-2" data-testid="admin-backups">
       <div className="flex items-center gap-2">
         <DatabaseBackup className="text-muted-foreground h-4 w-4" aria-hidden />
-        <h2 className="text-sm font-semibold">Backups (VPS)</h2>
+        <h2 className="text-sm font-semibold">Backups</h2>
       </div>
       <p className="text-muted-foreground text-xs">
-        Hosting target is a single VPS with Docker Compose. Run these on the box (or via cron).
+        How the production database is backed up and restored.
       </p>
       {guidance.data && (
         <>

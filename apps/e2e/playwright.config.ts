@@ -1,4 +1,12 @@
+import { existsSync } from "node:fs";
 import { defineConfig, devices } from "@playwright/test";
+
+// Specs that read the DB directly (email-digest, recurring-tasks) import
+// @canvas/db, whose pool reads DATABASE_URL at import time — load the same
+// repo-root .env the API uses so both talk to the same database. Real env
+// vars (CI) still win; CI has no .env file at all.
+const rootEnv = new URL("../../.env", import.meta.url);
+if (existsSync(rootEnv)) process.loadEnvFile(rootEnv);
 
 const isCI = !!process.env.CI;
 

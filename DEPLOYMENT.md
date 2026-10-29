@@ -1,107 +1,163 @@
-# DEPLOYMENT.md — production deploy checklist
+# DEPLOYMENT.md — production on an Oracle Always Free VM (€0)
 
-Target shape per ARCHITECTURE.md: Docker Compose locally → Fly.io/Railway in
-prod. `fly.toml` in the repo root is a Fly starting point; swap the
-equivalent steps if deploying to Railway instead (same image, same env
-vars). This doc assumes Fly.
+Production setup (Phase 7, see ARCHITECTURE.md):
 
-## 1. Provision infrastructure (once)
+- **App server:** one Oracle Cloud _Always Free_ VM running Ubuntu. On it:
+  - PM2 runs two processes from `ecosystem.config.cjs`:
+    - `canvas-api`: the API plus the built web app, served from one origin.
+    - `canvas-worker`: the BullMQ jobs.
+  - Caddy terminates HTTPS in front of the API.
+  - Redis is installed locally with apt.
+- **Database:** a Supabase project `canvas-prod` (free tier, pgvector).
+- **Files and backups:** a Cloudflare R2 bucket `canvas-prod`.
 
-- **Postgres with pgvector** — managed (Fly Postgres, Neon, Supabase, RDS…).
-  Must support `CREATE EXTENSION vector` (the embeddings migration runs
-  this itself; the extension binary just needs to be present).
-- **Redis** — managed (Upstash, Fly Redis, ElastiCache…). Used for BullMQ
-  (image gen, webhooks, notifications, scheduler) — required in prod, not
-  optional.
-- **S3-compatible bucket** — real S3 or Cloudflare R2 (cheap egress, see
-  ARCHITECTURE.md). Configure real bucket CORS for the direct-upload flows
-  (`attachment.presignUpload` etc. — this is `MINIO_API_CORS_ALLOW_ORIGIN`'s
-  prod equivalent, done on the bucket, not via env var).
-- **Fly app**: `fly launch --no-deploy` from repo root (reuses `fly.toml`;
-  pick the real app name + region when prompted, or edit the file first).
-  Fly auto-detects the two process groups (`app`, `worker`) already
-  declared in `fly.toml`.
+No Docker anywhere. For a dev machine, see `docs/LOCAL_SETUP.md` instead.
 
-## 2. Required secrets
+## 1. Provision accounts (once)
 
-`apps/api/src/env.ts` refuses to boot in production if any of these still
-look like local/dev defaults (localhost URLs, the MinIO `canvas`/
-`canvas12345` credentials). Set the real values as Fly secrets — never
-commit them:
+1. **Supabase**: create project `canvas-prod` (Frankfurt region, Free plan) and save the DB password. Under **Connect → Session pooler**, copy the URI (port **5432**, never the 6543 Transaction pooler).
+   - Optional: Project Settings → Database → SSL Configuration → download the CA certificate for `SUPABASE_CA_CERT`.
+   - Free projects pause after 7 days with no activity. A live app's traffic, plus the nightly backup, keeps it awake.
+2. **Cloudflare R2**: create bucket `canvas-prod`.
+   - Bucket → Settings → CORS Policy:
+     ```json
+     [
+       {
+         "AllowedOrigins": ["https://your-domain"],
+         "AllowedMethods": ["GET", "PUT"],
+         "AllowedHeaders": ["content-type"],
+         "ExposeHeaders": ["ETag"],
+         "MaxAgeSeconds": 3600
+       }
+     ]
+     ```
+   - Manage API tokens → Create API token → _Object Read & Write_, scoped to `canvas-prod`.
+   - The app never creates R2 buckets or edits their CORS; both are dashboard-only.
+3. **Domain**: an `A` record pointing `your-domain` at the VM's public IP (from step 2).
 
-```
-fly secrets set \
-  DATABASE_URL=postgres://... \
-  REDIS_URL=redis://... \
-  S3_ENDPOINT=https://... \
-  S3_REGION=... \
-  S3_BUCKET=... \
-  S3_ACCESS_KEY_ID=... \
-  S3_SECRET_ACCESS_KEY=... \
-  WEB_URL=https://your-domain \
-  GOOGLE_REDIRECT_URI=https://your-domain/auth/google/callback
-```
+## 2. Create the VM
 
-Notes:
+Oracle Cloud console → Compute → Instances → Create instance:
 
-- **`WEB_URL` is the single public origin.** The API
-  process now also serves the built web SPA (single-origin, see
-  `apps/api/src/index.ts` and the Dockerfile) — there's no separate web
-  deployment or cross-site cookie story to configure.
-- `S3_FORCE_PATH_STYLE` defaults to `true` (needed for MinIO); set it to
-  `false` for real S3/R2 virtual-hosted-style URLs if your bucket needs
-  that.
+- **Image:** Canonical Ubuntu 24.04. **Shape:** Ampere `VM.Standard.A1.Flex` (Always Free, e.g. 2 OCPU / 12 GB). Upload your SSH public key.
+- **Networking:** in the VCN's security list, add ingress rules for TCP **80** and **443** from `0.0.0.0/0`. Don't open 3001: the API is only reached through Caddy.
+- Oracle's Ubuntu image also ships its own iptables rules, so open the ports on the VM too:
+  ```bash
+  sudo iptables -I INPUT 6 -m state --state NEW -p tcp --dport 80 -j ACCEPT
+  sudo iptables -I INPUT 6 -m state --state NEW -p tcp --dport 443 -j ACCEPT
+  sudo netfilter-persistent save
+  ```
 
-Optional but recommended, same `fly secrets set` mechanism:
+## 3. Install the runtime
 
-- `ANTHROPIC_API_KEY` — Brain chat + image understanding. Unset = mocked.
-- `OPENAI_API_KEY`, `GEMINI_API_KEY` — image generation adapters. Unset =
-  mocked per-workspace ImageEngine calls.
-- `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` — "Continue with Google".
-  Unset = that button is hidden, email/password still works.
-- `SENTRY_DSN` (API/worker) and `VITE_SENTRY_DSN` (build-time, web) — error
-  tracking. `VITE_SENTRY_DSN` must be set _before_ `pnpm build` runs (Vite
-  inlines it), so it needs to be a build-arg/build-time env var, not just a
-  runtime Fly secret.
-- SMTP vars (`SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD`,
-  `EMAIL_FROM`) — notification digest emails. Unset = logged, not sent.
+```bash
+# Node 22 + pnpm + PM2
+curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash -
+sudo apt install -y nodejs git
+sudo npm install -g pnpm@11 pm2
 
-Full var list with descriptions: `.env.example`.
+# Redis (stays on 127.0.0.1 — env.ts allows that in production)
+sudo apt install -y redis-server
+sudo systemctl enable --now redis-server
 
-## 3. Deploy
+# pg_dump matching Supabase's Postgres major version (for backups)
+sudo apt install -y postgresql-common
+sudo /usr/share/postgresql-common/pgdg/apt.postgresql.org.sh -y
+sudo apt install -y postgresql-client-17
 
-```
-fly deploy
+# Caddy (automatic HTTPS)
+sudo apt install -y debian-keyring debian-archive-keyring apt-transport-https curl
+curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/gpg.key' | sudo gpg --dearmor -o /usr/share/keyrings/caddy-stable-archive-keyring.gpg
+curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt' | sudo tee /etc/apt/sources.list.d/caddy-stable.list
+sudo apt update && sudo apt install -y caddy
 ```
 
-Builds the root `Dockerfile` (`pnpm build` → both `apps/api` and
-`apps/web`), ships one image, and runs it as both the `app` and `worker`
-process groups per `fly.toml`.
+`sharp` and `@node-rs/argon2` ship arm64 builds, so the Ampere VM needs no extra build tools.
 
-**Before first traffic, run migrations against the target `DATABASE_URL`:**
+## 4. Configure and start the app
+
+```bash
+git clone <repo-url> ~/canvas-app && cd ~/canvas-app
+cp .env.example .env && nano .env
+```
+
+Set at least the following (each is explained in `.env.example`):
+
+| Variable                                                | Production value                                                                |
+| ------------------------------------------------------- | ------------------------------------------------------------------------------- |
+| `DATABASE_URL`                                          | `canvas-prod` Session pooler URI                                                |
+| `SUPABASE_CA_CERT`                                      | optional; path to the downloaded CA, e.g. `/home/ubuntu/canvas-app/prod-ca.crt` |
+| `REDIS_URL`                                             | `redis://127.0.0.1:6379`                                                        |
+| `S3_ENDPOINT`                                           | `https://<account-id>.r2.cloudflarestorage.com`                                 |
+| `S3_REGION` / `S3_FORCE_PATH_STYLE`                     | `auto` / `false`                                                                |
+| `S3_BUCKET`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY` | `canvas-prod` and its token                                                     |
+| `WEB_URL`                                               | `https://your-domain` (the one public origin)                                   |
+| `GOOGLE_REDIRECT_URI`                                   | `https://your-domain/auth/google/callback`                                      |
+
+Optional: `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `GEMINI_API_KEY` (AI is mocked when they're unset), `GOOGLE_CLIENT_ID`/`_SECRET`, SMTP vars, `SENTRY_DSN`. `VITE_SENTRY_DSN` is baked into the web bundle at build time, so it must be in `.env` before `pnpm build`.
+
+`NODE_ENV=production` and `DB_POOL_MAX` come from `ecosystem.config.cjs`, so you don't need them in `.env`. In production, the API refuses to boot if `.env` still has localhost or dev values for the database, web URL or storage.
+
+```bash
+pnpm install --frozen-lockfile
+pnpm build            # apps/api/dist + apps/web/dist
+pnpm db:migrate       # against canvas-prod
+pm2 start ecosystem.config.cjs
+pm2 save
+pm2 startup           # run the command it prints, so PM2 restarts on reboot
+```
+
+## 5. Caddy (HTTPS)
+
+`/etc/caddy/Caddyfile`:
 
 ```
-fly ssh console -C "pnpm db:migrate"
+your-domain {
+	reverse_proxy 127.0.0.1:3001
+}
 ```
 
-(or run `pnpm db:migrate` from CI/a one-off machine with the same
-`DATABASE_URL` secret — never edit an already-applied migration, per
-CLAUDE.md).
+```bash
+sudo systemctl reload caddy
+```
 
-## 4. Verify
+Caddy gets and renews the TLS certificate by itself and proxies WebSockets without extra config.
 
-- `GET https://your-domain/health` → `{"ok":true,"checks":{"api":"ok","database":"ok","redis":"ok"}}`
-  (this is also `fly.toml`'s own health check — a red deploy means this
-  isn't 200 yet).
-- Sign up → create workspace → invite a second user (Phase 0 accept
-  criteria) as a live smoke test.
-- Phase-2 smoke test (generate → edit ×3 → attach) if image provider keys
-  are set.
+## 6. Nightly database backup
 
-## Known scaling caveat
+`scripts/backup-db.sh` dumps `public` and `drizzle` with `pg_dump --format=custom`, gzips the dump, and uploads it to the R2 bucket as `backups/YYYY-MM-DD.dump.gz` (Kosovo date). It keeps the newest 14 backups. Install it with `crontab -e`:
 
-Realtime invalidation (WS) is in-process pub/sub, not Redis (see
-PROGRESS.md's note near "In-process pub/sub, not Redis") — correct for a
-single `app` machine, which is what `fly.toml` and this checklist assume
-(`min_machines_running = 1`, no autoscale-out). Revisit with Redis pub/sub
-before running more than one `app` instance concurrently.
+```
+30 2 * * * /home/ubuntu/canvas-app/scripts/backup-db.sh >> /home/ubuntu/canvas-backup.log 2>&1
+```
+
+Set `PG_DUMP=/usr/lib/postgresql/17/bin/pg_dump` in `.env` if several Postgres client versions are installed.
+
+**Restore** into an empty database:
+
+```bash
+gunzip -c 2026-01-31.dump.gz > db.dump
+psql "$DATABASE_URL" -c "create extension if not exists vector"
+pg_restore --no-owner -d "$DATABASE_URL" db.dump   # "schema public already exists" is expected
+```
+
+## 7. Deploying an update
+
+```bash
+cd ~/canvas-app && git pull
+pnpm install --frozen-lockfile && pnpm build && pnpm db:migrate
+pm2 reload ecosystem.config.cjs
+```
+
+Never edit an already-applied migration (CLAUDE.md).
+
+## 8. Verify
+
+- `curl https://your-domain/health` → `{"ok":true,"checks":{"api":"ok","database":"ok","redis":"ok"}}`.
+- `pm2 status` shows `canvas-api` and `canvas-worker` online. Check `pm2 logs` for any `storage: bucket … isn't reachable` warning.
+- Sign up → create a workspace → upload an attachment. The upload goes directly to R2, so this also exercises the CORS rule.
+- Phase-2 smoke test (generate → edit ×3 → attach), if image provider keys are set.
+
+## Scaling note
+
+Run exactly **one** `canvas-api` process. Board realtime goes through Redis pub/sub, but the collaborative doc editor (`lib/doc-collab.ts`) keeps each document's Yjs room in memory. Two API processes would split editors of the same doc between them.

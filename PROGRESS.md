@@ -2296,3 +2296,34 @@ Kept, as specified: Slack notify, automations, Google Drive picker, docs + Brain
 - `pnpm db:migrate` applied `0054` cleanly to an existing local DB with data: 59 → 47 tables, `attachments.message_id` gone.
 - Full local Playwright run at CI parity (`CI=1`): **67/67 passed**, no retries/flakes (down from 80 specs — the removed features' specs went with them). Phase-2 smoke test green.
 - Not verified on GitHub Actions (push is blocked — this machine's GitHub login lacks write access to the repo).
+
+## 2026-10-29 M7.0b: drop Docker; Supabase + R2 + PM2 — done
+
+Developers no longer need Docker. Dev runs `pnpm dev` (api + web + worker via turbo) against a Supabase `canvas-dev` project, an R2 `canvas-dev` bucket and Redis in WSL. Prod is PM2 + Caddy on an Oracle Always Free VM against Supabase `canvas-prod` + R2 `canvas-prod`. Containers survive only in CI (`services:` Postgres/Redis, plus a RustFS fake S3 for e2e).
+
+- **Deleted** `docker-compose.yml`, `Dockerfile`, `fly.toml`. Root `dev` no longer runs `docker compose`; `start:api` renamed to `start` (`start:worker` kept).
+- **DB connection** (`packages/db/src/connection.ts`, pure + unit-tested): TLS for any non-local host; with `SUPABASE_CA_CERT` (PEM text or a file path) the chain is verified, otherwise `rejectUnauthorized: false`. Pool size from `DB_POOL_MAX` (default 5; `ecosystem.config.cjs` sets api 5 / worker 3). ssl-related params (`sslmode` etc.) are stripped from the URL, because pg lets them override the explicit `ssl` object, so `?sslmode=require` would otherwise force system-CA verification and fail on Supabase's pooler cert. `drizzle.config.ts` uses the same helper and now loads the repo-root `.env` (drizzle-kit never did).
+- **pgvector on Supabase: no new migration needed.** `0034` already has `CREATE EXTENSION IF NOT EXISTS vector` with unqualified `vector(768)` types. As Supabase's `postgres` role it installs into `public`; if someone enabled it from the dashboard first (into `extensions`), the `IF NOT EXISTS` is a no-op and the type still resolves via Supabase's default `search_path` (`"$user", public, extensions`). Not verified against a live Supabase project (no credentials here).
+- **R2 storage** (`storage.ts`): S3 client sets `requestChecksumCalculation`/`responseChecksumValidation: "WHEN_REQUIRED"`. Newer AWS SDKs add CRC checksum params to presigned PUTs by default, which a browser upload can't satisfy; this is Cloudflare's documented fix. `ensureBucketExists()` now only creates the bucket and applies CORS for a **localhost** endpoint (CI's fake S3). For R2 (dev and prod) it only does a `HeadBucket` and logs a warning if unreachable: buckets and CORS are dashboard-managed (the app's token is object-scoped). CORS JSON documented in LOCAL_SETUP/DEPLOYMENT with explicit `AllowedHeaders: ["content-type"]`.
+- **Redis**: default `redis://127.0.0.1:6379`; `REDIS_URL` removed from the production localhost guard (prod Redis is on the same VM). DB/S3/WEB_URL/Google redirect localhost + dev S3 creds are still rejected.
+- **Fixed: `.env` loaded after the DB pool was created.** `index.ts`/`worker.ts` imported `@canvas/db` before `./env`, and `packages/db/src/client.ts` builds its pool from `process.env` at import time, so a `DATABASE_URL` that existed only in `.env` was silently ignored (localhost default used). Invisible while `.env` matched the Docker defaults; fatal with Supabase. New side-effect module `apps/api/src/load-env.ts` is now the first import of both entrypoints (confirmed in the built bundles: dotenv runs before `new Pool`). `playwright.config.ts` loads the same root `.env` for the two specs that query the DB directly.
+- **Fixed: the built API never actually ran.** `node apps/api/dist/index.js` crashed with `Dynamic require of "events" is not supported`. tsup inlines `@canvas/db` (`noExternal`), and `pg` isn't an `apps/api` dependency, so CommonJS `pg` got bundled into the ESM output. Pre-existing (reproduced on the 7.0a commit); the Docker image would have hit it too. Fixed by adding `pg` to `apps/api` dependencies, so tsup keeps it external.
+- **Vite `envDir: "../.."`**: `VITE_SENTRY_DSN` used to arrive as a Docker build arg; the server's `pnpm build` now reads it from the root `.env`. Only `VITE_`-prefixed vars reach the bundle.
+- **PM2**: `ecosystem.config.cjs` with `canvas-api` (API + built SPA, single origin) and `canvas-worker`, both `NODE_ENV=production`.
+- **Backups**: `scripts/backup-db.sh` → `apps/api/scripts/backup-db.mjs` (plain `.mjs` so it runs with no build step). It runs `pg_dump --format=custom --no-owner --no-privileges` of the `public` + `drizzle` schemas (Supabase's own auth/storage schemas aren't ours to dump), gzips it, uploads `backups/YYYY-MM-DD.dump.gz` (Europe/Belgrade date) and prunes to the newest 14. Key is `.dump.gz` rather than the brief's `.dump`, since the object is gzipped. `.env` isn't shell-sourced because values like `EMAIL_FROM=Canvas <…>` break `source`. `PG_DUMP`/`PGSSLMODE` overrides supported.
+- Admin page backup guidance rewritten for PM2/Supabase/R2 (`hosting: "vm_pm2"`).
+- Docs: `.env.example` rewritten with where each value lives in the Supabase/Cloudflare dashboards; new `docs/LOCAL_SETUP.md` (Windows, first-timer, WSL + Redis + Supabase + R2); `DEPLOYMENT.md` rewritten for Oracle + PM2 + Caddy + cron backup + restore; CLAUDE.md Commands and ARCHITECTURE.md DB/Jobs/Storage/Deploy rows updated. DEPLOYMENT's old "in-process pub/sub" scaling caveat was stale (board realtime already uses Redis pub/sub); the real one-API-process constraint is the in-memory Yjs doc rooms, documented instead.
+
+### Verified
+
+- `pnpm check` green; `pnpm test`: db 7 (new), shared 60, web 15, API 278.
+- `pnpm build`, then the built `apps/api/dist/index.js` + `worker.js` run from the repo root (as PM2 runs them): `/health` → `{"ok":true,"checks":{"api":"ok","database":"ok","redis":"ok"}}`, worker listening on all 6 queues.
+- `pnpm db:migrate` through the new drizzle config.
+- Full Playwright run at CI parity (`CI=1`, local CI-style services): **67/67 passed**, no retries. Phase-2 smoke test green.
+- Backup script end to end, in a Linux container (node 22 + postgresql-client-16) against the local stack: uploaded a 396 KB dump, pruned 16 → 14 objects; the dump restored into a scratch DB with identical table/user/migration counts (47/395/55). The only restore error is the expected `schema "public" already exists`.
+
+### Not verified (needs real accounts)
+
+- Against a live Supabase project (TLS handshake, Session pooler, `CREATE EXTENSION` there) and live R2 (presigned PUT/GET, CORS). Both are covered by config and docs only. First real run will be when `.env` is pointed at `canvas-dev`.
+- PM2 itself and Caddy (not installed on this machine); Oracle VM steps are M7.10.
+- CI changes on GitHub Actions (push still blocked).

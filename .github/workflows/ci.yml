@@ -1,5 +1,9 @@
 name: CI
 
+# Containers here are CI-only stand-ins (pgvector Postgres, Redis, an
+# S3-compatible server) — developers never need Docker: dev runs against a
+# Supabase dev project, Cloudflare R2 and Redis in WSL (docs/LOCAL_SETUP.md).
+
 on:
   push:
     branches: [main]
@@ -30,7 +34,7 @@ jobs:
       # worker process. Without this, ioredis retries in the background and
       # dumps ECONNREFUSED noise into CI logs (tests still pass — nothing
       # here actually calls the queue yet — but the noise is worth avoiding
-      # by matching what docker-compose.yml already provisions locally).
+      # by matching the local Redis every dev environment has).
       redis:
         image: redis:7-alpine
         ports:
@@ -110,11 +114,10 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      # Same S3-compatible image docker-compose.yml uses locally (RustFS —
-      # MinIO pulled its public images, and bitnami/minio before that).
-      # Bucket creation is handled by the app itself (storage.ts's
-      # ensureBucketExists(), called on both api and worker startup), so no
-      # bucket-provisioning env var is needed here. See PROGRESS.md.
+      # Fake S3 for e2e (RustFS — MinIO pulled its public images). Because
+      # its endpoint is localhost, storage.ts's ensureBucketExists() creates
+      # the bucket and CORS rule itself on api/worker startup; real R2
+      # buckets are pre-created in the Cloudflare dashboard. See PROGRESS.md.
       - name: Start S3 storage
         run: |
           docker run -d --name s3 \

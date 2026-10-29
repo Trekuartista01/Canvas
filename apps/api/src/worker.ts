@@ -1,3 +1,4 @@
+import "./load-env";
 import { db, schema } from "@canvas/db";
 import { Worker } from "bullmq";
 import { asc, and, eq, isNull } from "drizzle-orm";

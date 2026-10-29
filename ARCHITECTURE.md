@@ -9,12 +9,12 @@
 | Monorepo | pnpm workspaces + Turborepo | Claude Code navigates one repo well |
 | Frontend | React + Vite + TypeScript, TanStack Router/Query/Table, dnd-kit, Tailwind + shadcn/ui | Fast iteration, virtualized tables for 5k+ rows |
 | Backend | Node + TypeScript, Fastify, tRPC (internal) + REST (public API later) | End-to-end types; tRPC keeps Claude Code honest |
-| DB | Postgres 16 + Drizzle ORM | Migrations as code; pgvector later for semantic/visual search |
+| DB | Supabase Postgres (pgvector) + Drizzle ORM, via the Session pooler (TLS, small pools) | Migrations as code; free hosted Postgres with pgvector, no local DB server |
 | Realtime | WebSocket (fastify-websocket) publishing invalidation events; clients refetch via TanStack Query | Simple, replace with CRDT only for Docs |
-| Jobs | BullMQ + Redis | Image generation runs async; webhooks; notifications |
-| Storage | S3-compatible (Cloudflare R2 or MinIO locally) | Images are the hot path — cheap egress matters |
+| Jobs | BullMQ + Redis (local: WSL in dev, apt on the server) | Image generation runs async; notifications |
+| Storage | Cloudflare R2 (S3 API), bucket per environment | Images are the hot path — no egress fees |
 | Auth | Lucia or Auth.js; sessions in Postgres | Google OAuth + email/password |
-| Deploy | Docker Compose (dev) → Fly.io/Railway (prod) | One-command local env |
+| Deploy | No Docker. Dev: `pnpm dev` + Supabase/R2 dev resources. Prod: PM2 (`ecosystem.config.cjs`) + Caddy on an Oracle Always Free VM, nightly `pg_dump` to R2 | €0 hosting, one public origin |
 
 ## 2. System diagram
 

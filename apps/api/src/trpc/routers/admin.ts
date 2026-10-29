@@ -43,16 +43,16 @@ export const adminRouter = router({
   backupGuidance: protectedProcedure.input(workspaceAdminSchema).query(async ({ ctx, input }) => {
     await assertCan(ctx.user, input.workspaceId, "workspace:manage");
     return {
-      hosting: "vps_compose" as const,
+      hosting: "vm_pm2" as const,
       steps: [
-        "Run API, worker, and web behind Docker Compose on your VPS (see repo Dockerfile).",
-        "Nightly: pg_dump $DATABASE_URL | gzip > backup-$(date -u +%Y%m%d).sql.gz",
-        "Copy dumps to off-box storage (S3/R2 or another disk). Keep at least 7 daily + 4 weekly.",
-        "Also version object storage (image/files bucket) or sync it with rclone.",
-        "Quarterly restore drill: load a dump into a scratch Postgres and hit /health.",
+        "The API and worker run under PM2 on the server (ecosystem.config.cjs); the database is Supabase.",
+        "Nightly cron runs scripts/backup-db.sh: pg_dump → gzip → R2 bucket at backups/YYYY-MM-DD.dump.gz.",
+        "The newest 14 daily backups are kept; older ones are deleted automatically.",
+        "Uploaded files live in the same R2 bucket — enable R2 object versioning or sync it elsewhere with rclone.",
+        "Quarterly restore drill: restore the latest dump into a scratch database and hit /health.",
       ],
       restoreHint:
-        "gunzip -c backup.sql.gz | psql $DATABASE_URL — then pnpm db:migrate if the dump is from an older schema.",
+        'gunzip -c 2026-01-31.dump.gz > db.dump; psql $DATABASE_URL -c "create extension if not exists vector"; pg_restore --no-owner -d $DATABASE_URL db.dump — a "schema public already exists" error is expected.',
     };
   }),
 });

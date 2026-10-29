@@ -1,3 +1,4 @@
+import "./load-env";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import cookie from "@fastify/cookie";
@@ -82,7 +83,7 @@ registerImageAssetRealtimeRoutes(app);
 registerCopyGenerationRealtimeRoutes(app);
 registerDocRealtimeRoutes(app);
 
-// Single-origin prod deploy (see Dockerfile / fly.toml): this API server
+// Single-origin prod deploy (see ecosystem.config.cjs / DEPLOYMENT.md): this API server
 // also serves apps/web's built SPA, so there's one public URL and no
 // cross-site cookie/CORS story to get right. `pnpm build` (turbo) builds
 // apps/web/dist as a sibling of this file's own build output

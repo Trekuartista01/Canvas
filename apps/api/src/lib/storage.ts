@@ -19,12 +19,36 @@ export const s3 = new S3Client({
     accessKeyId: env.S3_ACCESS_KEY_ID,
     secretAccessKey: env.S3_SECRET_ACCESS_KEY,
   },
+  // Cloudflare R2: newer AWS SDKs attach CRC checksum headers/params to
+  // every PutObject by default, including presigned URLs — the browser's
+  // direct PUT then has to reproduce a checksum it never computed. Only send
+  // checksums when an operation actually requires one.
+  requestChecksumCalculation: "WHEN_REQUIRED",
+  responseChecksumValidation: "WHEN_REQUIRED",
 });
 
-// MinIO doesn't ship with the dev bucket pre-created (unlike Postgres,
-// which gets its DB from docker-compose env vars) — create it idempotently
-// on startup rather than requiring a manual `mc mb` step.
+// A throwaway S3-compatible server (CI's e2e job) starts empty, so the app
+// creates the bucket and its CORS rule itself. Cloudflare R2 (dev and prod)
+// is never managed from here: the bucket is pre-created and its CORS rule
+// set in the Cloudflare dashboard (docs/LOCAL_SETUP.md, DEPLOYMENT.md), and
+// the app's R2 token is object-scoped — it can't create buckets or edit CORS.
+function isLocalEndpoint(endpoint: string) {
+  return /localhost|127\.0\.0\.1/i.test(endpoint);
+}
+
 export async function ensureBucketExists() {
+  if (!isLocalEndpoint(env.S3_ENDPOINT)) {
+    try {
+      await s3.send(new HeadBucketCommand({ Bucket: env.S3_BUCKET }));
+    } catch (err) {
+      console.warn(
+        `storage: bucket "${env.S3_BUCKET}" isn't reachable at ${env.S3_ENDPOINT} — create it in the Cloudflare dashboard and check the S3_* credentials:`,
+        err instanceof Error ? err.message : err,
+      );
+    }
+    return;
+  }
+
   try {
     await s3.send(new HeadBucketCommand({ Bucket: env.S3_BUCKET }));
   } catch {
@@ -35,12 +59,9 @@ export async function ensureBucketExists() {
   // the browser to the bucket, bypassing the API — that only works if the
   // bucket itself allows cross-origin PUTs from the web app's origin.
   // Fastify's own CORS registration (index.ts) is unrelated; this is a
-  // bucket-level policy the S3/MinIO server enforces on direct requests.
-  // RustFS (local dev, docker-compose.yml), S3 and R2 all support this call.
-  // It's still only swallowed on failure rather than required, so an
-  // S3-compatible server that doesn't implement it (e.g. MinIO, which 501s
-  // "NotImplemented") falls back to its own server-level CORS config
-  // without crashing startup.
+  // bucket-level policy the storage server enforces on direct requests.
+  // Swallowed on failure so a server without PutBucketCors support doesn't
+  // crash startup.
   try {
     await s3.send(
       new PutBucketCorsCommand({
@@ -93,7 +114,7 @@ export async function headObject(key: string) {
 // that would otherwise have to be buffered whole in the API's memory by
 // @fastify/multipart before ever reaching S3. Downloads are untouched:
 // GET /uploads/:id still streams through the app with a permission check
-// on every request, so MinIO/S3 still isn't reachable by the browser for
+// on every request, so the bucket still isn't reachable by the browser for
 // reads. Signing the PUT with a fixed ContentType means the object can
 // only be uploaded with that exact Content-Type header — the presigned
 // URL can't be reused to upload a differently-typed file than what was
@@ -114,7 +135,7 @@ export async function getPresignedUploadUrl(
 // source image to an ImageEngine adapter's edit() call) — not exposed to
 // the browser. Distinct from M1.9's decision to stream every attachment
 // byte through the app rather than issue presigned URLs, which was
-// specifically about not exposing MinIO to the browser directly; this is a
+// specifically about not exposing the bucket to the browser directly; this is a
 // different boundary (server -> external API), where a short-lived
 // presigned URL is the standard, simplest way to hand off image bytes.
 export async function getPresignedUrl(key: string, expiresInSeconds = 300): Promise<string> {

@@ -8,7 +8,7 @@
   },
   "packageManager": "pnpm@11.0.9",
   "scripts": {
-    "dev": "docker compose up -d && turbo run dev worker",
+    "dev": "turbo run dev worker",
     "build": "turbo run build",
     "check": "turbo run typecheck lint && pnpm format:check",
     "typecheck": "turbo run typecheck",
@@ -19,7 +19,7 @@
     "test:e2e": "turbo run test:e2e",
     "db:generate": "pnpm --filter @canvas/db db:generate",
     "db:migrate": "pnpm --filter @canvas/db db:migrate",
-    "start:api": "pnpm --filter @canvas/api start",
+    "start": "pnpm --filter @canvas/api start",
     "start:worker": "pnpm --filter @canvas/api worker:start"
   },
   "devDependencies": {

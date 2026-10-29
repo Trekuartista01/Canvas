@@ -5,6 +5,9 @@ import { defineConfig } from "vite";
 import { VitePWA } from "vite-plugin-pwa";
 
 export default defineConfig({
+  // Read VITE_* vars (e.g. VITE_SENTRY_DSN) from the repo-root .env shared with
+  // apps/api — only the VITE_ prefix is ever exposed to the browser bundle.
+  envDir: "../..",
   plugins: [
     react(),
     tailwindcss(),

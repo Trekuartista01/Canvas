@@ -1,13 +1,5 @@
-import { config } from "dotenv";
-import path from "node:path";
-import { fileURLToPath } from "node:url";
+import "./load-env";
 import { z } from "zod";
-
-// Explicit absolute path, not a bare config() call — turbo/tsx run this
-// package's scripts (dev/worker) with apps/api as cwd, not the repo root
-// where .env actually lives, so dotenv's default cwd-relative lookup would
-// silently find nothing and every var would fall back to its default.
-config({ path: path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../../.env") });
 
 const isProd = process.env.NODE_ENV === "production";
 
@@ -18,7 +10,7 @@ const envSchema = z.object({
   DATABASE_URL: isProd
     ? z.string().min(1)
     : z.string().default("postgres://canvas:canvas@localhost:5432/canvas"),
-  REDIS_URL: isProd ? z.string().min(1) : z.string().default("redis://localhost:6379"),
+  REDIS_URL: isProd ? z.string().min(1) : z.string().default("redis://127.0.0.1:6379"),
   WEB_URL: isProd ? z.string().url() : z.string().default("http://localhost:5183"),
   GOOGLE_CLIENT_ID: optionalString,
   GOOGLE_CLIENT_SECRET: optionalString,
@@ -62,9 +54,10 @@ const envSchema = z.object({
 function assertProdNotLocalhost(parsed: z.infer<typeof envSchema>) {
   if (!isProd) return;
   const offenders: string[] = [];
+  // REDIS_URL is deliberately absent: prod Redis runs on the same VM as the
+  // api/worker (apt redis-server), so redis://127.0.0.1:6379 is correct there.
   for (const [name, value] of [
     ["DATABASE_URL", parsed.DATABASE_URL],
-    ["REDIS_URL", parsed.REDIS_URL],
     ["WEB_URL", parsed.WEB_URL],
     ["S3_ENDPOINT", parsed.S3_ENDPOINT],
     ["GOOGLE_REDIRECT_URI", parsed.GOOGLE_REDIRECT_URI],
@@ -72,7 +65,7 @@ function assertProdNotLocalhost(parsed: z.infer<typeof envSchema>) {
     if (/localhost|127\.0\.0\.1/i.test(value)) offenders.push(name);
   }
   if (parsed.S3_ACCESS_KEY_ID === "canvas" || parsed.S3_SECRET_ACCESS_KEY === "canvas12345") {
-    offenders.push("S3_ACCESS_KEY_ID/S3_SECRET_ACCESS_KEY (dev MinIO defaults)");
+    offenders.push("S3_ACCESS_KEY_ID/S3_SECRET_ACCESS_KEY (local dev S3 defaults)");
   }
   if (parsed.SAFE_OUTBOUND_ALLOW_PRIVATE) {
     offenders.push("SAFE_OUTBOUND_ALLOW_PRIVATE (disables SSRF protection — e2e-only)");
