@@ -1,0 +1,3 @@
+# Prettier enforces LF; keep Windows checkouts (core.autocrlf=true) from
+# rewriting files to CRLF and failing `pnpm format:check` locally.
+* text=auto eol=lf
