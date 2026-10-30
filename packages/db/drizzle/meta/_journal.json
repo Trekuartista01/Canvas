@@ -442,6 +442,13 @@
       "when": 1793356878919,
       "tag": "0062_powerful_cable",
       "breakpoints": true
+    },
+    {
+      "idx": 63,
+      "version": "7",
+      "when": 1793360817145,
+      "tag": "0063_confused_harry_osborn",
+      "breakpoints": true
     }
   ]
 }

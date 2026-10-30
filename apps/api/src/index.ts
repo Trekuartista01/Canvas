@@ -27,6 +27,7 @@ import { registerImageAssetRealtimeRoutes } from "./routes/image-asset-realtime"
 import { registerImageAssetRoutes } from "./routes/image-assets";
 import { registerLeaveDocumentRoutes } from "./routes/leave-documents";
 import { registerPayrollExportRoutes } from "./routes/payroll-export";
+import { registerTestHookRoutes } from "./routes/test-hooks";
 import { registerRealtimeRoutes } from "./routes/realtime";
 import { createContext } from "./trpc/context";
 import { appRouter } from "./trpc/router";
@@ -81,6 +82,7 @@ registerAiReferenceRoutes(app);
 registerExportRoutes(app);
 registerLeaveDocumentRoutes(app);
 registerPayrollExportRoutes(app);
+registerTestHookRoutes(app);
 registerRealtimeRoutes(app);
 registerBrainRealtimeRoutes(app);
 registerImageAssetRealtimeRoutes(app);

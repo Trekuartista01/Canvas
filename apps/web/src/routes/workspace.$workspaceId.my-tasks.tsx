@@ -1,4 +1,5 @@
 import type { AppRouter } from "@canvas/api";
+import { EmployeeOfMonthBanner } from "@/components/employee-of-month-banner";
 import { isOverdue, type StatusKind } from "@canvas/shared";
 import { formatDue } from "@/lib/format";
 import { useSession } from "@/hooks/use-session";
@@ -79,6 +80,8 @@ function MyTasksPage() {
           </Link>
         )}
       </div>
+
+      <EmployeeOfMonthBanner workspaceId={workspaceId} />
 
       {tasks.isLoading ? (
         <p className="text-muted-foreground text-sm">Loading…</p>

@@ -54,6 +54,9 @@ const envSchema = z.object({
   // stands in for a real receiver with. Set only by the e2e webServer env
   // (never a real deployment — see assertProdNotLocalhost below).
   SAFE_OUTBOUND_ALLOW_PRIVATE: z.coerce.boolean().default(false),
+  // M7.8: registers /test-hooks/* (routes/test-hooks.ts) so e2e can run a
+  // monthly scheduler job on demand. Set only by the e2e webServer env.
+  E2E_TEST_HOOKS: z.coerce.boolean().default(false),
   // M7.7: AES-256-GCM key for payroll ID-card numbers and IBANs — 32 random
   // bytes, base64 (`openssl rand -base64 32`). The dev default is public, so
   // production refuses it (assertProdNotLocalhost). Losing the key makes
@@ -86,6 +89,9 @@ function assertProdNotLocalhost(parsed: z.infer<typeof envSchema>) {
   }
   if (parsed.PAYROLL_ENCRYPTION_KEY === DEV_PAYROLL_KEY) {
     offenders.push("PAYROLL_ENCRYPTION_KEY (the public dev key)");
+  }
+  if (parsed.E2E_TEST_HOOKS) {
+    offenders.push("E2E_TEST_HOOKS (test-only routes)");
   }
   if (parsed.SAFE_OUTBOUND_ALLOW_PRIVATE) {
     offenders.push("SAFE_OUTBOUND_ALLOW_PRIVATE (disables SSRF protection — e2e-only)");

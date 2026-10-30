@@ -44,6 +44,10 @@ export function useRealtime(workspaceId: string | undefined) {
             utils.task.get.invalidate({ taskId: event.id });
             utils.task.highlights.invalidate();
             utils.task.listMine.invalidate();
+            // M7.8: the engagements board and performance numbers follow tasks.
+            utils.performance.engagements.invalidate();
+            utils.performance.team.invalidate();
+            utils.performance.employee.invalidate();
             // attachment.list is a separate query from task.get/task.list
             // (attachments-section.tsx, clips-section.tsx) — a new
             // attachment publishes a plain "task updated" event (see

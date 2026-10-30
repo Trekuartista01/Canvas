@@ -73,6 +73,7 @@ export default defineConfig({
         AUTH_RATE_LIMIT_MAX: "1000",
         AUTH_EMAIL_RATE_LIMIT_MAX: "1000",
         SAFE_OUTBOUND_ALLOW_PRIVATE: "true",
+        E2E_TEST_HOOKS: "true",
       },
     },
     {

@@ -7,6 +7,7 @@ import { sendDailyReportReminders } from "./daily-report-reminders";
 import { sendHolidayNotices } from "./holiday-notices";
 import { applyLeaveCarryOver } from "./leave-carry-over";
 import { sendContractExpiryNotices } from "./contract-expiry";
+import { runEmployeeOfMonth } from "./performance-data";
 import { seedMissingHolidayCalendars } from "./working-days";
 import { buildDigestEmail } from "./digest";
 import { nextOrderKey } from "./order";
@@ -203,4 +204,6 @@ export async function runSchedulerTick() {
   await applyLeaveCarryOver();
   // M7.6: HR hears 30 and 7 days before a contract expires.
   await sendContractExpiryNotices();
+  // M7.8: last month's Employee of the Month, once per workspace.
+  await runEmployeeOfMonth();
 }

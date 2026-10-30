@@ -62,3 +62,4 @@ export * from "./schemas/holidays";
 export * from "./schemas/leave";
 export * from "./schemas/documents";
 export * from "./schemas/payroll";
+export * from "./schemas/performance";

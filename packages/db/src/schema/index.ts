@@ -25,3 +25,4 @@ export * from "./holidays";
 export * from "./leave";
 export * from "./documents";
 export * from "./payroll";
+export * from "./performance";

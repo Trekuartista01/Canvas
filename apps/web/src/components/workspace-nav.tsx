@@ -3,6 +3,7 @@ import { cn } from "@/lib/utils";
 import type { PeopleAction, WorkspaceAction } from "@canvas/shared";
 import { Link, useRouterState } from "@tanstack/react-router";
 import {
+  Activity,
   Banknote,
   CalendarDays,
   CalendarRange,
@@ -23,6 +24,7 @@ import {
   Plane,
   PenSquare,
   Sparkles,
+  TrendingUp,
   UserCog,
   Users,
   Wallet,
@@ -57,6 +59,19 @@ const NAV_GROUPS: { label: string; entries: NavEntry[] }[] = [
         to: "/w/$workspaceId/workload",
         icon: Users,
         requires: "report:viewTeam",
+      },
+      // M7.8: live "who's doing what" board, and the performance report.
+      {
+        label: "Engagements",
+        to: "/w/$workspaceId/engagements",
+        icon: Activity,
+        requires: "report:viewTeam",
+      },
+      {
+        label: "Performance",
+        to: "/w/$workspaceId/performance",
+        icon: TrendingUp,
+        requires: "performance:view",
       },
       { label: "Timesheet", to: "/w/$workspaceId/timesheet", icon: Clock3 },
       {

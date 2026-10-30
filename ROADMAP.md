@@ -72,7 +72,7 @@ Replaces the separate Seri HR app. Full prompts per milestone: `PHASE7_PROMPTS.m
 - M7.5 Leave management (types, approval, balance rules, carry-over, PDF). ✅ Done.
 - M7.6 Contracts (expiry alerts, My Contract) + company document library. ✅ Done.
 - M7.7 Payroll (encrypted ID/IBAN, HR-only, audited, Excel/PDF export). ✅ Done.
-- M7.8 Performance report, Employee of the Month, Engagements board.
+- M7.8 Performance report, Employee of the Month, Engagements board. ✅ Done.
 - M7.9 Seri import (mongodump → Canvas, dry-run first).
 - M7.10 Production deploy (Oracle Always Free + Supabase + R2, €0).
 - ✅ Accept: staff submits daily report and a proof-backed task, manager approves; leave request deducts working days correctly around a Kosovo holiday; payroll export works for HR only; app runs in prod without Docker.

@@ -110,6 +110,11 @@ payroll_records  (id, workspace_id fk, user_id fk,                      -- M7.7,
                   id_card_number_enc, iban_enc,                         -- AES-256-GCM, PAYROLL_ENCRYPTION_KEY
                   bank_name, account_holder, updated_by fk users,
                   updated_at, uniq(workspace_id, user_id))              -- reads/edits/exports → activity
+
+employee_of_month(id, workspace_id fk, month text 'YYYY-MM',           -- M7.8, computed on the 1st
+                  user_id fk users null,                                -- null = nobody qualified
+                  score, breakdown_json,                                -- { winner, ranking[] }
+                  computed_at, uniq(workspace_id, month))
 ```
 
 ## Image Brain

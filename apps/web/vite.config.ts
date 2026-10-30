@@ -61,6 +61,8 @@ export default defineConfig({
       "/export": "http://localhost:3001",
       "/leave-documents": "http://localhost:3001",
       "/payroll-export": "http://localhost:3001",
+      // e2e only — the API registers it only with E2E_TEST_HOOKS set.
+      "/test-hooks": "http://localhost:3001",
       "/ws": { target: "ws://localhost:3001", ws: true },
     },
   },

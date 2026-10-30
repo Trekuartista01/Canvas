@@ -2621,3 +2621,61 @@ Developers no longer need Docker. Dev runs `pnpm dev` (api + web + worker via tu
   - The audit trail shows the edit, the view and both exports, with no values in it.
   - Sam has no Payroll link, sees his own details masked, and gets 403 on the export URL. A staff manager (has Directory) also has no Payroll link and gets 403.
 - Full Playwright run at CI parity (`CI=1`, retries off, local Postgres/Redis/RustFS containers): **74/74 passed**. Phase-2 smoke test green.
+
+## 2026-10-30 M7.8: Performance report, Employee of the Month, Engagements board — done
+
+### Built
+
+- **Pure metrics** (`apps/api/src/lib/performance.ts`, 15 tests). Every comparison uses Kosovo wall-clock keys, the same rule as M7.2's overdue: a due date with no time is due by 23:59:59 that day.
+  - `classifyTasks(tasks, { from, to, now })` evaluates as of the end of `to`, or now if the range hasn't ended:
+    - **completed on time / late**: finished inside the range, judged against the deadline (an undated task is never late);
+    - **overdue**: open at that moment and past its deadline;
+    - **in progress**: open, not overdue, in an active/review status;
+    - **not started**: the rest of the open tasks.
+  - "Open at that moment" uses `completedAt`, so a task finished after the range still counts as open (and possibly overdue) at its end.
+  - Also: `employeeOfMonthScore`, `rankEmployeeOfMonth`, `previousMonth` / `monthRange` (year ends, leap February), `engagementStatus`.
+- **Schema** (migration `0063`): `employee_of_month` (workspace, `month` "YYYY-MM", `user_id` nullable, `score`, `breakdown_json` = `{ winner, ranking }`, unique per workspace + month).
+- **`performance` router**:
+  - `team` (`performance:view`; a staff manager is scoped to their direct reports by `teamScopeFor`): per-employee totals for a range.
+  - `employee` (same, per target): totals, on-time/late completions per Monday-start week, the overdue task list.
+  - `engagements` (`report:viewTeam`, same scoping): one card per active employee with open count, in-progress/awaiting-approval tasks, next deadline and status.
+  - `employeeOfMonth` (any active member): last month's result.
+  - Data comes from `lib/performance-data.ts`: assigned tasks and subtasks, excluding deleted tasks, lists and spaces.
+- **Employee of the Month job** (scheduler tick): from the 1st (Kosovo date), every workspace without a row for last month gets one.
+  - All active members are ranked. Only people with any tasks are kept in the ranking; the winner is the top qualifier.
+  - A row is written even when nobody qualifies (`user_id` null), which marks the month as done. The unique key keeps it to once.
+  - A win writes an `employee_of_month.awarded` activity row.
+  - Locally it computed 967 workspaces in ~4.4 s; a rerun created nothing.
+- **E2E test hook**: `POST /test-hooks/employee-of-month { workspaceId, month }` recomputes (replaces) one workspace's month. It's registered only when `E2E_TEST_HOOKS` is set (the Playwright webServer env sets it), and `env.ts` refuses to start production with it on, like `SAFE_OUTBOUND_ALLOW_PRIVATE`. The caller still needs `performance:view` in that workspace.
+- **UI**:
+  - **Employee of the Month banner** on Home and on My Tasks, because staff land on My Tasks, not Home. Visible to everyone all month: winner, month, on-time/late counts.
+  - **Result panel**: the top-10 ranking with score, breakdown and "not qualified" flags. Only for whole-workspace performance viewers (super admin, HR, operations manager), and only on days 1–5 of the following month.
+  - **Performance** (Work nav, `performance:view`): This month / Last month / custom range; a virtualized team table (total, on time, late, overdue, in progress, not started); a person's detail panel with a donut of the breakdown, a weekly on-time bar chart (reusing `components/charts.tsx`) and their overdue tasks linking to each task.
+  - **Engagements** (Work nav, `report:viewTeam`): a live board, one card per employee with status (On track / Due today / Overdue), open count, next deadline and in-progress tasks (⏳ marks awaiting approval), plus search and a status filter with counts. Virtualized by rows of cards.
+  - Live updates: `use-realtime.ts` now invalidates `performance.engagements` / `team` / `employee` on every task event. No new WS messages.
+
+### Decisions
+
+- **Employee of the Month formula** (from the brief, recorded here as asked): **score = 2 × (completed on time) + 1 × (completed late) − 2 × (overdue at month end)**.
+  - To qualify: **at least 3 completed tasks** (on time + late) in the month.
+  - Ties: **more on-time** first, then **fewer late**, then **whoever finished their last task earliest**.
+  - "On time" = `completedAt` ≤ due date + due time in Kosovo time; no due date counts as on time.
+  - "Overdue at month end" = still open at 23:59:59 on the month's last day and past its deadline (from `completedAt`, so finishing it later doesn't erase that).
+  - Every active member is eligible, whatever their people role. Subtasks count like tasks; tasks in deleted lists/spaces don't.
+- **Who sees the ranking:** people who see the whole workspace's performance (super admin, HR, operations manager). A staff manager's performance view is limited to their reports, so they don't get the full ranking. The server sends the ranking only to those roles; the days 1–5 window is applied in the browser (it's a display rule, not a permission). That's also what lets the e2e test pin the browser clock.
+- "In progress" includes "Awaiting approval" (review), since the work isn't finished.
+- **Engagements is a new route** rather than part of Workload: Workload is about counts per person; this is per-person live status.
+- Performance views write no activity rows (they're reads, unlike payroll).
+
+### Verified
+
+- `pnpm check` green; `pnpm test`: API 354 (+15 performance), shared 103, db 7, web 15.
+- `0063` applied to the local DB; the Employee of the Month job checked against it (see above), simulated rows deleted.
+- New `performance.spec.ts`:
+  - Seeds last month's history in the DB: Sam 3 tasks on time, Tina 4 late.
+  - Calls the test hook (`{ userId: Sam, score: 6 }`). With the browser clock on the 3rd, Home shows the banner and the ranking (Sam, then Tina "4 late").
+  - Performance → Last month shows Sam 3/3/0/0 and Tina 4/0/4.
+  - Sam (staff) sees the banner on My Tasks without the ranking.
+  - Engagements shows Tina Overdue (an in-progress task due 2 days ago) and Sam On track. Moving Tina's due date to next week in another tab flips her card to On track live over the existing WS invalidation.
+- `apps/web/vite.config.ts` proxies `/test-hooks` to the API in dev (the route only exists when `E2E_TEST_HOOKS` is set).
+- Full Playwright run at CI parity (`CI=1`, retries off, local Postgres/Redis/RustFS containers): **75/75 passed**. Phase-2 smoke test green.
