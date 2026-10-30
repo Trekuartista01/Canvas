@@ -11,9 +11,10 @@
     "build": "tsup",
     "start": "node dist/index.js",
     "worker:start": "node dist/worker.js",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.scripts.json",
     "lint": "eslint src",
-    "test": "vitest run"
+    "test": "vitest run",
+    "seri:inspect": "tsx scripts/import-seri/inspect.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.112.3",
@@ -57,6 +58,8 @@
     "@types/node": "^22.10.2",
     "@types/nodemailer": "^8.0.1",
     "@types/ws": "^8.18.1",
+    "bson": "6.10.4",
+    "mongodb": "6.16.0",
     "tsup": "^8.5.1",
     "tsx": "^4.19.2",
     "typescript": "^5.7.2",

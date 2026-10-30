@@ -12,3 +12,6 @@ coverage
 playwright-report
 test-results
 minio-data
+
+# M7.9 Seri importer output (describes real people — never commit)
+.seri-import

@@ -2679,3 +2679,24 @@ Developers no longer need Docker. Dev runs `pnpm dev` (api + web + worker via tu
   - Engagements shows Tina Overdue (an in-progress task due 2 days ago) and Sam On track. Moving Tina's due date to next week in another tab flips her card to On track live over the existing WS invalidation.
 - `apps/web/vite.config.ts` proxies `/test-hooks` to the API in dev (the route only exists when `E2E_TEST_HOOKS` is set).
 - Full Playwright run at CI parity (`CI=1`, retries off, local Postgres/Redis/RustFS containers): **75/75 passed**. Phase-2 smoke test green.
+
+## 2026-10-30 M7.9: Import from Seri — in progress (step 1 tooling; waiting for the data)
+
+The brief's step 1 is to inspect the real Seri collections, write `SERI_MAPPING.md`, and **stop for review before any data is written**. No Seri data is on this machine yet: no mongodump/mongoexport folder and no `MONGO_URL`. So only the read-only inspector is built; the mapping and the importer (step 2) wait for the data and the mapping review.
+
+### Built
+
+- **`pnpm --filter @canvas/api seri:inspect -- --dir <folder>`**, or with `MONGO_URL=<read-only URL>` (+ `--db <name>`). `apps/api/scripts/import-seri/inspect.ts` reads:
+  - `mongodump` output (`<collection>.bson`; `*.metadata.json` skipped);
+  - `mongoexport` JSON (one Extended-JSON document per line, or `--jsonArray`), in nested folders too;
+  - or a live database (read preference `secondaryPreferred`; only `listCollections` / `estimatedDocumentCount` / `find`).
+  - Nothing is written to Seri or Canvas.
+- Output goes to `<out>/inspection.json` + `<out>/SERI_INSPECTION.md`. The default `out` is `.seri-import/` in the repo root, which is **gitignored**. For every collection it lists: document count, and per field (nested paths, `[]` for array elements) its types, how often it's present, examples, URL detection (Seri storage files to download later) and, for status/role/type-like fields, the full vocabulary (≤ 12 short values), which is what the mapping needs for enums.
+- **Personal data stays out of the output:** values of fields that look personal or secret (passwords/hashes, tokens, email, names, phone, address, birth date, ID numbers, IBAN/bank/salary, notes/comments/descriptions…) are shown as `<redacted>` and never listed as enum values. Vocabulary fields (status, role, type, department…) stay visible.
+- Pure logic in `src/lib/seri-import/` (`field-stats.ts`, `read-source.ts`), 8 tests: BSON stream splitting and corrupt-file detection, mongoexport lines vs array, nested folders + metadata skipping, nested/array paths, types/presence, redaction (no email, hash or phone anywhere in the rendered markdown), enum detection.
+- `bson` 6.10.4 and `mongodb` 6.16.0 added as **devDependencies** of `apps/api` (script-only). `apps/api/tsconfig.scripts.json` typechecks `scripts/` too (part of `pnpm typecheck`).
+
+### Next (after the data arrives)
+
+1. Run the inspector, write `SERI_MAPPING.md` (each collection/field → Canvas table/column, enum translations, what's dropped), and **stop for review**.
+2. Then the importer: `--dry-run` (default) printing counts + problems, `--commit`; idempotent through a `seri_import_map` (source_collection, source_id, target_table, target_id) table; passwords not imported ("set your password" email after commit); payroll encrypted on the way in; files downloaded from Seri's storage URLs into R2.
