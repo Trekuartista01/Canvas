@@ -2392,3 +2392,31 @@ Developers no longer need Docker. Dev runs `pnpm dev` (api + web + worker via tu
 - `0057` applied to the local DB.
 - New `task-approval.spec.ts`: manager creates a task in the dialog (assignee, priority, due 14:30, proof required) → staff signs in, sees it on My Tasks with its due time, can't submit without proof, uploads a proof photo and submits → manager sees it under Awaiting approval with the photo and approves → Completed on the board and Done on the staff member's My Tasks.
 - Full Playwright run at CI parity (`CI=1`, retries off, local Postgres/Redis/RustFS containers): **69/69 passed**. Phase-2 smoke test green.
+
+## 2026-10-30 M7.3: Daily reports + read receipts + 16:45 reminder — done
+
+### Built
+
+- **Schema** (migration `0058`): `daily_reports` (workspace, user, `report_date` date, TipTap `body_json`, `submitted_at`/`updated_at`, unique per workspace+user+date), `daily_report_reads` (report, user, `read_at`; PK pair) and `daily_report_reminders` (workspace, user, report_date, `sent_at`; unique triple), which is the reminder's idempotency ledger.
+- **Pure helpers** (`packages/shared/src/daily-reports.ts`): `isReminderDue(nowUtc, tz, isHoliday?)` → `{ due, reportDate }`, `isWorkingDay(date, isHoliday?)` (Mon–Fri), `todayReportDate(now)`. All Kosovo time via `Intl` (`wallClock` from M7.2's `due.ts`), with no hard-coded offset. 9 tests, including both 2026 DST weekends (the Friday before and the Monday after, CET vs CEST), the Sunday change days themselves, the local-midnight rollover and the holiday hook.
+- **`dailyReport` router**: `today`, `save` (always today's Kosovo date; the date is never client-supplied, so a report locks at midnight without any job closing it; empty reports refused), `mine` (history + read counts), `team` (date → who submitted / who didn't, with read counts), `get` (body + "Read by" list), `markRead`. Authors read their own; anyone else needs `report:viewTeam` over the author through `assertCanPeople`, so a staff manager is limited to their direct reports, and `team` is scoped with `teamScopeFor()` (its first consumer). Activity rows: `daily_report.submitted` / `daily_report.updated` / `daily_report.read` (first open only). New realtime entity `dailyReport` (`{entity, id, workspaceId, kind}`, no payload) refreshes the team view and receipts live.
+- **Reminder** (`lib/daily-report-reminders.ts`, run on every existing scheduler tick): when due, finds active members with people role `staff` (never the owner) who have no report and no ledger row for today, claims the ledger row first (`ON CONFLICT DO NOTHING`), then writes a `daily_report.reminder` activity row, sends the in-app notification and emails a link to the Daily report page. An email failure is logged and doesn't stop the rest. The notification shows as a standalone line and opens the Daily report page.
+- **UI**: People → **Daily report** (everyone: today's TipTap form with Submit / Save changes until midnight, "Submitted at HH:MM · edited HH:MM", virtualized history with read counts); People → **Team reports** (`report:viewTeam`: date picker, "n of m submitted", virtualized Submitted/Not submitted rows); **report view** `/daily-reports/:id` (read-only body; opening someone else's report records the read; shows "Read by" with times). Times are shown in Kosovo time.
+- Also fixed an M7.2 gap: the submitted/approved/rejected/transferred notifications weren't clickable in the bell. They now open the task.
+
+### Decisions
+
+- **Who is expected to report = people role `staff`.** The team view lists every in-scope staff member plus anyone else in scope who did submit; the reminder goes only to staff. Every role can still write a report from the Daily report page.
+- **Reminder window = 16:45 until local midnight**, not exactly 16:45. A worker that was down at 16:45 still catches up that evening; the ledger keeps it to one reminder per person per day, however many ticks or workers there are.
+- **The ledger row is claimed before sending.** If the email then fails, it isn't retried: at most once, not at least once. The in-app notification has already been written by then.
+- **Holidays**: `isReminderDue`/`isWorkingDay` take an `isHoliday(date)` hook defaulting to "never". M7.4 passes the Kosovo calendar in at the one call site in `sendDailyReportReminders`.
+- Read receipts are recorded by an explicit `markRead` mutation fired when the report view opens (a query never writes). Only non-authors count.
+- `submitted_at` is the first submission; edits bump `updated_at` only.
+
+### Verified
+
+- `pnpm check` green; `pnpm test`: shared 80 (+9 daily-report/DST), API 307, db 7, web 15.
+- `0058` applied to the local DB.
+- Reminder job against the local DB with fixed clocks: nothing at 16:40; at Monday 16:50 Kosovo time 127 staff reminded (mock email); a second run reminded nobody (ledger and activity counts unchanged); Saturday reminded nobody. The test rows were deleted afterwards.
+- New `daily-reports.spec.ts`: owner adds a staff member → Team reports shows him "Not submitted" → staff signs in (no Team reports in his nav), writes and submits today's report (stays editable) → manager's team view flips to "Submitted · Unread" live → manager opens it (read recorded) → team view shows "Read by 1" → staff opens his own report and sees the manager under "Read by".
+- Full Playwright run at CI parity (`CI=1`, retries off, local Postgres/Redis/RustFS containers): **70/70 passed**. Phase-2 smoke test green.

@@ -13,7 +13,14 @@ const TASK_LINK_VERBS = new Set([
   "task.priority_urgent",
   "task.completed",
   "task.completed_via_form",
+  "task.submitted_for_review",
+  "task.approved",
+  "task.rejected",
+  "task.transferred",
 ]);
+
+// Scheduler-sent, so shown as the bare label rather than "<actor> <verb>".
+const STANDALONE_VERBS = new Set(["reminder.fired", "daily_report.reminder"]);
 
 const COMPLETED_VERBS = new Set(["task.completed", "task.completed_via_form"]);
 
@@ -132,13 +139,18 @@ export function NotificationsBell() {
                         params: { workspaceId: n.workspaceId, listId: link.listId },
                         search: { openTask: link.taskId },
                       });
+                    } else if (n.verb === "daily_report.reminder") {
+                      navigate({
+                        to: "/w/$workspaceId/daily-report",
+                        params: { workspaceId: n.workspaceId },
+                      });
                     }
                   }}
                   className={`border-border block w-full border-b px-2 py-2 text-left text-xs last:border-b-0 ${
                     n.readAt ? "" : "bg-muted/50"
                   } hover:bg-muted`}
                 >
-                  {n.verb === "reminder.fired" ? (
+                  {STANDALONE_VERBS.has(n.verb) ? (
                     <span className="font-medium">{NOTIFICATION_VERB_LABELS[n.verb]}</span>
                   ) : completedTitle ? (
                     <>

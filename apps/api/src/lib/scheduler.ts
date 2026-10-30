@@ -3,6 +3,7 @@ import { and, eq, gt, isNull, lte, or } from "drizzle-orm";
 import { env } from "../env";
 import { getEmailClient } from "../email";
 import { logActivity } from "./activity";
+import { sendDailyReportReminders } from "./daily-report-reminders";
 import { buildDigestEmail } from "./digest";
 import { nextOrderKey } from "./order";
 import { computeNextRunAt } from "./recurrence";
@@ -190,4 +191,5 @@ export async function runSchedulerTick() {
   await spawnDueRecurringTasks();
   await fireDueReminders();
   await sendDueDigests();
+  await sendDailyReportReminders();
 }

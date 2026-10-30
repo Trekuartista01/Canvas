@@ -4,6 +4,7 @@ import type { PeopleAction, WorkspaceAction } from "@canvas/shared";
 import { Link, useRouterState } from "@tanstack/react-router";
 import {
   CheckSquare,
+  ClipboardCheck,
   ClipboardList,
   Clock3,
   Contact,
@@ -12,6 +13,7 @@ import {
   Home,
   Images,
   LayoutGrid,
+  NotebookPen,
   Palette,
   PenSquare,
   Sparkles,
@@ -72,6 +74,14 @@ const NAV_GROUPS: { label: string; entries: NavEntry[] }[] = [
         to: "/w/$workspaceId/people",
         icon: Contact,
         requires: "people:viewDirectory",
+      },
+      // M7.3: everyone writes their own; managers see their team's.
+      { label: "Daily report", to: "/w/$workspaceId/daily-report", icon: NotebookPen },
+      {
+        label: "Team reports",
+        to: "/w/$workspaceId/team-reports",
+        icon: ClipboardCheck,
+        requires: "report:viewTeam",
       },
     ],
   },

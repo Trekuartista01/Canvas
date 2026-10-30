@@ -407,6 +407,13 @@
       "when": 1793271793566,
       "tag": "0057_mixed_mantis",
       "breakpoints": true
+    },
+    {
+      "idx": 58,
+      "version": "7",
+      "when": 1793352994880,
+      "tag": "0058_equal_zodiak",
+      "breakpoints": true
     }
   ]
 }

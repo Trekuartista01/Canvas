@@ -20,3 +20,4 @@ export * from "./dashboards";
 export * from "./embeddings";
 export * from "./copywriter";
 export * from "./people";
+export * from "./daily-reports";

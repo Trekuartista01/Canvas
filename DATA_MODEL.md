@@ -60,6 +60,13 @@ attachments      (id, workspace_id fk, task_id fk null, comment_id fk null,
 activity         (id, workspace_id fk, actor_id fk, entity_type, entity_id,
                   verb, payload_json jsonb, created_at)     -- append-only
 notifications    (id, user_id fk, activity_id fk, read_at null)
+
+daily_reports    (id, workspace_id fk, user_id fk, report_date date,      -- M7.3; Kosovo calendar date
+                  body_json jsonb, submitted_at, updated_at,            -- TipTap JSON; editable that day only
+                  uniq(workspace_id, user_id, report_date))
+daily_report_reads(report_id fk, user_id fk, read_at, pk pair)           -- read receipts (non-authors)
+daily_report_reminders(id, workspace_id fk, user_id fk, report_date,     -- 16:45 reminder ledger:
+                  sent_at, uniq(workspace_id, user_id, report_date))    -- at most one per person per day
 ```
 
 ## Image Brain

@@ -26,6 +26,7 @@ import { taskRouter } from "./routers/task";
 import { taskTemplateRouter } from "./routers/task-template";
 import { timeEntryRouter } from "./routers/time-entry";
 import { peopleRouter } from "./routers/people";
+import { dailyReportRouter } from "./routers/daily-report";
 import { workloadRouter } from "./routers/workload";
 import { workspaceRouter } from "./routers/workspace";
 import { publicProcedure, router } from "./trpc";
@@ -60,6 +61,7 @@ export const appRouter = router({
   dashboard: dashboardRouter,
   role: roleRouter,
   people: peopleRouter,
+  dailyReport: dailyReportRouter,
   search: searchRouter,
   aiUsage: aiUsageRouter,
 });

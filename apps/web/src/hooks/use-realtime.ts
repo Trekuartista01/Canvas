@@ -67,6 +67,8 @@ export function useRealtime(workspaceId: string | undefined) {
           utils.customField.defs.list.invalidate();
         } else if (event.entity === "customFieldValue") {
           utils.customField.values.listForTask.invalidate({ taskId: event.taskId });
+        } else if (event.entity === "dailyReport") {
+          utils.dailyReport.invalidate();
         }
       };
 

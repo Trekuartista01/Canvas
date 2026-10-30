@@ -30,6 +30,9 @@ import { rolesRoute } from "./routes/workspace.$workspaceId.roles";
 import { adminRoute } from "./routes/workspace.$workspaceId.admin";
 import { semanticSearchRoute } from "./routes/workspace.$workspaceId.semantic-search";
 import { myTasksRoute } from "./routes/workspace.$workspaceId.my-tasks";
+import { dailyReportRoute } from "./routes/workspace.$workspaceId.daily-report";
+import { dailyReportViewRoute } from "./routes/workspace.$workspaceId.daily-reports.$reportId";
+import { teamReportsRoute } from "./routes/workspace.$workspaceId.team-reports";
 import { peopleDirectoryRoute } from "./routes/workspace.$workspaceId.people";
 import { personProfileRoute } from "./routes/workspace.$workspaceId.people.$userId";
 import { newWorkspaceRoute } from "./routes/workspaces.new";
@@ -47,6 +50,9 @@ const routeTree = rootRoute.addChildren([
   workspaceShellRoute.addChildren([
     workspaceHomeRoute,
     myTasksRoute,
+    dailyReportRoute,
+    dailyReportViewRoute,
+    teamReportsRoute,
     peopleDirectoryRoute,
     personProfileRoute,
     listRoute,

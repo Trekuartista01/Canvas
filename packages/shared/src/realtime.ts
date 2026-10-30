@@ -69,6 +69,14 @@ export const realtimeEventSchema = z.discriminatedUnion("entity", [
     taskId: z.string().uuid(),
     kind,
   }),
+  // M7.3: a daily report was saved or read — refreshes the team view, the
+  // author's history and the "Read by" list.
+  z.object({
+    entity: z.literal("dailyReport"),
+    id: z.string().uuid(),
+    workspaceId: z.string().uuid(),
+    kind,
+  }),
 ]);
 
 export type RealtimeEvent = z.infer<typeof realtimeEventSchema>;

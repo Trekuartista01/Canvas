@@ -20,4 +20,6 @@ export const NOTIFICATION_VERB_LABELS: Record<string, string> = {
   "task.approved": "approved your task",
   "task.rejected": "sent a task back to you",
   "task.transferred": "transferred a task",
+  // M7.3 — shown on its own, without an actor name (the scheduler sends it).
+  "daily_report.reminder": "Reminder: submit today's daily report",
 };

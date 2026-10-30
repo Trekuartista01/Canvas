@@ -67,7 +67,7 @@ Replaces the separate Seri HR app. Full prompts per milestone: `PHASE7_PROMPTS.m
 - M7.0b Drop Docker: Supabase Postgres + Cloudflare R2 + local Redis; PM2 + Caddy on an Oracle Always Free VM; nightly DB backup to R2. ✅ Done.
 - M7.1 People roles (super_admin/hr/operation_manager/staff_manager/staff), reports-to, staff profiles, role-based landing + My Tasks. ✅ Done.
 - M7.2 Task approval flow (pending → in progress → awaiting approval → completed), proof photo, transfer, collaborators, due time. ✅ Done.
-- M7.3 Daily reports + read receipts + 16:45 weekday reminder.
+- M7.3 Daily reports + read receipts + 16:45 weekday reminder. ✅ Done.
 - M7.4 Kosovo public holidays calendar + notifications + working-days helper.
 - M7.5 Leave management (types, approval, balance rules, carry-over, PDF).
 - M7.6 Contracts (expiry alerts, My Contract) + company document library.
