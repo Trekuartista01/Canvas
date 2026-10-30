@@ -5,6 +5,11 @@ const isProd = process.env.NODE_ENV === "production";
 
 const optionalString = z.string().optional();
 
+// Dev/test only — committed, so never usable in production.
+const DEV_PAYROLL_KEY = Buffer.from("canvas-dev-payroll-key-not-secret")
+  .subarray(0, 32)
+  .toString("base64");
+
 const envSchema = z.object({
   API_PORT: z.coerce.number().default(3001),
   DATABASE_URL: isProd
@@ -49,6 +54,18 @@ const envSchema = z.object({
   // stands in for a real receiver with. Set only by the e2e webServer env
   // (never a real deployment — see assertProdNotLocalhost below).
   SAFE_OUTBOUND_ALLOW_PRIVATE: z.coerce.boolean().default(false),
+  // M7.7: AES-256-GCM key for payroll ID-card numbers and IBANs — 32 random
+  // bytes, base64 (`openssl rand -base64 32`). The dev default is public, so
+  // production refuses it (assertProdNotLocalhost). Losing the key makes
+  // every stored value unreadable — back it up with the database backups.
+  // An empty line copied from .env.example counts as unset.
+  PAYROLL_ENCRYPTION_KEY: z.preprocess(
+    (value) => (value === "" ? undefined : value),
+    (isProd ? z.string().min(1) : z.string().default(DEV_PAYROLL_KEY)).refine(
+      (value) => Buffer.from(value, "base64").length === 32,
+      "PAYROLL_ENCRYPTION_KEY must be 32 bytes, base64-encoded (openssl rand -base64 32)",
+    ),
+  ),
 });
 
 function assertProdNotLocalhost(parsed: z.infer<typeof envSchema>) {
@@ -66,6 +83,9 @@ function assertProdNotLocalhost(parsed: z.infer<typeof envSchema>) {
   }
   if (parsed.S3_ACCESS_KEY_ID === "canvas" || parsed.S3_SECRET_ACCESS_KEY === "canvas12345") {
     offenders.push("S3_ACCESS_KEY_ID/S3_SECRET_ACCESS_KEY (local dev S3 defaults)");
+  }
+  if (parsed.PAYROLL_ENCRYPTION_KEY === DEV_PAYROLL_KEY) {
+    offenders.push("PAYROLL_ENCRYPTION_KEY (the public dev key)");
   }
   if (parsed.SAFE_OUTBOUND_ALLOW_PRIVATE) {
     offenders.push("SAFE_OUTBOUND_ALLOW_PRIVATE (disables SSRF protection — e2e-only)");

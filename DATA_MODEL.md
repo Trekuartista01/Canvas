@@ -104,6 +104,12 @@ company_documents(id, workspace_id fk, category_id fk null, title,
                   uploaded_by fk users, deleted_at)
 company_document_versions(id, document_id fk, attachment_id fk, version,
                   uploaded_by fk users, uniq(document_id, version))     -- every version, current included
+
+payroll_records  (id, workspace_id fk, user_id fk,                      -- M7.7, HR only
+                  net_salary_eur numeric(12,2),
+                  id_card_number_enc, iban_enc,                         -- AES-256-GCM, PAYROLL_ENCRYPTION_KEY
+                  bank_name, account_holder, updated_by fk users,
+                  updated_at, uniq(workspace_id, user_id))              -- reads/edits/exports → activity
 ```
 
 ## Image Brain

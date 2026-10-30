@@ -85,6 +85,14 @@ export const realtimeEventSchema = z.discriminatedUnion("entity", [
     workspaceId: z.string().uuid(),
     kind,
   }),
+  // M7.7: a payroll record changed. Invalidation only — never any payroll
+  // values over the socket.
+  z.object({
+    entity: z.literal("payroll"),
+    id: z.string().uuid(),
+    workspaceId: z.string().uuid(),
+    kind,
+  }),
 ]);
 
 export type RealtimeEvent = z.infer<typeof realtimeEventSchema>;

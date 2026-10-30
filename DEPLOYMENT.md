@@ -93,10 +93,13 @@ Set at least the following (each is explained in `.env.example`):
 | `S3_BUCKET`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY` | `canvas-prod` and its token                                                     |
 | `WEB_URL`                                               | `https://your-domain` (the one public origin)                                   |
 | `GOOGLE_REDIRECT_URI`                                   | `https://your-domain/auth/google/callback`                                      |
+| `PAYROLL_ENCRYPTION_KEY`                                | output of `openssl rand -base64 32` — see the warning below                     |
 
 Optional: `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `GEMINI_API_KEY` (AI is mocked when they're unset), `GOOGLE_CLIENT_ID`/`_SECRET`, SMTP vars, `SENTRY_DSN`. `VITE_SENTRY_DSN` is baked into the web bundle at build time, so it must be in `.env` before `pnpm build`.
 
-`NODE_ENV=production` and `DB_POOL_MAX` come from `ecosystem.config.cjs`, so you don't need them in `.env`. In production, the API refuses to boot if `.env` still has localhost or dev values for the database, web URL or storage.
+`NODE_ENV=production` and `DB_POOL_MAX` come from `ecosystem.config.cjs`, so you don't need them in `.env`. In production, the API refuses to boot if `.env` still has localhost or dev values for the database, web URL or storage, or no real `PAYROLL_ENCRYPTION_KEY`.
+
+> **Keep a copy of `PAYROLL_ENCRYPTION_KEY` somewhere safe, apart from the server** (a password manager). Payroll ID-card numbers and IBANs are stored encrypted with it; the nightly database backup is useless for payroll without it, and a lost key can't be recovered. Never change it on a running system: values encrypted with the old key would become unreadable.
 
 ```bash
 pnpm install --frozen-lockfile
@@ -132,6 +135,8 @@ Caddy gets and renews the TLS certificate by itself and proxies WebSockets witho
 ```
 
 Set `PG_DUMP=/usr/lib/postgresql/17/bin/pg_dump` in `.env` if several Postgres client versions are installed.
+
+The backup contains payroll ID-card numbers and IBANs only in encrypted form. Restoring them needs the same `PAYROLL_ENCRYPTION_KEY`.
 
 **Restore** into an empty database:
 

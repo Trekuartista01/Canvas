@@ -3,6 +3,7 @@ import { cn } from "@/lib/utils";
 import type { PeopleAction, WorkspaceAction } from "@canvas/shared";
 import { Link, useRouterState } from "@tanstack/react-router";
 import {
+  Banknote,
   CalendarDays,
   CalendarRange,
   CheckSquare,
@@ -24,6 +25,7 @@ import {
   Sparkles,
   UserCog,
   Users,
+  Wallet,
   Zap,
   type LucideIcon,
 } from "lucide-react";
@@ -108,6 +110,14 @@ const NAV_GROUPS: { label: string; entries: NavEntry[] }[] = [
         requires: "contract:manage",
       },
       { label: "Company documents", to: "/w/$workspaceId/company-documents", icon: FolderOpen },
+      // M7.7: own pay details for everyone; the payroll table for HR only.
+      { label: "My pay details", to: "/w/$workspaceId/my-pay", icon: Wallet },
+      {
+        label: "Payroll",
+        to: "/w/$workspaceId/payroll",
+        icon: Banknote,
+        requires: "payroll:view",
+      },
     ],
   },
   {

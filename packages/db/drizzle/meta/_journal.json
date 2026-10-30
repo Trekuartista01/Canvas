@@ -435,6 +435,13 @@
       "when": 1793355970512,
       "tag": "0061_open_mesmero",
       "breakpoints": true
+    },
+    {
+      "idx": 62,
+      "version": "7",
+      "when": 1793356878919,
+      "tag": "0062_powerful_cable",
+      "breakpoints": true
     }
   ]
 }

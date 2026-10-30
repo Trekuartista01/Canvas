@@ -2569,3 +2569,55 @@ Developers no longer need Docker. Dev runs `pnpm dev` (api + web + worker via tu
   - Sam (no Contracts link in his nav) sees only his contract and annex, never Tina's. Both download via signed URLs with the right file names (the annex as its replacement).
   - Sam sees the company document without management controls and downloads the current version.
 - Full Playwright run at CI parity (`CI=1`, retries off, local Postgres/Redis/RustFS containers): **73/73 passed**. Phase-2 smoke test green.
+
+## 2026-10-30 M7.7: Payroll — done
+
+### Built
+
+- **Schema** (migration `0062`): `payroll_records` (workspace, user, unique per workspace + user, `net_salary_eur` numeric(12,2), `id_card_number_enc`, `bank_name`, `iban_enc`, `account_holder`, `updated_by`, `updated_at`).
+- **`lib/field-crypto.ts`** (7 tests):
+  - AES-256-GCM with a fresh 96-bit IV per value, stored as `v1.<base64 iv|ciphertext|tag>`; the version prefix leaves room for key rotation.
+  - Each value is bound to its row and field through authenticated additional data (`payroll:<workspace>:<user>:<field>`), so a ciphertext copied into another person's row, or into the other field, fails to decrypt.
+  - Tests cover: round trip (incl. ë/Ç), fresh IV every time and no plaintext in the stored value, wrong key, moved row/field, tampered byte, truncated value, unknown version, wrong key size.
+  - `maskLast4` gives "•••• 8906".
+- **`PAYROLL_ENCRYPTION_KEY`** (env): 32 bytes, base64, validated at boot. Locally a public dev key is used when it's unset or empty (an empty line copied from `.env.example` counts as unset). In production the API refuses to boot when it's missing, the wrong length or the dev key. Added to `.env.example` and to `DEPLOYMENT.md`, with a warning to keep it apart from the server: the nightly backup is useless for payroll without it.
+- **IBAN** (shared `payroll.ts`, 3 tests): `normalizeIban`, `isValidIban` (ISO 13616 mod-97; Kosovo `XK05 1212 0123 4567 8906` etc.), `formatIban`, `formatEur` (de-DE → "650,50 €"; `sq-XK` isn't in every ICU build and Chrome fell back to "€650.50"). The upsert schema normalizes and validates the IBAN server-side; the form checks it live.
+- **`lib/payroll.ts`**: the only place that decrypts. `loadPayrollRows(workspace, { reveal })` returns every active member (with or without a record), masked unless `reveal`. A value that can't be decrypted shows as "[unreadable]" and logs only which user/field, never the stored value.
+- **`payroll` router**:
+  - `list` (`payroll:view`): the masked table.
+  - `get` (`payroll:view`): one person in full, for the drawer.
+  - `upsert` (`payroll:manage`): never on your own record; null clears a field.
+  - `mine` (any active member): own record, masked to the last 4.
+  - `audit` (`payroll:view`): the trail.
+- **The audit trail:** every read (table, a person's record, your own pay details), every edit and every export writes an activity row: `payroll.list_viewed` / `viewed` / `self_viewed` / `updated` / `exported`. Payloads carry who and which fields (`fields: ["iban", …]`), the format and the row count, never a value. The `audit` procedure lists them with actor and subject names.
+- **Exports** (`GET /payroll-export/:workspaceId/payroll.xlsx|pdf`, `payroll:view`, audited):
+  - **exceljs 4.4.0** (new dependency): a frozen header, a € number format, the ID column forced to text so long numbers don't turn into exponents, and a total row.
+  - **pdf-lib**: landscape A4 with the header repeated on every page, cells truncated to fit, "Confidential · generated … · page N", and a total row.
+  - Both contain the full decrypted values. 3 tests (the xlsx parsed back; the PDF paginates 120 rows; unsupported characters survive).
+- **Never over WS**: new realtime entity `payroll` is `{entity, id, workspaceId, kind}` only. The client invalidates only `payroll.list`, which only HR has cached (an uncached query isn't fetched), so nothing reaches managers or staff.
+- **UI**:
+  - **Payroll** (People nav, `payroll:view`): a virtualized table (employee + position, net salary, bank, masked IBAN, masked ID card, last updated) with search and a running total. Clicking a row opens the **edit drawer**, which reveals that record (audited) and is editable with `payroll:manage`. Also an **Audit trail** tab and Export Excel / Export PDF.
+  - **My pay details** (everyone): own record, masked to the last 4.
+  - Neither payroll query refetches on window focus, since each fetch is an audited view.
+
+### Decisions
+
+- **The table is masked; the drawer and the exports reveal.** Every person-level view of the full values is then one audit row naming that person, instead of every table load silently exposing everyone's IBAN.
+- **Nobody edits their own payroll record**, HR included: a second person has to.
+- **Reads done by queries write activity rows**, deliberately. It's the one place a query has a side effect: who looked at payroll is exactly what the trail is for. The payroll queries don't refetch on focus, to keep that trail meaningful.
+- The audit trail is visible to `payroll:view` (HR + super admin). Payroll activity rows also appear in Admin's activity log, but they hold no values.
+- Members with no record still appear in the table (blank), so HR can see who's missing.
+
+### Verified
+
+- `pnpm check` green; `pnpm test`: API 339 (+7 crypto, +3 export), shared 103 (+3 IBAN), db 7, web 15.
+- `0062` applied to the local DB.
+- Production boot guard with `NODE_ENV=production`: a missing, 16-byte or dev key is refused; a real 32-byte key boots. The built-bundle style ESM default import of exceljs works under Node 22.
+- New `payroll.spec.ts`:
+  - HR fills Sam's record in the drawer. A bad IBAN check digit is flagged and blocks Save; the valid one (typed lowercase with spaces) saves.
+  - The table shows "•••• 8906" / "•••• 7890" and never the full IBAN; the total reads 650,50; reopening the drawer shows the full IBAN.
+  - **The DB row holds only `v1.` ciphertext**: neither the IBAN's digits nor the ID number appears anywhere in it.
+  - The xlsx (`PK…`) and PDF (`%PDF-`) exports download.
+  - The audit trail shows the edit, the view and both exports, with no values in it.
+  - Sam has no Payroll link, sees his own details masked, and gets 403 on the export URL. A staff manager (has Directory) also has no Payroll link and gets 403.
+- Full Playwright run at CI parity (`CI=1`, retries off, local Postgres/Redis/RustFS containers): **74/74 passed**. Phase-2 smoke test green.

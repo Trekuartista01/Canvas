@@ -71,6 +71,10 @@ export function useRealtime(workspaceId: string | undefined) {
           utils.dailyReport.invalidate();
         } else if (event.entity === "leave") {
           utils.leave.invalidate();
+        } else if (event.entity === "payroll") {
+          // Only HR has the table cached (an uncached query isn't fetched),
+          // and every refetch is itself an audited view.
+          utils.payroll.list.invalidate();
         }
       };
 

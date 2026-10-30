@@ -31,6 +31,7 @@ import { holidayRouter } from "./routers/holiday";
 import { leaveRouter } from "./routers/leave";
 import { contractRouter } from "./routers/contract";
 import { companyDocumentRouter } from "./routers/company-document";
+import { payrollRouter } from "./routers/payroll";
 import { workloadRouter } from "./routers/workload";
 import { workspaceRouter } from "./routers/workspace";
 import { publicProcedure, router } from "./trpc";
@@ -70,6 +71,7 @@ export const appRouter = router({
   leave: leaveRouter,
   contract: contractRouter,
   companyDocument: companyDocumentRouter,
+  payroll: payrollRouter,
   search: searchRouter,
   aiUsage: aiUsageRouter,
 });
