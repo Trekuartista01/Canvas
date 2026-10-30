@@ -9,7 +9,7 @@ test("Phase 6: data export downloads a workspace's tasks as CSV and as JSON", as
   await createSpaceAndList(page, "Ops", "Sprint");
   await page.getByRole("button", { name: "Board", exact: true }).click();
 
-  const todoColumn = page.getByTestId("status-column-To Do");
+  const todoColumn = page.getByTestId("status-column-Pending");
   await todoColumn.getByRole("button", { name: "+ Add task" }).click();
   await page.getByPlaceholder("Task title").fill("Ship the launch email");
   await page.keyboard.press("Enter");
@@ -33,7 +33,7 @@ test("Phase 6: data export downloads a workspace's tasks as CSV and as JSON", as
   expect(csvBody.split("\r\n")[0]).toBe(
     "Name,Space,List,Status,Priority,Assignee Email,Tags,Start Date,Due Date,Completed At,Created At",
   );
-  expect(csvBody).toContain("Ship the launch email,Ops,Sprint,To Do");
+  expect(csvBody).toContain("Ship the launch email,Ops,Sprint,Pending");
 
   const jsonResponse = await page.request.get(`${API_ORIGIN}/export/${workspaceId}/workspace.json`);
   expect(jsonResponse.ok()).toBe(true);
@@ -45,7 +45,7 @@ test("Phase 6: data export downloads a workspace's tasks as CSV and as JSON", as
     title: "Ship the launch email",
     space: "Ops",
     list: "Sprint",
-    status: "To Do",
+    status: "Pending",
   });
 });
 

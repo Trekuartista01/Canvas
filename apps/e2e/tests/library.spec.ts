@@ -20,7 +20,10 @@ test("Library: a generated image is saved in Canvas, searchable/filterable, and 
   await createSpaceAndList(page, "Creative", "Campaigns");
   await page.getByRole("button", { name: "Board", exact: true }).click();
 
-  await page.getByTestId("status-column-To Do").getByRole("button", { name: "+ Add task" }).click();
+  await page
+    .getByTestId("status-column-Pending")
+    .getByRole("button", { name: "+ Add task" })
+    .click();
   await page.getByPlaceholder("Task title").fill("Launch art");
   await page.keyboard.press("Enter");
   await page.getByRole("button", { name: "Launch art" }).click();
@@ -187,7 +190,10 @@ test("Generate panel: images can be saved directly into a chosen folder", async 
 
   await createSpaceAndList(page, "Creative", "Campaigns");
   await page.getByRole("button", { name: "Board", exact: true }).click();
-  await page.getByTestId("status-column-To Do").getByRole("button", { name: "+ Add task" }).click();
+  await page
+    .getByTestId("status-column-Pending")
+    .getByRole("button", { name: "+ Add task" })
+    .click();
   await page.getByPlaceholder("Task title").fill("Launch art");
   await page.keyboard.press("Enter");
   await page.getByRole("button", { name: "Launch art" }).click();

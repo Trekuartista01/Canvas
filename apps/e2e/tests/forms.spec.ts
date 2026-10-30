@@ -107,7 +107,7 @@ test("task-completion forms: bind a form to a task, an anonymous submitter attac
 
   await createSpaceAndList(page, "Delivery", "Assets");
   await page.getByRole("button", { name: "Board", exact: true }).click();
-  const todoColumn = page.getByTestId("status-column-To Do");
+  const todoColumn = page.getByTestId("status-column-Pending");
   await todoColumn.getByRole("button", { name: "+ Add task" }).click();
   await page.getByPlaceholder("Task title").fill("Design homepage banner");
   await page.keyboard.press("Enter");
@@ -167,7 +167,7 @@ test("task-completion forms: bind a form to a task, an anonymous submitter attac
   await page.getByRole("link", { name: "Assets" }).click();
   await page.getByRole("button", { name: "Board", exact: true }).click();
   await expect(
-    page.getByTestId("status-column-Done").getByText("Design homepage banner"),
+    page.getByTestId("status-column-Completed").getByText("Design homepage banner"),
   ).toBeVisible({ timeout: 15_000 });
 
   // Bob, the Operations Manager, was notified with the external

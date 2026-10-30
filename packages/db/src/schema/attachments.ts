@@ -1,4 +1,13 @@
-import { index, integer, pgEnum, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
+import {
+  boolean,
+  index,
+  integer,
+  pgEnum,
+  pgTable,
+  text,
+  timestamp,
+  uuid,
+} from "drizzle-orm/pg-core";
 import { uuidv7 } from "uuidv7";
 import { users } from "./auth";
 import { comments } from "./comments";
@@ -45,6 +54,9 @@ export const attachments = pgTable(
     // M1.8's workspace-wide custom field defs.
     imageAssetId: uuid("image_asset_id").references(() => imageAssets.id),
     source: attachmentSource("source").notNull().default("upload"),
+    // M7.2: an image that proves the work was done — a task with
+    // requires_proof can't be submitted for review without one.
+    isProof: boolean("is_proof").notNull().default(false),
     // Nullable, unlike the rest of M1.9's original columns — only a
     // "google_drive" source attachment (no S3 object) leaves these null.
     fileKey: text("file_key"),

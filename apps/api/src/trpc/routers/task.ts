@@ -13,10 +13,14 @@ import {
   listTasksSchema,
   presetToRRule,
   removeTaskDependencySchema,
+  rejectTaskSchema,
   removeTaskTagSchema,
   searchTasksSchema,
   setTaskRecurrenceSchema,
+  taskCollaboratorSchema,
   taskHighlightsSchema,
+  taskIdSchema,
+  transferTaskSchema,
   unassignTaskSchema,
   updateTaskSchema,
   type StatusKind,
@@ -49,11 +53,19 @@ import {
 } from "../../lib/task-update";
 import {
   firstStatusForList,
+  firstStatusOfKind,
   lastTaskOrderKey,
   requireTask,
   spaceIdForList,
   workspaceIdForList,
 } from "../../lib/task-queries";
+import {
+  approveTask,
+  rejectTask,
+  submitTaskForReview,
+  transferTask,
+} from "../../lib/task-approval";
+import { assertStatusTransition, getAssigneeIds, isTaskApprover } from "../../lib/task-transition";
 import { protectedProcedure, router } from "../trpc";
 
 async function requireStatusInList(statusId: string, listId: string) {
@@ -281,6 +293,7 @@ export const taskRouter = router({
         title: schema.tasks.title,
         priority: schema.tasks.priority,
         dueDate: schema.tasks.dueDate,
+        dueTime: schema.tasks.dueTime,
         listId: schema.tasks.listId,
         listName: schema.lists.name,
         spaceName: schema.spaces.name,
@@ -424,11 +437,36 @@ export const taskRouter = router({
         orderKey: nextOrderKey(lastKey),
         createdBy: ctx.user.id,
         completedAt: computeCompletedAt(status.kind, null, new Date()),
+        priority: input.priority ?? null,
+        dueDate: input.dueDate ?? null,
+        dueTime: input.dueDate ? (input.dueTime ?? null) : null,
+        requiresProof: input.requiresProof ?? false,
       })
       .returning();
     if (!task) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
 
     await logActivity(workspaceId, ctx.user.id, "task", task.id, "task.created");
+
+    // M7.2 create dialog: one task handed to several people at once.
+    const assigneeIds = [...new Set(input.assigneeIds ?? [])];
+    for (const userId of assigneeIds) await requireWorkspaceMember(workspaceId, userId);
+    if (assigneeIds.length > 0) {
+      await db
+        .insert(schema.taskAssignees)
+        .values(assigneeIds.map((userId) => ({ taskId: task.id, userId })));
+      const assignedActivity = await logActivity(
+        workspaceId,
+        ctx.user.id,
+        "task",
+        task.id,
+        "task.assigned",
+        { taskId: task.id, listId: task.listId, title: task.title },
+      );
+      await notifyUsers(
+        assignedActivity.id,
+        assigneeIds.filter((id) => id !== ctx.user.id),
+      );
+    }
     await enqueueTaskEmbedding(workspaceId, ctx.user.id, task);
     // Runs before publish() so that by the time the realtime "task
     // updated" invalidation reaches any open client, an automation's own
@@ -466,6 +504,15 @@ export const taskRouter = router({
       const previousStatus = await db.query.statuses.findFirst({
         where: eq(schema.statuses.id, task.statusId),
       });
+      // M7.2: submit/approve rules apply to a plain status change (board
+      // drag, status picker) exactly as to the dedicated procedures.
+      await assertStatusTransition(
+        ctx.user,
+        workspaceId,
+        task,
+        previousStatus?.kind ?? "open",
+        status.kind,
+      );
       justCompleted = isDoneKind(status.kind) && !isDoneKind(previousStatus?.kind ?? "open");
     }
 
@@ -488,6 +535,9 @@ export const taskRouter = router({
           priority: input.priority,
           startDate: input.startDate,
           dueDate: input.dueDate,
+          // Clearing the due date clears its time too.
+          dueTime: input.dueDate === null ? null : input.dueTime,
+          requiresProof: input.requiresProof,
           isMilestone: input.isMilestone,
           completedAt,
         }),
@@ -547,6 +597,10 @@ export const taskRouter = router({
     const workspaceId = await workspaceIdForList(task.listId);
     const spaceId = await spaceIdForList(task.listId);
     await assertCan(ctx.user, workspaceId, "task:update", { spaceId });
+    const current = await db.query.statuses.findFirst({
+      where: eq(schema.statuses.id, task.statusId),
+    });
+    await assertStatusTransition(ctx.user, workspaceId, task, current?.kind ?? "open", "done");
     return completeTaskWithDefaultStatus(input.taskId, ctx.user.id);
   }),
 
@@ -567,6 +621,8 @@ export const taskRouter = router({
         title: schema.tasks.title,
         priority: schema.tasks.priority,
         completedAt: schema.tasks.completedAt,
+        createdBy: schema.tasks.createdBy,
+        requiresProof: schema.tasks.requiresProof,
       })
       .from(schema.tasks)
       .where(
@@ -591,6 +647,20 @@ export const taskRouter = router({
         (s) => [s.id, s.kind] as const,
       ),
     );
+
+    // M7.2: every row must pass the approval rules before any row changes —
+    // a bulk edit is all-or-nothing, not a partial approval.
+    if (newStatusKind !== undefined) {
+      for (const row of rows) {
+        await assertStatusTransition(
+          ctx.user,
+          workspaceId,
+          { ...row, listId: input.listId },
+          statusKindById.get(row.statusId) ?? "open",
+          newStatusKind,
+        );
+      }
+    }
 
     // Status changes append each task to the end of the new column so we
     // don't invent a shared orderKey for the whole selection.
@@ -702,6 +772,102 @@ export const taskRouter = router({
       kind: "deleted",
     });
     return { id: task.id };
+  }),
+
+  // M7.2 approval flow — the rules live in lib/task-transition-rules.ts.
+  submitForReview: protectedProcedure
+    .input(taskIdSchema)
+    .mutation(({ ctx, input }) => submitTaskForReview(ctx.user, input.taskId)),
+
+  approve: protectedProcedure
+    .input(taskIdSchema)
+    .mutation(({ ctx, input }) => approveTask(ctx.user, input.taskId)),
+
+  reject: protectedProcedure
+    .input(rejectTaskSchema)
+    .mutation(({ ctx, input }) => rejectTask(ctx.user, input.taskId, input.comment)),
+
+  transfer: protectedProcedure
+    .input(transferTaskSchema)
+    .mutation(({ ctx, input }) => transferTask(ctx.user, input)),
+
+  // What the task panel needs to show the approval controls.
+  approvalState: protectedProcedure.input(taskIdSchema).query(async ({ ctx, input }) => {
+    const task = await requireTask(input.taskId);
+    const workspaceId = await workspaceIdForList(task.listId);
+    await assertCan(ctx.user, workspaceId, "task:view");
+    const assigneeIds = await getAssigneeIds(task.id);
+    const review = await firstStatusOfKind(task.listId, "review");
+    return {
+      hasReviewStatus: review !== null,
+      isAssignee: assigneeIds.includes(ctx.user.id),
+      isApprover: await isTaskApprover(ctx.user, workspaceId, task, assigneeIds),
+    };
+  }),
+
+  // M7.2: involved without owning the work. Workspace roles already decide
+  // who may see/comment/attach; collaborators are the explicit "keep me in
+  // the loop" list that review/approval/transfer notifications reach.
+  collaborators: router({
+    list: protectedProcedure.input(taskIdSchema).query(async ({ ctx, input }) => {
+      const task = await requireTask(input.taskId);
+      const workspaceId = await workspaceIdForList(task.listId);
+      await assertCan(ctx.user, workspaceId, "task:view");
+      return db
+        .select({
+          userId: schema.users.id,
+          name: schema.users.name,
+          avatarUrl: schema.users.avatarUrl,
+        })
+        .from(schema.taskCollaborators)
+        .innerJoin(schema.users, eq(schema.users.id, schema.taskCollaborators.userId))
+        .where(eq(schema.taskCollaborators.taskId, task.id));
+    }),
+
+    add: protectedProcedure.input(taskCollaboratorSchema).mutation(async ({ ctx, input }) => {
+      const task = await requireTask(input.taskId);
+      const workspaceId = await workspaceIdForList(task.listId);
+      await assertCan(ctx.user, workspaceId, "task:update");
+      await requireWorkspaceMember(workspaceId, input.userId);
+      await db
+        .insert(schema.taskCollaborators)
+        .values({ taskId: task.id, userId: input.userId })
+        .onConflictDoNothing();
+      await logActivity(workspaceId, ctx.user.id, "task", task.id, "task.collaborator_added", {
+        userId: input.userId,
+      });
+      await publish(workspaceId, {
+        entity: "task",
+        id: task.id,
+        listId: task.listId,
+        kind: "updated",
+      });
+      return { taskId: task.id, userId: input.userId };
+    }),
+
+    remove: protectedProcedure.input(taskCollaboratorSchema).mutation(async ({ ctx, input }) => {
+      const task = await requireTask(input.taskId);
+      const workspaceId = await workspaceIdForList(task.listId);
+      await assertCan(ctx.user, workspaceId, "task:update");
+      await db
+        .delete(schema.taskCollaborators)
+        .where(
+          and(
+            eq(schema.taskCollaborators.taskId, task.id),
+            eq(schema.taskCollaborators.userId, input.userId),
+          ),
+        );
+      await logActivity(workspaceId, ctx.user.id, "task", task.id, "task.collaborator_removed", {
+        userId: input.userId,
+      });
+      await publish(workspaceId, {
+        entity: "task",
+        id: task.id,
+        listId: task.listId,
+        kind: "updated",
+      });
+      return { taskId: task.id, userId: input.userId };
+    }),
   }),
 
   assignees: router({

@@ -10,7 +10,7 @@ test("save a task as a template, then create a new task from it", async ({ page 
   await createSpaceAndList(page, "Ops", "Onboarding");
 
   await page.getByRole("button", { name: "Board", exact: true }).click();
-  const todoColumn = page.getByTestId("status-column-To Do");
+  const todoColumn = page.getByTestId("status-column-Pending");
   await todoColumn.getByRole("button", { name: "+ Add task" }).click();
   await page.getByPlaceholder("Task title").fill("Set up new hire laptop");
   await page.keyboard.press("Enter");

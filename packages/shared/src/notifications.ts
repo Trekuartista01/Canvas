@@ -15,4 +15,9 @@ export const NOTIFICATION_VERB_LABELS: Record<string, string> = {
   // — same shape as task.completed's payload plus a self-reported
   // submitterName, since there's no real user to read a name off of.
   "task.completed_via_form": "finished a task",
+  // M7.2 approval flow.
+  "task.submitted_for_review": "sent a task for your approval",
+  "task.approved": "approved your task",
+  "task.rejected": "sent a task back to you",
+  "task.transferred": "transferred a task",
 };

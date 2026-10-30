@@ -51,7 +51,7 @@ test("inviting someone lets you pick a custom role directly, and it's applied on
   await bobPage.getByRole("link", { name: "Open" }).click();
   await bobPage.getByRole("link", { name: "Sprint" }).click();
   await bobPage.getByRole("button", { name: "Board", exact: true }).click();
-  const todoColumn = bobPage.getByTestId("status-column-To Do");
+  const todoColumn = bobPage.getByTestId("status-column-Pending");
   await todoColumn.getByRole("button", { name: "+ Add task" }).click();
   await bobPage.getByPlaceholder("Task title").fill("Should not save");
   await bobPage.keyboard.press("Enter");

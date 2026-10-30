@@ -3,7 +3,7 @@ import { bucketSumByDay, computeBurndownSeries, countByStatusKind } from "./dash
 
 describe("countByStatusKind", () => {
   it("zero-fills every kind, even ones with no tasks", () => {
-    expect(countByStatusKind([])).toEqual({ open: 0, active: 0, done: 0, closed: 0 });
+    expect(countByStatusKind([])).toEqual({ open: 0, active: 0, review: 0, done: 0, closed: 0 });
   });
 
   it("counts tasks per kind", () => {
@@ -12,7 +12,7 @@ describe("countByStatusKind", () => {
       { statusKind: "open" as const },
       { statusKind: "done" as const },
     ];
-    expect(countByStatusKind(tasks)).toEqual({ open: 2, active: 0, done: 1, closed: 0 });
+    expect(countByStatusKind(tasks)).toEqual({ open: 2, active: 0, review: 0, done: 1, closed: 0 });
   });
 });
 

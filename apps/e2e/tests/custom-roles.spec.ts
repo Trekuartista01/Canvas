@@ -63,7 +63,7 @@ test("Phase 6: a custom role's grant and a space permission override each let a 
   // Bob can also create a task in Sprint, thanks to the space override.
   await bobPage.getByRole("link", { name: "Sprint" }).click();
   await bobPage.getByRole("button", { name: "Board", exact: true }).click();
-  const todoColumn = bobPage.getByTestId("status-column-To Do");
+  const todoColumn = bobPage.getByTestId("status-column-Pending");
   await todoColumn.getByRole("button", { name: "+ Add task" }).click();
   await bobPage.getByPlaceholder("Task title").fill("Guest-created task");
   await bobPage.keyboard.press("Enter");

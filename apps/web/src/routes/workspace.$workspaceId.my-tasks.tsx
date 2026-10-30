@@ -1,5 +1,6 @@
 import type { AppRouter } from "@canvas/api";
-import type { StatusKind } from "@canvas/shared";
+import { isOverdue, type StatusKind } from "@canvas/shared";
+import { formatDue } from "@/lib/format";
 import { useSession } from "@/hooks/use-session";
 import { trpc } from "@/lib/trpc";
 import { useVirtualizer } from "@tanstack/react-virtual";
@@ -18,23 +19,16 @@ export const myTasksRoute = createRoute({
 });
 
 // Statuses are per list, so tasks from different lists are grouped by their
-// status *kind* — the normalized open/active/done/closed every status has.
+// status *kind* — the normalized open/active/review/done/closed every status has.
 const GROUPS: { kind: StatusKind; label: string }[] = [
   { kind: "active", label: "In progress" },
+  { kind: "review", label: "Awaiting approval" },
   { kind: "open", label: "To do" },
   { kind: "done", label: "Done" },
   { kind: "closed", label: "Closed" },
 ];
 
 type Row = { type: "header"; label: string; count: number } | { type: "task"; task: MyTask };
-
-function formatDue(dueDate: string | null) {
-  if (!dueDate) return "No due date";
-  return new Date(`${dueDate}T00:00:00`).toLocaleDateString(undefined, {
-    day: "numeric",
-    month: "short",
-  });
-}
 
 function MyTasksPage() {
   const { workspaceId } = myTasksRoute.useParams();
@@ -129,8 +123,22 @@ function MyTasksPage() {
                           {row.task.spaceName} / {row.task.listName} · {row.task.statusName}
                         </span>
                       </span>
-                      <span className="text-muted-foreground shrink-0 text-xs">
-                        {formatDue(row.task.dueDate)}
+                      <span
+                        className={
+                          isOverdue(
+                            {
+                              dueDate: row.task.dueDate,
+                              dueTime: row.task.dueTime,
+                              done:
+                                row.task.statusKind === "done" || row.task.statusKind === "closed",
+                            },
+                            new Date(),
+                          )
+                            ? "shrink-0 text-xs text-red-600 dark:text-red-400"
+                            : "text-muted-foreground shrink-0 text-xs"
+                        }
+                      >
+                        {formatDue(row.task.dueDate, row.task.dueTime) ?? "No due date"}
                       </span>
                     </Link>
                   )}

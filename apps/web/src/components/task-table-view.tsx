@@ -1,5 +1,5 @@
 import type { AppRouter } from "@canvas/api";
-import { TASK_PRIORITIES, type TaskPriority } from "@canvas/shared";
+import { formatDueTime, isOverdue, TASK_PRIORITIES, type TaskPriority } from "@canvas/shared";
 import { Input } from "@/components/ui/input";
 import { NewTaskInlineForm } from "@/components/new-task-inline-form";
 import { StatusSelect } from "@/components/status-select";
@@ -119,7 +119,7 @@ export function TaskTableView({
       }),
       columnHelper.accessor("dueDate", {
         header: "Due",
-        cell: (info) => <DateCell listId={listId} task={info.row.original} field="dueDate" />,
+        cell: (info) => <DueCell listId={listId} task={info.row.original} />,
       }),
       columnHelper.display({
         id: "open",
@@ -427,5 +427,28 @@ function DateCell({
       }
       className="border-border bg-background h-7 w-full rounded border text-xs"
     />
+  );
+}
+
+// The due column also shows the due time (M7.2) and flags overdue work —
+// the time itself is edited in the task panel.
+function DueCell({ listId, task }: { listId: string; task: Task }) {
+  const overdue = isOverdue(
+    { dueDate: task.dueDate, dueTime: task.dueTime, done: task.completedAt !== null },
+    new Date(),
+  );
+  return (
+    <div className="flex items-center gap-1">
+      <DateCell listId={listId} task={task} field="dueDate" />
+      {task.dueTime && (
+        <span
+          className={
+            overdue ? "text-xs text-red-600 dark:text-red-400" : "text-muted-foreground text-xs"
+          }
+        >
+          {formatDueTime(task.dueTime)}
+        </span>
+      )}
+    </div>
   );
 }

@@ -26,7 +26,7 @@ test("comment, @mention, react, and reply across two users; mentioned user gets 
   await page.getByRole("link", { name: "Open" }).click();
   await createSpaceAndList(page, "Design", "Backlog");
   await page.getByRole("button", { name: "Board", exact: true }).click();
-  const todoColumn = page.getByTestId("status-column-To Do");
+  const todoColumn = page.getByTestId("status-column-Pending");
   await todoColumn.getByRole("button", { name: "+ Add task" }).click();
   await page.getByPlaceholder("Task title").fill("Review homepage copy");
   await page.keyboard.press("Enter");

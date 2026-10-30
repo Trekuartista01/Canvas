@@ -1,3 +1,5 @@
+import { NewTaskDialog } from "@/components/new-task-dialog";
+import { Button } from "@/components/ui/button";
 import { TaskBoard } from "@/components/task-board";
 import { TaskCalendarView } from "@/components/task-calendar-view";
 import { TaskDetailPanel } from "@/components/task-detail-panel";
@@ -31,6 +33,7 @@ function ListPage() {
   const tree = trpc.hierarchy.tree.useQuery({ workspaceId });
   const [view, setView] = useState<"list" | "board" | "calendar" | "table" | "gantt">("list");
   const [openTaskId, setOpenTaskId] = useState<string | null>(openTask ?? null);
+  const [creatingTask, setCreatingTask] = useState(false);
 
   const utils = trpc.useUtils();
   const templates = trpc.taskTemplate.list.useQuery({ workspaceId });
@@ -77,6 +80,9 @@ function ListPage() {
           <h1 className="text-lg font-semibold"># {list.name}</h1>
         </div>
         <div className="flex items-center gap-3 text-sm">
+          <Button size="sm" onClick={() => setCreatingTask(true)} data-testid="new-task-button">
+            + New task
+          </Button>
           {(templates.data ?? []).length > 0 && (
             <select
               value={selectedTemplateId}
@@ -135,6 +141,13 @@ function ListPage() {
         <TaskGanttView listId={listId} onOpenTask={setOpenTaskId} />
       )}
 
+      {creatingTask && (
+        <NewTaskDialog
+          workspaceId={workspaceId}
+          listId={listId}
+          onClose={() => setCreatingTask(false)}
+        />
+      )}
       {openTaskId && (
         <TaskDetailPanel
           taskId={openTaskId}

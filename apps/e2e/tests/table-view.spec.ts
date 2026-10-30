@@ -9,7 +9,7 @@ test("M3.2 table: inline edit + bulk set priority", async ({ page }) => {
   await createSpaceAndList(page, "Ops", "Spreadsheet");
 
   await page.getByRole("button", { name: "Board", exact: true }).click();
-  const todo = page.getByTestId("status-column-To Do");
+  const todo = page.getByTestId("status-column-Pending");
   for (const title of ["Alpha row", "Beta row"]) {
     await todo.getByRole("button", { name: "+ Add task" }).click();
     await page.getByPlaceholder("Task title").fill(title);

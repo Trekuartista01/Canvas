@@ -1,4 +1,5 @@
 import { db, schema } from "@canvas/db";
+import type { StatusKind } from "@canvas/shared";
 import { TRPCError } from "@trpc/server";
 import { and, asc, desc, eq, isNull, or } from "drizzle-orm";
 import { requireList, requireSpace } from "./hierarchy";
@@ -83,4 +84,14 @@ export async function lastTaskOrderKey(listId: string, statusId: string): Promis
     .orderBy(desc(schema.tasks.orderKey))
     .limit(1);
   return last?.orderKey ?? null;
+}
+
+// M7.2: the status submit/reject move a task into — the list's first status
+// of that kind, or null if it has none (a pre-M7.2 list with no review).
+export async function firstStatusOfKind(listId: string, kind: StatusKind) {
+  const status = await db.query.statuses.findFirst({
+    where: and(eq(schema.statuses.listId, listId), eq(schema.statuses.kind, kind)),
+    orderBy: asc(schema.statuses.orderKey),
+  });
+  return status ?? null;
 }

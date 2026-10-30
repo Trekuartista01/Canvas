@@ -18,7 +18,7 @@ test("M3.4: manage dependencies from the task panel, reject a cycle, mark a mile
   await createSpaceAndList(page, "Ops", "Rollout");
 
   await page.getByRole("button", { name: "Board", exact: true }).click();
-  const todoColumn = page.getByTestId("status-column-To Do");
+  const todoColumn = page.getByTestId("status-column-Pending");
   for (const title of ["Design", "Build", "Launch"]) {
     await todoColumn.getByRole("button", { name: "+ Add task" }).click();
     await page.getByPlaceholder("Task title").fill(title);

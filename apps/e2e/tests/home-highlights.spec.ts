@@ -10,7 +10,7 @@ test("Home: Top priority surfaces urgent + assigned-to-me tasks, Recently added 
   await createWorkspaceAndOpen(page, "Home Workspace");
   await createSpaceAndList(page, "Ops", "Sprint");
   await page.getByRole("button", { name: "Board", exact: true }).click();
-  const todoColumn = page.getByTestId("status-column-To Do");
+  const todoColumn = page.getByTestId("status-column-Pending");
 
   await todoColumn.getByRole("button", { name: "+ Add task" }).click();
   await page.getByPlaceholder("Task title").fill("Normal task");
@@ -62,7 +62,7 @@ test("Login summary: shows once right after logging in, not on a later reload", 
   await createWorkspaceAndOpen(page, "Login Summary Workspace");
   await createSpaceAndList(page, "Ops", "Sprint");
   await page.getByRole("button", { name: "Board", exact: true }).click();
-  const todoColumn = page.getByTestId("status-column-To Do");
+  const todoColumn = page.getByTestId("status-column-Pending");
   await todoColumn.getByRole("button", { name: "+ Add task" }).click();
   await page.getByPlaceholder("Task title").fill("Urgent onboarding task");
   await page.keyboard.press("Enter");

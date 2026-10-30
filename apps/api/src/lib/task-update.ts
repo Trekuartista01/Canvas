@@ -54,6 +54,8 @@ export function buildTaskUpdateFields(input: {
   priority?: TaskPriority | null;
   startDate?: string | null;
   dueDate?: string | null;
+  dueTime?: string | null;
+  requiresProof?: boolean;
   isMilestone?: boolean;
   completedAt?: Date | null;
 }) {
@@ -74,6 +76,8 @@ export function buildTaskUpdateFields(input: {
     ...(input.priority !== undefined ? { priority: input.priority } : {}),
     ...(input.startDate !== undefined ? { startDate: input.startDate } : {}),
     ...(input.dueDate !== undefined ? { dueDate: input.dueDate } : {}),
+    ...(input.dueTime !== undefined ? { dueTime: input.dueTime } : {}),
+    ...(input.requiresProof !== undefined ? { requiresProof: input.requiresProof } : {}),
     ...(input.isMilestone !== undefined ? { isMilestone: input.isMilestone } : {}),
   };
 }

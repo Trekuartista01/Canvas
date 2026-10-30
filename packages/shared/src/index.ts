@@ -21,6 +21,7 @@ export * from "./workload";
 export * from "./notifications";
 export * from "./brain-context";
 export * from "./people";
+export * from "./due";
 export * from "./schemas/auth";
 export * from "./schemas/workspace";
 export * from "./schemas/hierarchy";

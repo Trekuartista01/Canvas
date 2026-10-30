@@ -5,6 +5,7 @@ import {
   deleteAttachmentSchema,
   listAttachmentsSchema,
   presignUploadSchema,
+  setAttachmentProofSchema,
 } from "@canvas/shared";
 import { TRPCError } from "@trpc/server";
 import { asc, eq } from "drizzle-orm";
@@ -103,6 +104,9 @@ export const attachmentRouter = router({
   // the large 3D/video files this flow exists for never hit this branch.
   confirmUpload: protectedProcedure.input(confirmUploadSchema).mutation(async ({ ctx, input }) => {
     const { workspaceId } = await requireAttachmentTarget(ctx.user, { taskId: input.taskId });
+    if (input.isProof && !input.mime.startsWith("image/")) {
+      throw new TRPCError({ code: "BAD_REQUEST", message: "Proof must be a photo" });
+    }
 
     const head = await headObject(input.key);
     if (!head) {
@@ -139,11 +143,19 @@ export const attachmentRouter = router({
         blurhash,
         width,
         height,
+        isProof: input.isProof ?? false,
       })
       .returning();
     if (!attachment) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
 
-    await logActivity(workspaceId, ctx.user.id, "attachment", attachment.id, "attachment.created");
+    await logActivity(
+      workspaceId,
+      ctx.user.id,
+      "attachment",
+      attachment.id,
+      "attachment.created",
+      attachment.isProof ? { isProof: true } : undefined,
+    );
 
     // Pre-existing gap this touches while it's here: neither the old
     // /uploads route nor this one ever published a realtime event, so
@@ -161,6 +173,38 @@ export const attachmentRouter = router({
     });
 
     return attachment;
+  }),
+
+  // M7.2: mark an already-uploaded photo as proof of work (or unmark it).
+  setProof: protectedProcedure.input(setAttachmentProofSchema).mutation(async ({ ctx, input }) => {
+    const attachment = await db.query.attachments.findFirst({
+      where: eq(schema.attachments.id, input.attachmentId),
+    });
+    if (!attachment?.taskId) throw new TRPCError({ code: "NOT_FOUND" });
+    await assertCan(ctx.user, attachment.workspaceId, "attachment:create");
+    if (input.isProof && !attachment.mime.startsWith("image/")) {
+      throw new TRPCError({ code: "BAD_REQUEST", message: "Proof must be a photo" });
+    }
+
+    await db
+      .update(schema.attachments)
+      .set({ isProof: input.isProof, updatedAt: new Date() })
+      .where(eq(schema.attachments.id, attachment.id));
+    await logActivity(
+      attachment.workspaceId,
+      ctx.user.id,
+      "attachment",
+      attachment.id,
+      input.isProof ? "attachment.marked_proof" : "attachment.unmarked_proof",
+    );
+    const task = await requireTask(attachment.taskId);
+    await publish(attachment.workspaceId, {
+      entity: "task",
+      id: task.id,
+      listId: task.listId,
+      kind: "updated",
+    });
+    return { id: attachment.id, isProof: input.isProof };
   }),
 
   // M5.6 Google Drive "picker": a plain tRPC mutation (unlike /uploads —

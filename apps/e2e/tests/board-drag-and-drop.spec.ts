@@ -39,8 +39,8 @@ test("drag tasks across and within status columns on the board", async ({ page }
   await createSpaceAndList(page, "Ops", "Kanban Test");
 
   await page.getByRole("button", { name: "Board", exact: true }).click();
-  const todoColumn = page.getByTestId("status-column-To Do");
-  const doneColumn = page.getByTestId("status-column-Done");
+  const todoColumn = page.getByTestId("status-column-Pending");
+  const doneColumn = page.getByTestId("status-column-Completed");
 
   await todoColumn.getByRole("button", { name: "+ Add task" }).click();
   await page.getByPlaceholder("Task title").fill("Design the invite");

@@ -32,6 +32,8 @@ export const confirmUploadSchema = z.object({
   taskId: z.string().uuid(),
   fileName: z.string().trim().min(1).max(300),
   mime: z.string().trim().min(1).max(200),
+  // M7.2: upload straight into the task's proof (images only).
+  isProof: z.boolean().optional(),
 });
 
 export const deleteAttachmentSchema = z.object({
@@ -49,4 +51,10 @@ export const attachExternalSchema = z.object({
   url: z.string().trim().url(),
   fileName: z.string().trim().min(1).max(300),
   mime: z.string().trim().min(1).max(200).optional(),
+});
+
+// M7.2: mark/unmark an existing image attachment as proof of work.
+export const setAttachmentProofSchema = z.object({
+  attachmentId: z.string().uuid(),
+  isProof: z.boolean(),
 });

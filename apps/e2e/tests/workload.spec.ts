@@ -18,7 +18,7 @@ test("M3.8: workload shows tasks due this week per assignee, excludes tasks outs
   await createSpaceAndList(page, "Ops", "Sprint");
 
   await page.getByRole("button", { name: "Board", exact: true }).click();
-  const todoColumn = page.getByTestId("status-column-To Do");
+  const todoColumn = page.getByTestId("status-column-Pending");
 
   for (const title of ["Design mockups", "Write copy"]) {
     await todoColumn.getByRole("button", { name: "+ Add task" }).click();
@@ -99,7 +99,7 @@ test("Workload: shows each person's total open-task count and suggests diversify
   await page.getByRole("link", { name: "Open" }).click();
   await createSpaceAndList(page, "Ops", "Sprint");
   await page.getByRole("button", { name: "Board", exact: true }).click();
-  const todoColumn = page.getByTestId("status-column-To Do");
+  const todoColumn = page.getByTestId("status-column-Pending");
 
   // Nia gets 4 open tasks, Bob gets 1 — a lopsided, roughly-4x split.
   for (const title of ["Task A", "Task B", "Task C", "Task D"]) {

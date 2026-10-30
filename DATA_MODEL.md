@@ -21,14 +21,17 @@ spaces           (id, workspace_id fk, name, icon, order_key,
 folders          (id, space_id fk, name, order_key, deleted_at)          -- optional layer
 lists            (id, space_id fk, folder_id fk null, name, order_key, deleted_at)
 
-statuses         (id, list_id fk, name, color, kind enum('open','active','done','closed'),
+statuses         (id, list_id fk, name, color,
+                  kind enum('open','active','review','done','closed'),    -- review = awaiting approval (M7.2)
                   order_key)                                             -- custom per list
 tasks            (id, list_id fk, parent_task_id fk null,                -- subtasks
                   title, description_json jsonb,                         -- rich text (TipTap JSON)
                   status_id fk, priority enum('urgent','high','normal','low') null,
-                  start_date, due_date, order_key,
+                  start_date, due_date, due_time time null,              -- Europe/Belgrade wall clock
+                  requires_proof bool default false, order_key,          -- proof photo before review
                   created_by fk users, deleted_at)
 task_assignees   (task_id fk, user_id fk, uniq pair)
+task_collaborators(task_id fk, user_id fk, pk pair)                      -- M7.2: in the loop, not owners
 task_watchers    (task_id fk, user_id fk, uniq pair)
 task_dependencies(id, task_id fk, depends_on_task_id fk,
                   kind enum('blocks','waiting_on'), uniq(task_id, depends_on_task_id))
@@ -51,7 +54,8 @@ custom_field_values(id, field_def_id fk, task_id fk, value_json jsonb, uniq(fiel
 
 attachments      (id, workspace_id fk, task_id fk null, comment_id fk null,
                   uploader_id fk, image_asset_id fk null,  -- set when attachment is an image
-                  file_key, file_name, mime, size_bytes)
+                  file_key, file_name, mime, size_bytes,
+                  is_proof bool default false)              -- M7.2: proof-of-work photo (images only)
 
 activity         (id, workspace_id fk, actor_id fk, entity_type, entity_id,
                   verb, payload_json jsonb, created_at)     -- append-only

@@ -24,6 +24,13 @@ export function AttachmentsSection({ taskId }: { taskId: string }) {
   const attachments = trpc.attachment.list.useQuery({ taskId });
   const invalidate = () => utils.attachment.list.invalidate({ taskId });
   const del = trpc.attachment.delete.useMutation({ onSuccess: invalidate });
+  // M7.2: an already-attached photo can count as proof of work.
+  const setProof = trpc.attachment.setProof.useMutation({
+    onSuccess: () => {
+      void invalidate();
+      void utils.task.approvalState.invalidate({ taskId });
+    },
+  });
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
@@ -81,6 +88,19 @@ export function AttachmentsSection({ taskId }: { taskId: string }) {
             {images.map((a, i) => (
               <div key={a.id} className="group relative">
                 <BlurhashThumb attachment={a} onClick={() => setLightboxIndex(i)} />
+                <button
+                  type="button"
+                  aria-pressed={a.isProof}
+                  title={a.isProof ? "Unmark as proof" : "Mark as proof"}
+                  onClick={() => setProof.mutate({ attachmentId: a.id, isProof: !a.isProof })}
+                  className={`bg-background/90 absolute top-1 left-1 rounded-full px-1.5 text-[10px] ${
+                    a.isProof
+                      ? "text-status-good inline"
+                      : "text-muted-foreground hidden group-hover:inline"
+                  }`}
+                >
+                  {a.isProof ? "Proof ✓" : "Mark proof"}
+                </button>
                 <button
                   type="button"
                   aria-label={`Delete ${a.fileName}`}

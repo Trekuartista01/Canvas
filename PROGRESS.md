@@ -2360,3 +2360,35 @@ Developers no longer need Docker. Dev runs `pnpm dev` (api + web + worker via tu
 ### TODO / next
 
 - `teamScopeFor()` is in place but no list-level team view consumes it yet. The leave/report/performance milestones (7.3, 7.5, 7.8) are its first users.
+
+## 2026-10-30 M7.2: Task approval flow, proof photo, transfer, collaborators, due time — done
+
+### Built
+
+- **Schema** (migration `0057`): `status_kind` gets `'review'` (`ALTER TYPE … ADD VALUE 'review' BEFORE 'done'`); `tasks.due_time` (`time`, nullable) and `tasks.requires_proof` (bool, default false); `attachments.is_proof` (bool, default false); new `task_collaborators` (task_id, user_id; PK pair, cascade on both).
+- **New lists** are seeded Pending (open) / In progress (active) / Awaiting approval (review) / Completed (done).
+- **One rulebook for every status change**: `checkStatusTransition()` (`lib/task-transition-rules.ts`, pure, unit-tested) with a DB-backed wrapper `assertStatusTransition()` (`lib/task-transition.ts`). `task.update` (status picker, board drag), `task.bulkUpdate` (all-or-nothing: every row checked before any changes), `task.complete` and the new procedures all go through it. Rules: an assignee (or approver) moves to review, and when `requires_proof` is set they need at least one `is_proof` attachment first; only an approver moves to done/closed (approve, or close out directly); review → active/open goes only through Reject; only an approver reopens finished work; pending ↔ in progress is free.
+- **Approver** = `tasks:manageTeam`, resolved per task (`isTaskApprover`): super_admin/hr/operation_manager pass; a staff_manager passes when an assignee reports to them; the task's **creator** passes via a new `target.isCreator` in `can()`, unless they're also an assignee, so nobody approves their own work. HR was added to `tasks:manageTeam` per the brief.
+- **Procedures**: `task.submitForReview`, `task.approve`, `task.reject` (comment required, posted as a TipTap comment), `task.transfer` (replaces one assignee, note required and posted as a comment; the outgoing assignee may do it themselves, otherwise it takes an approver), `task.approvalState` (drives the panel), `task.collaborators.list/add/remove`. All write activity rows (`task.submitted_for_review/approved/rejected/transferred/collaborator_added/collaborator_removed`). Moving into done reuses the same side effects as `task.update`: `completedAt`, `task.completed` activity + ops-manager notification, status automations, realtime.
+- **Notifications**: on submit, the creator and every assignee's direct manager (active, not the submitter, not an assignee); if that's nobody, the operation managers. Approve/reject notify assignees + collaborators; transfer notifies both people.
+- **Proof photos**: `attachment.confirmUpload` takes `isProof` (images only); `attachment.setProof` marks or unmarks an existing photo (a "Mark proof" toggle on image attachments). The task panel's new **Approval** section shows proof photos at the top with an "Add proof photo" button (`capture="environment"` for phones), plus Submit / Approve / Reject (with a reason).
+- **Create dialog** ("+ New task" on the list page): title, multi-assign, priority, due date + time, requires proof. The inline board "+ Add task" stays the quick path.
+- **Due time** is shown wherever the due date is: task panel (editable, disabled without a date), table Due column, My Tasks, calendar chips and the public task form. `isOverdue()` (shared `due.ts`) compares against Europe/Belgrade wall-clock time via `Intl`, with no hard-coded offset; a date with no time is due by end of day. Overdue shows in red in the table and on My Tasks.
+- **Collaborators** field in the task panel (add/remove chips) and a **Transfer to colleague** control under Assignees.
+- My Tasks has an "Awaiting approval" group.
+
+### Decisions
+
+- **Only lists that have a review-kind status are gated.** Lists created before M7.2 keep their old free-form To Do/In Progress/Done behaviour, so nothing existing breaks; HR/admins can add an "Awaiting approval" status to an old list to opt it in.
+- **Collaborators don't get extra access.** Seeing, commenting and attaching are already decided by workspace/space roles through `can()`. A collaborator is the explicit "keep me in the loop" list that approval/reject notifications reach. Granting access per task would need a per-task permission path, which `can()` doesn't have.
+- Reject sends the task to the list's first **active** status (In progress), per the brief.
+- Due time is stored as Kosovo wall-clock time (`time`, no zone) and shown as stored; only overdue checks convert "now" into Kosovo time.
+- The public task form (`form.submitPublic`) still completes a task directly. It's a token link, outside the signed-in approval flow (unchanged behaviour).
+- e2e specs that used the old default status names (To Do / In Progress / Done) were renamed to Pending / In progress / Completed. They run as the workspace owner, who is super admin and therefore an approver, so the gated moves still pass.
+
+### Verified
+
+- `pnpm check` green; `pnpm test`: API 307 (+10 transition rules, +creator case in can), shared 71 (+6 Kosovo-time due/overdue), db 7, web 15.
+- `0057` applied to the local DB.
+- New `task-approval.spec.ts`: manager creates a task in the dialog (assignee, priority, due 14:30, proof required) → staff signs in, sees it on My Tasks with its due time, can't submit without proof, uploads a proof photo and submits → manager sees it under Awaiting approval with the photo and approves → Completed on the board and Done on the staff member's My Tasks.
+- Full Playwright run at CI parity (`CI=1`, retries off, local Postgres/Redis/RustFS containers): **69/69 passed**. Phase-2 smoke test green.

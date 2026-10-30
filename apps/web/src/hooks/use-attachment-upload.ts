@@ -40,7 +40,8 @@ export function useAttachmentUpload() {
   const confirm = trpc.attachment.confirmUpload.useMutation();
   const [progress, setProgress] = useState<Record<string, number>>({});
 
-  async function uploadFile(file: File, target: AttachmentTarget) {
+  // `opts.isProof` (M7.2): the photo goes straight into the task's proof.
+  async function uploadFile(file: File, target: AttachmentTarget, opts?: { isProof?: boolean }) {
     const mime = file.type || "application/octet-stream";
     const { attachmentId, key, uploadUrl } = await presign.mutateAsync({
       ...target,
@@ -54,7 +55,14 @@ export function useAttachmentUpload() {
       await putWithProgress(uploadUrl, file, mime, (pct) =>
         setProgress((p) => ({ ...p, [attachmentId]: pct })),
       );
-      return await confirm.mutateAsync({ attachmentId, key, ...target, fileName: file.name, mime });
+      return await confirm.mutateAsync({
+        attachmentId,
+        key,
+        ...target,
+        fileName: file.name,
+        mime,
+        isProof: opts?.isProof,
+      });
     } finally {
       setProgress((p) => {
         const next = { ...p };

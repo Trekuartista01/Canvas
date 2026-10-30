@@ -9,7 +9,7 @@ test("M3.1 calendar: set due date, see task on day, open from calendar", async (
   await createSpaceAndList(page, "Ops", "Schedule");
 
   await page.getByRole("button", { name: "Board", exact: true }).click();
-  const todoColumn = page.getByTestId("status-column-To Do");
+  const todoColumn = page.getByTestId("status-column-Pending");
   await todoColumn.getByRole("button", { name: "+ Add task" }).click();
   await page.getByPlaceholder("Task title").fill("Ship calendar");
   await page.keyboard.press("Enter");

@@ -260,7 +260,7 @@ describe("can() — People (M7.1)", () => {
     "report:viewTeam": ["super_admin", "hr", "operation_manager", "staff_manager"],
     "performance:view": ["super_admin", "hr", "operation_manager", "staff_manager"],
     "holiday:manage": ["super_admin", "hr"],
-    "tasks:manageTeam": ["super_admin", "operation_manager", "staff_manager"],
+    "tasks:manageTeam": ["super_admin", "hr", "operation_manager", "staff_manager"],
   };
 
   for (const action of PEOPLE_ACTIONS) {
@@ -306,5 +306,14 @@ describe("can() — People (M7.1)", () => {
     expect(can(user, "people:viewProfile", people("staff", self))).toBe(true);
     expect(can(user, "people:viewProfile", people("staff", stranger))).toBe(false);
     expect(can(user, "people:viewProfile", people("staff", report))).toBe(false);
+  });
+
+  it("lets a task's creator manage it (approve/reject/transfer) whatever their role (M7.2)", () => {
+    const creator = { isSelf: false, isDirectReport: false, isCreator: true };
+    expect(can(user, "tasks:manageTeam", people("staff", creator))).toBe(true);
+    expect(can(user, "tasks:manageTeam", people("staff", stranger))).toBe(false);
+    expect(can(user, "tasks:manageTeam", people(null, creator))).toBe(false);
+    // Only tasks:manageTeam honours isCreator.
+    expect(can(user, "leave:approve", people("staff", creator))).toBe(false);
   });
 });

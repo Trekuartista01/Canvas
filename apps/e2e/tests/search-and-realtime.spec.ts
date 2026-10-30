@@ -7,7 +7,7 @@ test("search finds a task by title across the workspace", async ({ page }) => {
   await createSpaceAndList(page, "Ops", "Backlog");
 
   await page.getByRole("button", { name: "Board", exact: true }).click();
-  const todoColumn = page.getByTestId("status-column-To Do");
+  const todoColumn = page.getByTestId("status-column-Pending");
   await todoColumn.getByRole("button", { name: "+ Add task" }).click();
   await page.getByPlaceholder("Task title").fill("Renew office lease");
   await page.keyboard.press("Enter");
@@ -60,7 +60,7 @@ test("task changes made by one user appear live for another user with no reload"
   await bobPage.getByRole("button", { name: "Board", exact: true }).click();
 
   // Ada creates a task
-  const todoColumn = page.getByTestId("status-column-To Do");
+  const todoColumn = page.getByTestId("status-column-Pending");
   await todoColumn.getByRole("button", { name: "+ Add task" }).click();
   await page.getByPlaceholder("Task title").fill("Live-updated task");
   await page.keyboard.press("Enter");
@@ -72,9 +72,9 @@ test("task changes made by one user appear live for another user with no reload"
   // status" button label
   await page.getByRole("button", { name: "Live-updated task" }).click();
   const panel = page.getByTestId("task-detail-panel");
-  await panel.getByLabel("Status").selectOption({ label: "In Progress" });
+  await panel.getByLabel("Status").selectOption({ label: "In progress" });
 
-  const bobInProgressColumn = bobPage.getByTestId("status-column-In Progress");
+  const bobInProgressColumn = bobPage.getByTestId("status-column-In progress");
   await expect(bobInProgressColumn.getByText("Live-updated task")).toBeVisible();
 
   await bobContext.close();

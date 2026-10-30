@@ -7,6 +7,7 @@ import {
   TASK_PRIORITIES,
   type RecurrencePreset,
   type TaskDependencyKind,
+  formatDueTime,
 } from "@canvas/shared";
 import { ActivitySection } from "@/components/activity-section";
 import { AttachmentsSection } from "@/components/attachments-section";
@@ -17,6 +18,8 @@ import { CustomFieldsSection } from "@/components/custom-fields-section";
 import { Field, Section } from "@/components/detail-field";
 import { GenerationPanel } from "@/components/generation-panel";
 import { TagsSection } from "@/components/tags-section";
+import { TaskApprovalSection } from "@/components/task-approval-section";
+import { CollaboratorsField, TransferControl } from "@/components/task-people-fields";
 import { TimeTrackingSection } from "@/components/time-tracking-section";
 import { Input } from "@/components/ui/input";
 import { useOptimisticChecklistItemUpdate } from "@/hooks/use-checklist-mutations";
@@ -91,6 +94,12 @@ export function TaskDetailPanel({
     statuses.data?.find((s) => s.kind === "closed");
   const currentStatusKind = statuses.data?.find((s) => s.id === task.data?.statusId)?.kind;
   const isFinished = currentStatusKind === "done" || currentStatusKind === "closed";
+  // M7.2: on a list with an approval step, only an approver may finish a
+  // task outright (and never one awaiting approval — that's Approve, in the
+  // Approval section); everyone else submits it for approval instead.
+  const approval = trpc.task.approvalState.useQuery({ taskId });
+  const canFinishDirectly =
+    currentStatusKind !== "review" && (!approval.data?.hasReviewStatus || approval.data.isApprover);
 
   const [savingTemplate, setSavingTemplate] = useState(false);
   const [templateName, setTemplateName] = useState("");
@@ -121,7 +130,7 @@ export function TaskDetailPanel({
         className="border-border bg-background relative flex h-full w-full max-w-lg flex-col overflow-y-auto border-l p-6 shadow-xl outline-none"
       >
         <div className="absolute top-4 right-4 flex items-center gap-3">
-          {task.data && doneStatus && !isFinished && (
+          {task.data && doneStatus && !isFinished && canFinishDirectly && (
             <button
               type="button"
               onClick={() => update.mutate({ taskId, statusId: doneStatus.id })}
@@ -207,6 +216,19 @@ export function TaskDetailPanel({
               className="h-auto border-none px-0 text-lg font-semibold shadow-none focus-visible:ring-0"
             />
 
+            <TaskApprovalSection
+              taskId={taskId}
+              statusKind={currentStatusKind}
+              requiresProof={task.data.requiresProof}
+              onChanged={invalidate}
+            />
+
+            {update.error && (
+              <p className="text-sm text-red-600 dark:text-red-400" role="alert">
+                {update.error.message}
+              </p>
+            )}
+
             <div className="grid grid-cols-2 gap-4">
               <Field label="Status">
                 <select
@@ -261,6 +283,28 @@ export function TaskDetailPanel({
                   value={task.data.dueDate ?? ""}
                   onChange={(e) => update.mutate({ taskId, dueDate: e.target.value || null })}
                   className="h-8 text-sm"
+                />
+              </Field>
+
+              <Field label="Due time">
+                <Input
+                  type="time"
+                  data-testid="task-due-time"
+                  value={formatDueTime(task.data.dueTime) ?? ""}
+                  disabled={!task.data.dueDate}
+                  title={task.data.dueDate ? "Kosovo time" : "Set a due date first"}
+                  onChange={(e) => update.mutate({ taskId, dueTime: e.target.value || null })}
+                  className="h-8 text-sm"
+                />
+              </Field>
+
+              <Field label="Requires proof photo">
+                <input
+                  type="checkbox"
+                  data-testid="task-requires-proof"
+                  checked={task.data.requiresProof}
+                  onChange={(e) => update.mutate({ taskId, requiresProof: e.target.checked })}
+                  className="h-4 w-4"
                 />
               </Field>
 
@@ -336,7 +380,15 @@ export function TaskDetailPanel({
                     ))}
                 </select>
               </div>
+              <TransferControl
+                taskId={taskId}
+                assignees={task.data.assignees}
+                members={members.data ?? []}
+                onChanged={invalidate}
+              />
             </Field>
+
+            <CollaboratorsField taskId={taskId} members={members.data ?? []} />
 
             <Field label="Description">
               <DescriptionEditor

@@ -59,10 +59,12 @@ async function lastListOrderKey(spaceId: string): Promise<string | null> {
   return last?.orderKey ?? null;
 }
 
+// M7.2 lifecycle: pending → in progress → awaiting approval → completed.
 const DEFAULT_STATUSES: { name: string; color: string; kind: (typeof STATUS_KINDS)[number] }[] = [
-  { name: "To Do", color: "#94a3b8", kind: "open" },
-  { name: "In Progress", color: "#3b82f6", kind: "active" },
-  { name: "Done", color: "#22c55e", kind: "done" },
+  { name: "Pending", color: "#94a3b8", kind: "open" },
+  { name: "In progress", color: "#3b82f6", kind: "active" },
+  { name: "Awaiting approval", color: "#f59e0b", kind: "review" },
+  { name: "Completed", color: "#22c55e", kind: "done" },
 ];
 
 export const hierarchyRouter = router({

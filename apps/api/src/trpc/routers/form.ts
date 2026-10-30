@@ -200,6 +200,7 @@ export const formRouter = router({
           id: task.id,
           title: task.title,
           dueDate: task.dueDate,
+          dueTime: task.dueTime,
           done: status ? isDoneKind(status.kind) : false,
         },
       };

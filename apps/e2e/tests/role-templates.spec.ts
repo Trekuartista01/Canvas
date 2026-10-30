@@ -57,7 +57,7 @@ test("Role templates: Staff can't create tasks or see Platform pages; Finance Ma
 
   await bobPage.getByRole("link", { name: "Sprint" }).click();
   await bobPage.getByRole("button", { name: "Board", exact: true }).click();
-  const bobTodoColumn = bobPage.getByTestId("status-column-To Do");
+  const bobTodoColumn = bobPage.getByTestId("status-column-Pending");
   await bobTodoColumn.getByRole("button", { name: "+ Add task" }).click();
   await bobPage.getByPlaceholder("Task title").fill("Staff task");
   await bobPage.keyboard.press("Enter");

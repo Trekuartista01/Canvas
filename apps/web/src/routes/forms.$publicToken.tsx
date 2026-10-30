@@ -1,3 +1,4 @@
+import { formatDue } from "@/lib/format";
 import {
   PublicTaskAttachZone,
   type PublicUploadedFile,
@@ -54,7 +55,7 @@ function TaskCompletionForm({
 }: {
   publicToken: string;
   name: string;
-  task: { title: string; dueDate: string | null; done: boolean };
+  task: { title: string; dueDate: string | null; dueTime: string | null; done: boolean };
 }) {
   const [submitterName, setSubmitterName] = useState("");
   const [files, setFiles] = useState<PublicUploadedFile[]>([]);
@@ -75,7 +76,11 @@ function TaskCompletionForm({
 
       <div className="border-border space-y-1 rounded-md border p-3">
         <p className="text-sm font-medium">{task.title}</p>
-        {task.dueDate && <p className="text-muted-foreground text-xs">Due {task.dueDate}</p>}
+        {task.dueDate && (
+          <p className="text-muted-foreground text-xs">
+            Due {formatDue(task.dueDate, task.dueTime)}
+          </p>
+        )}
         {task.done && (
           <p className="text-muted-foreground text-xs">
             This task is already marked done — submitting again is fine if you have more to attach.

@@ -56,3 +56,16 @@ export function describeAutomationRunLogEntry(entry: AutomationRunLogEntry): str
       return "Sent a Slack message";
   }
 }
+
+/**
+ * M7.2: "12 Mar" or "12 Mar, 14:30" — the due date plus its optional time
+ * (Kosovo wall-clock time, shown as stored).
+ */
+export function formatDue(dueDate: string | null, dueTime?: string | null): string | null {
+  if (!dueDate) return null;
+  const date = new Date(`${dueDate}T00:00:00`).toLocaleDateString(undefined, {
+    day: "numeric",
+    month: "short",
+  });
+  return dueTime ? `${date}, ${dueTime.slice(0, 5)}` : date;
+}

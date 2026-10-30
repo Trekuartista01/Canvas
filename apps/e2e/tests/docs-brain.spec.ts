@@ -9,7 +9,7 @@ test("M4.2 docs: link task, Brain generates inline image", async ({ page }) => {
   await createSpaceAndList(page, "Creative", "Campaigns");
 
   await page.getByRole("button", { name: "Board", exact: true }).click();
-  const todoColumn = page.getByTestId("status-column-To Do");
+  const todoColumn = page.getByTestId("status-column-Pending");
   await todoColumn.getByRole("button", { name: "+ Add task" }).click();
   await page.getByPlaceholder("Task title").fill("Hero banner");
   await page.keyboard.press("Enter");

@@ -14,7 +14,7 @@ test("M2.6 version tree: branch siblings, compare, promote", async ({ page }) =>
   await createSpaceAndList(page, "Creative", "Campaigns");
 
   await page.getByRole("button", { name: "Board", exact: true }).click();
-  const todoColumn = page.getByTestId("status-column-To Do");
+  const todoColumn = page.getByTestId("status-column-Pending");
   await todoColumn.getByRole("button", { name: "+ Add task" }).click();
   await page.getByPlaceholder("Task title").fill("Tree art");
   await page.keyboard.press("Enter");

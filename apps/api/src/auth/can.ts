@@ -194,7 +194,12 @@ const PEOPLE_MATRIX: Record<PeopleAction, { roles: readonly PeopleRole[]; team?:
     team: true,
   },
   "holiday:manage": { roles: ["super_admin", "hr"] },
-  "tasks:manageTeam": { roles: ["super_admin", "operation_manager", "staff_manager"], team: true },
+  // M7.2: also "approve"/"reject"/"transfer" on tasks. Besides these roles,
+  // the task's creator qualifies (target.isCreator) — see lib/task-transition.ts.
+  "tasks:manageTeam": {
+    roles: ["super_admin", "hr", "operation_manager", "staff_manager"],
+    team: true,
+  },
 };
 
 export interface PeopleResource {
@@ -207,7 +212,7 @@ export interface PeopleResource {
    * staff_manager passes those, and the caller must then scope its query to
    * their direct reports (see teamScopeFor in lib/permissions.ts).
    */
-  target?: { isSelf: boolean; isDirectReport: boolean };
+  target?: { isSelf: boolean; isDirectReport: boolean; isCreator?: boolean };
 }
 
 export function can(
@@ -230,6 +235,7 @@ export function can(
 function canPeople(action: PeopleAction, resource: PeopleResource): boolean {
   if (!resource.peopleRole) return false;
   if (action === "people:viewProfile" && resource.target?.isSelf) return true;
+  if (action === "tasks:manageTeam" && resource.target?.isCreator) return true;
 
   const rule = PEOPLE_MATRIX[action];
   if (!rule.roles.includes(resource.peopleRole)) return false;

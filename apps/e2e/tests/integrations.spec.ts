@@ -30,7 +30,7 @@ test("M5.6 integrations: Slack notify automation posts a message on status chang
   try {
     await page.getByRole("button", { name: "Board", exact: true }).click();
     await page
-      .getByTestId("status-column-To Do")
+      .getByTestId("status-column-Pending")
       .getByRole("button", { name: "+ Add task" })
       .click();
     await page.getByPlaceholder("Task title").fill("Announce the launch");
@@ -59,7 +59,7 @@ test("M5.6 integrations: Slack notify automation posts a message on status chang
     await page.getByRole("button", { name: "Announce the launch" }).click();
     const panel = page.getByTestId("task-detail-panel");
     const updated = page.waitForResponse((res) => res.url().includes("task.update"));
-    await panel.getByLabel("Status").selectOption({ label: "Done" });
+    await panel.getByLabel("Status").selectOption({ label: "Completed" });
     await updated;
 
     // Delivered asynchronously via the slack-jobs BullMQ queue — poll briefly.
@@ -79,7 +79,10 @@ test("M5.6 integrations: attach a Google Drive file from a task", async ({ page 
   await createSpaceAndList(page, "Engineering", "Backlog");
 
   await page.getByRole("button", { name: "Board", exact: true }).click();
-  await page.getByTestId("status-column-To Do").getByRole("button", { name: "+ Add task" }).click();
+  await page
+    .getByTestId("status-column-Pending")
+    .getByRole("button", { name: "+ Add task" })
+    .click();
   await page.getByPlaceholder("Task title").fill("Ship dark mode");
   await page.keyboard.press("Enter");
   await page.getByRole("button", { name: "Ship dark mode" }).click();

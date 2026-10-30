@@ -31,7 +31,7 @@ test("Generation UX: set brand palette, generate variants, promote one, attach t
   await page.getByRole("link", { name: "Home", exact: true }).click();
   await createSpaceAndList(page, "Creative", "Campaigns");
   await page.getByRole("button", { name: "Board", exact: true }).click();
-  const todoColumn = page.getByTestId("status-column-To Do");
+  const todoColumn = page.getByTestId("status-column-Pending");
   await todoColumn.getByRole("button", { name: "+ Add task" }).click();
   await page.getByPlaceholder("Task title").fill("Launch art");
   await page.keyboard.press("Enter");
@@ -104,7 +104,10 @@ test("Brand Kits: a space's assigned kit wins over the workspace default", async
   await page.getByRole("link", { name: "Home", exact: true }).click();
   await page.getByRole("link", { name: "Deliverables" }).click();
   await page.getByRole("button", { name: "Board", exact: true }).click();
-  await page.getByTestId("status-column-To Do").getByRole("button", { name: "+ Add task" }).click();
+  await page
+    .getByTestId("status-column-Pending")
+    .getByRole("button", { name: "+ Add task" })
+    .click();
   await page.getByPlaceholder("Task title").fill("Client B task");
   await page.keyboard.press("Enter");
   await page.getByRole("button", { name: "Client B task" }).click();
@@ -116,7 +119,10 @@ test("Brand Kits: a space's assigned kit wins over the workspace default", async
   await page.getByRole("link", { name: "Home", exact: true }).click();
   await page.getByRole("link", { name: "Ops" }).click();
   await page.getByRole("button", { name: "Board", exact: true }).click();
-  await page.getByTestId("status-column-To Do").getByRole("button", { name: "+ Add task" }).click();
+  await page
+    .getByTestId("status-column-Pending")
+    .getByRole("button", { name: "+ Add task" })
+    .click();
   await page.getByPlaceholder("Task title").fill("Internal task");
   await page.keyboard.press("Enter");
   await page.getByRole("button", { name: "Internal task" }).click();

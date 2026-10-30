@@ -1,4 +1,10 @@
-import { WEEKDAY_LABELS, buildMonthGrid, monthLabel, taskDateKey } from "@canvas/shared";
+import {
+  WEEKDAY_LABELS,
+  buildMonthGrid,
+  formatDueTime,
+  monthLabel,
+  taskDateKey,
+} from "@canvas/shared";
 import { UndatedTasksList } from "@/components/undated-tasks-list";
 import { useOptimisticTaskUpdate } from "@/hooks/use-task-mutations";
 import { trpc } from "@/lib/trpc";
@@ -8,6 +14,7 @@ type CalendarTask = {
   id: string;
   title: string;
   dueDate: string | null;
+  dueTime: string | null;
   startDate: string | null;
 };
 
@@ -122,6 +129,11 @@ export function TaskCalendarView({
                     onClick={() => onOpenTask(task.id)}
                     className="bg-muted hover:bg-muted/80 line-clamp-2 w-full rounded px-1 py-0.5 text-left text-[11px]"
                   >
+                    {task.dueDate && task.dueTime && (
+                      <span className="text-muted-foreground mr-1">
+                        {formatDueTime(task.dueTime)}
+                      </span>
+                    )}
                     {task.title}
                   </button>
                 ))}

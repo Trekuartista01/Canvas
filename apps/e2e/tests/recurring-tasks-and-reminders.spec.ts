@@ -18,7 +18,7 @@ test("M3.5: a recurring task spawns its next occurrence, a due reminder notifies
   await createSpaceAndList(page, "Ops", "Standups");
 
   await page.getByRole("button", { name: "Board", exact: true }).click();
-  const todoColumn = page.getByTestId("status-column-To Do");
+  const todoColumn = page.getByTestId("status-column-Pending");
   await todoColumn.getByRole("button", { name: "+ Add task" }).click();
   await page.getByPlaceholder("Task title").fill("Weekly standup");
   await page.keyboard.press("Enter");

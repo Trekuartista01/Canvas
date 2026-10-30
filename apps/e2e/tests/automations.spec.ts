@@ -11,7 +11,7 @@ test("M5.1 automations: status → Done runs a tag + comment action, gated by a 
   await createSpaceAndList(page, "Support", "Bugs");
 
   await page.getByRole("button", { name: "Board", exact: true }).click();
-  const todoColumn = page.getByTestId("status-column-To Do");
+  const todoColumn = page.getByTestId("status-column-Pending");
 
   // A throwaway task purely to originate the "shipped" tag (tag creation is
   // only exposed via a task's "+ New tag" flow) — the real task under test
@@ -65,7 +65,7 @@ test("M5.1 automations: status → Done runs a tag + comment action, gated by a 
   await page.getByRole("button", { name: "Board", exact: true }).click();
   await page.getByRole("button", { name: "Fix the login bug" }).click();
   const updated = page.waitForResponse((res) => res.url().includes("task.update"));
-  await panel.getByLabel("Status").selectOption({ label: "Done" });
+  await panel.getByLabel("Status").selectOption({ label: "Completed" });
   await updated;
 
   // The automation's tag/comment are written server-side by the time

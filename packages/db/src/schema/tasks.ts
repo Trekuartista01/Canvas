@@ -10,6 +10,7 @@ import {
   pgTable,
   primaryKey,
   text,
+  time,
   timestamp,
   unique,
   uuid,
@@ -27,7 +28,9 @@ const tsvector = customType<{ data: string }>({
   },
 });
 
-export const statusKind = pgEnum("status_kind", ["open", "active", "done", "closed"]);
+// M7.2 adds "review" (= "awaiting approval"): an assignee submits work into
+// it; only an approver moves it on to done (see apps/api/src/lib/task-transition.ts).
+export const statusKind = pgEnum("status_kind", ["open", "active", "review", "done", "closed"]);
 export const taskPriority = pgEnum("task_priority", ["urgent", "high", "normal", "low"]);
 
 export const statuses = pgTable(
@@ -79,6 +82,12 @@ export const tasks = pgTable(
     priority: taskPriority("priority"),
     startDate: date("start_date"),
     dueDate: date("due_date"),
+    // M7.2: optional time of day on the due date, Europe/Belgrade wall-clock
+    // time (never UTC — see packages/shared/src/due.ts). Null = end of day.
+    dueTime: time("due_time"),
+    // M7.2: submitting for review needs at least one proof photo
+    // (attachments.is_proof) when set.
+    requiresProof: boolean("requires_proof").notNull().default(false),
     // M3.4: not in DATA_MODEL.md's tasks row (no dedicated `milestones`
     // table exists there either) — a milestone is modeled as a flag on an
     // otherwise-ordinary task rather than a new entity. See PROGRESS.md.
@@ -131,6 +140,26 @@ export const taskAssignees = pgTable(
     // assigned to task X"; "which tasks is user X assigned" (workload.ts)
     // needs its own index since userId isn't the PK's leading column.
     index("task_assignees_user_id_idx").on(table.userId),
+  ],
+);
+
+// M7.2: people involved in a task without owning it — they see it, comment
+// and attach, and hear about review/approval/transfer, but an assignee is the
+// one who does (and submits) the work.
+export const taskCollaborators = pgTable(
+  "task_collaborators",
+  {
+    taskId: uuid("task_id")
+      .notNull()
+      .references(() => tasks.id, { onDelete: "cascade" }),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.taskId, table.userId] }),
+    index("task_collaborators_user_id_idx").on(table.userId),
   ],
 );
 

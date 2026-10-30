@@ -19,7 +19,7 @@ test("M5.2 dashboards: task counts, burndown, and time-tracked widgets reflect r
   await createSpaceAndList(page, "Ops", "Sprint");
 
   await page.getByRole("button", { name: "Board", exact: true }).click();
-  const todoColumn = page.getByTestId("status-column-To Do");
+  const todoColumn = page.getByTestId("status-column-Pending");
 
   await todoColumn.getByRole("button", { name: "+ Add task" }).click();
   await page.getByPlaceholder("Task title").fill("Design homepage");
@@ -33,7 +33,7 @@ test("M5.2 dashboards: task counts, burndown, and time-tracked widgets reflect r
   await page.getByRole("button", { name: "Ship banner" }).click();
   const panel = page.getByTestId("task-detail-panel");
   const doneUpdate = page.waitForResponse((res) => res.url().includes("task.update"));
-  await panel.getByLabel("Status").selectOption({ label: "Done" });
+  await panel.getByLabel("Status").selectOption({ label: "Completed" });
   await doneUpdate;
   await page.getByRole("button", { name: "Close", exact: true }).click();
 
@@ -111,7 +111,7 @@ test("Dashboards: assignee and priority breakdown widgets reflect real workspace
   await createWorkspaceAndOpen(page, "Breakdown Workspace");
   await createSpaceAndList(page, "Ops", "Sprint");
   await page.getByRole("button", { name: "Board", exact: true }).click();
-  const todoColumn = page.getByTestId("status-column-To Do");
+  const todoColumn = page.getByTestId("status-column-Pending");
 
   await todoColumn.getByRole("button", { name: "+ Add task" }).click();
   await page.getByPlaceholder("Task title").fill("Assigned urgent task");

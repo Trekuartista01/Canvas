@@ -13,10 +13,10 @@ test("sign up, build a workspace hierarchy, and manage tasks across board + list
 
   // --- M1.2: default statuses were seeded, add a task via the board view ---
   await page.getByRole("button", { name: "Board", exact: true }).click();
-  const todoColumn = page.getByTestId("status-column-To Do");
+  const todoColumn = page.getByTestId("status-column-Pending");
   await expect(todoColumn).toBeVisible();
-  await expect(page.getByTestId("status-column-In Progress")).toBeVisible();
-  await expect(page.getByTestId("status-column-Done")).toBeVisible();
+  await expect(page.getByTestId("status-column-In progress")).toBeVisible();
+  await expect(page.getByTestId("status-column-Completed")).toBeVisible();
 
   await todoColumn.getByRole("button", { name: "+ Add task" }).click();
   await page.getByPlaceholder("Task title").fill("Ship the launch email");
@@ -37,7 +37,7 @@ test("sign up, build a workspace hierarchy, and manage tasks across board + list
 
   // group by status
   await page.getByRole("button", { name: /Group by status/ }).click();
-  await expect(page.getByText("To Do (1)")).toBeVisible();
+  await expect(page.getByText("Pending (1)")).toBeVisible();
 
   // search filters the task out
   await page.getByPlaceholder("Search titles…").fill("no such task");

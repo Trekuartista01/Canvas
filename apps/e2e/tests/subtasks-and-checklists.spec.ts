@@ -7,7 +7,7 @@ test("add a subtask and a checklist to a task, and verify both persist", async (
   await createSpaceAndList(page, "Marketing", "Sprint");
 
   await page.getByRole("button", { name: "Board", exact: true }).click();
-  const todoColumn = page.getByTestId("status-column-To Do");
+  const todoColumn = page.getByTestId("status-column-Pending");
   await todoColumn.getByRole("button", { name: "+ Add task" }).click();
   await page.getByPlaceholder("Task title").fill("Launch campaign");
   await page.keyboard.press("Enter");
