@@ -22,4 +22,6 @@ export const NOTIFICATION_VERB_LABELS: Record<string, string> = {
   "task.transferred": "transferred a task",
   // M7.3 — shown on its own, without an actor name (the scheduler sends it).
   "daily_report.reminder": "Reminder: submit today's daily report",
+  // M7.4 — rendered with the holiday name and date from the payload.
+  "holiday.upcoming": "Public holiday coming up",
 };

@@ -6,6 +6,7 @@ import { env } from "../env";
 import { logActivity } from "./activity";
 import { activeMembershipCondition } from "./membership";
 import { notifyUsers } from "./notify";
+import { loadHolidayChecker } from "./working-days";
 
 /**
  * M7.3: from 16:45 Kosovo time on working days, reminds every active staff
@@ -14,12 +15,21 @@ import { notifyUsers } from "./notify";
  * before anything is sent, so each person is reminded at most once a day
  * however many ticks (or workers) see them.
  *
- * Holidays: isReminderDue takes an isHoliday hook — M7.4 plugs the Kosovo
- * holiday calendar in here.
+ * Holidays (M7.4): the first check only rules out weekends and the time of
+ * day; each workspace's own holiday calendar then decides per workspace.
  */
 export async function sendDailyReportReminders(now = new Date()) {
   const { due, reportDate } = isReminderDue(now);
   if (!due) return;
+  const holidayByWorkspace = new Map<string, boolean>();
+  async function isHolidayIn(workspaceId: string) {
+    let holiday = holidayByWorkspace.get(workspaceId);
+    if (holiday === undefined) {
+      holiday = (await loadHolidayChecker(workspaceId))(reportDate);
+      holidayByWorkspace.set(workspaceId, holiday);
+    }
+    return holiday;
+  }
 
   const pending = await db
     .select({
@@ -64,6 +74,7 @@ export async function sendDailyReportReminders(now = new Date()) {
 
   const emailClient = getEmailClient();
   for (const person of pending) {
+    if (await isHolidayIn(person.workspaceId)) continue;
     const [claim] = await db
       .insert(schema.dailyReportReminders)
       .values({ workspaceId: person.workspaceId, userId: person.userId, reportDate })

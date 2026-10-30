@@ -1,21 +1,9 @@
 import { APP_TIME_ZONE, wallClock } from "./due";
+import { isWorkingDay } from "./holidays";
 
-// M7.3: the daily-report reminder goes out at 16:45 Kosovo time on working days.
+// M7.3: the daily-report reminder goes out at 16:45 Kosovo time on working
+// days (Mon–Fri, minus the workspace's public holidays — see ./holidays.ts).
 export const DAILY_REPORT_REMINDER_TIME = "16:45:00";
-
-/**
- * Is "YYYY-MM-DD" a day people are expected to report? Mon–Fri, minus
- * public holidays. `isHoliday` is the hook for M7.4's Kosovo holiday
- * calendar — until then nothing counts as a holiday.
- */
-export function isWorkingDay(
-  date: string,
-  isHoliday: (date: string) => boolean = () => false,
-): boolean {
-  // Noon UTC keeps the weekday stable regardless of the machine's zone.
-  const weekday = new Date(`${date}T12:00:00Z`).getUTCDay();
-  return weekday !== 0 && weekday !== 6 && !isHoliday(date);
-}
 
 /**
  * Whether the reminder should go out at `nowUtc`, and for which report date.

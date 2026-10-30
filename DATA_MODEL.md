@@ -67,6 +67,15 @@ daily_reports    (id, workspace_id fk, user_id fk, report_date date,      -- M7.
 daily_report_reads(report_id fk, user_id fk, read_at, pk pair)           -- read receipts (non-authors)
 daily_report_reminders(id, workspace_id fk, user_id fk, report_date,     -- 16:45 reminder ledger:
                   sent_at, uniq(workspace_id, user_id, report_date))    -- at most one per person per day
+
+public_holidays  (id, workspace_id fk, date, name,                      -- M7.4 Kosovo calendar
+                  observed_date null,                                   -- HR override; null = weekend rule
+                  is_recurring_fixed bool,                              -- true: month/day repeats yearly
+                  created_by fk users null, deleted_at)
+public_holiday_notices(id, workspace_id fk, holiday_id fk, observed_date, -- "holiday in N days" ledger
+                  sent_at, uniq(workspace_id, holiday_id, observed_date))
+-- workspaces also carry holiday_notice_days (default 2, 0 = off) and
+-- holidays_seeded_at (fixed holidays seeded once).
 ```
 
 ## Image Brain

@@ -11,17 +11,11 @@ import { TRPCError } from "@trpc/server";
 import { and, asc, count, desc, eq, inArray } from "drizzle-orm";
 import type { SessionUser } from "../../auth/session";
 import { logActivity } from "../../lib/activity";
-import { activeMembershipCondition, getPeopleContext } from "../../lib/membership";
-import { assertCanPeople, teamScopeFor } from "../../lib/permissions";
+import { activeMembershipCondition } from "../../lib/membership";
+import { assertCanPeople, requireActiveMember, teamScopeFor } from "../../lib/permissions";
 import { extractPlainText } from "../../lib/plain-text";
 import { publish } from "../../lib/realtime";
 import { protectedProcedure, router } from "../trpc";
-
-async function requireActiveMember(user: SessionUser, workspaceId: string) {
-  const people = await getPeopleContext(workspaceId, user.id);
-  if (!people) throw new TRPCError({ code: "FORBIDDEN" });
-  return people;
-}
 
 async function requireReport(reportId: string) {
   const report = await db.query.dailyReports.findFirst({

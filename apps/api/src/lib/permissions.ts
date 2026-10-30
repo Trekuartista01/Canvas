@@ -110,3 +110,23 @@ export async function teamScopeFor(workspaceId: string, userId: string, peopleRo
     );
   return reports.map((r) => r.userId);
 }
+
+/**
+ * Any active (non-deactivated) member — for features every role uses on
+ * their own data (daily reports, the holiday calendar).
+ */
+export async function requireActiveMember(user: SessionUser, workspaceId: string) {
+  const people = await getPeopleContext(workspaceId, user.id);
+  if (!people) throw new TRPCError({ code: "FORBIDDEN" });
+  return people;
+}
+
+/** assertCanPeople as a boolean, for "may this caller see the edit controls?". */
+export async function canPeopleAction(
+  user: SessionUser,
+  workspaceId: string,
+  action: PeopleAction,
+) {
+  const people = await getPeopleContext(workspaceId, user.id);
+  return can(user, action, { type: "people", peopleRole: people?.peopleRole ?? null });
+}

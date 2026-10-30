@@ -2420,3 +2420,36 @@ Developers no longer need Docker. Dev runs `pnpm dev` (api + web + worker via tu
 - Reminder job against the local DB with fixed clocks: nothing at 16:40; at Monday 16:50 Kosovo time 127 staff reminded (mock email); a second run reminded nobody (ledger and activity counts unchanged); Saturday reminded nobody. The test rows were deleted afterwards.
 - New `daily-reports.spec.ts`: owner adds a staff member → Team reports shows him "Not submitted" → staff signs in (no Team reports in his nav), writes and submits today's report (stays editable) → manager's team view flips to "Submitted · Unread" live → manager opens it (read recorded) → team view shows "Read by 1" → staff opens his own report and sees the manager under "Read by".
 - Full Playwright run at CI parity (`CI=1`, retries off, local Postgres/Redis/RustFS containers): **70/70 passed**. Phase-2 smoke test green.
+
+## 2026-10-30 M7.4: Kosovo public holidays — done
+
+### Built
+
+- **Schema** (migration `0059`): `public_holidays` (workspace, `date`, `name`, `observed_date` nullable, `is_recurring_fixed`, `created_by`, soft delete via `deleted_at`), `public_holiday_notices` (the notice idempotency ledger: unique workspace + holiday + observed date), and on `workspaces`: `holiday_notice_days` (default 2, 0 = off) and `holidays_seeded_at`.
+- **Pure calendar logic** (`packages/shared/src/holidays.ts`, 15 tests):
+  - `KOSOVO_FIXED_HOLIDAYS`, the 8 dates from the brief.
+  - `KOSOVO_MOVABLE_HOLIDAYS`: the Easter Mondays come with a suggested date from `catholicEaster()` / `orthodoxEaster()` (Gregorian and Julian computus; checked against 2024–2027); the Eids have none.
+  - `expandHolidays(rows, year)` applies the **observed rule**: a Sat/Sun holiday moves to the next working day that isn't already a holiday or another holiday's substitute. Tested with New Year 2022 (Sat + Sun → Mon + Tue) and 1 May 2027 (Sat, and Mon 3 May is Orthodox Easter Monday → Tue 4 May).
+  - Also `makeHolidayChecker` (expands years lazily and caches them), `isWorkingDay`, `countWorkingDays(from, to)` (inclusive; tested across a year boundary), `isHolidayNoticeDue`, `hasMovableHolidays`.
+  - `isWorkingDay` moved here from `daily-reports.ts`; there is one copy.
+- **`apps/api/src/lib/working-days.ts`** for 7.5: `loadHolidayRows`, `loadHolidayChecker`, `isWorkingDay(workspaceId, date)`, `countWorkingDays(workspaceId, from, to)`, plus the seeding helpers.
+- **Seeding**: the 8 fixed holidays (recurring) are seeded when a workspace is created. The scheduler tick backfills any workspace with `holidays_seeded_at` null, which covers every workspace from before M7.4. The marker is claimed in the same transaction as the insert, so it seeds once and never re-seeds a calendar HR emptied on purpose.
+- **`holiday` router**: `list` (any active member; the year's occurrences with observed dates, the "has movable" flag, notice days, `canManage`), `create` / `update` / `delete` (soft) and `setNoticeDays`, all `holiday:manage` (HR + super admin) with activity rows (`holiday.created/updated/deleted`, `workspace.holiday_notice_days_changed`). A recurring holiday can't take an observed-date override.
+- **Holiday notices** (`lib/holiday-notices.ts`, on the scheduler tick): for this year and next, any holiday whose day off is between N days away and tomorrow → claim the ledger row → one `holiday.upcoming` activity row (attributed to the workspace owner, since activity needs an actor) → in-app notification + email to every active member. The bell shows "Public holiday: <name> — day off <date>" and opens the Holidays page.
+- **7.3 reminder wired**: `sendDailyReportReminders` still uses `isReminderDue` for weekend and time of day, then skips any workspace whose calendar has that date off (one checker per workspace per tick).
+- **UI**: People → **Holidays** (everyone): year switcher; a virtualized list with date, name, "Every year" / "<year> only" and "Day off …" when a holiday moved; an amber **"No movable holidays entered for <year>"** banner. HR also gets Add holiday, one-click "+ Catholic Easter Monday" / "+ Orthodox Easter Monday" (date prefilled) / "+ Eid al-Fitr" / "+ Eid al-Adha" buttons for whichever are missing that year, an optional "Day off (if different)" override for one-off holidays, edit/delete on hover, and the notice-days setting.
+
+### Decisions
+
+- **`observed_date` is an HR override, not a cache.** Null means "by the rule", computed per year at read time. A recurring row's observed day differs every year, and a movable holiday added later can bump another holiday's substitute day (the 2027 Labour Day case), so a stored value would go stale. Overrides are allowed on one-off holidays only.
+- A recurring holiday's `date` only anchors month/day; the anchor year is the year it was seeded.
+- **Notices go to every active member**, not only the `staff` role, because everyone gets the day off. A notice is timed by the **observed** day off; the email mentions the original date when they differ. It goes out from N days before until the day before (catch-up window), and the ledger keeps it to once per workspace and holiday. 0 days turns notices off.
+- As with 7.3, the ledger row is claimed before sending, so a failed email isn't retried.
+
+### Verified
+
+- `pnpm check` green; `pnpm test`: shared 95 (+15 holidays), API 307, db 7, web 15.
+- `0059` applied to the local DB; the worker's tick backfilled all 673 existing local workspaces.
+- Scheduler jobs against the local DB with fixed clocks: Christmas 2026 notice not sent on 22 Dec (3 days before), sent on 23 Dec (one per workspace), and a rerun on 24 Dec sent nothing new (same ledger and email counts). The daily-report reminder sent 0 on Fri 25 Dec at 16:50 and 143 on Thu 24 Dec. Test rows deleted afterwards.
+- New `holidays.spec.ts` (pinned to 2027): the seeded calendar shows Independence Day etc., Labour Day (Sat) has its day off on Mon 3 May; "No movable holidays entered for 2027" shows; HR clicks "+ Orthodox Easter Monday" (date prefilled 2027-05-03) and adds it; the banner clears and Labour Day's day off moves to Tue 4 May; a staff member sees the same calendar with no edit controls.
+- Full Playwright run at CI parity (`CI=1`, retries off, local Postgres/Redis/RustFS containers): **71/71 passed**. Phase-2 smoke test green.

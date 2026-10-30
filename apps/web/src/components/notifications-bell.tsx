@@ -48,6 +48,21 @@ function completedTaskTitle(payload: unknown): string | null {
 // Only set on task.completed_via_form — the self-reported name of an
 // external, session-less form submitter, since there's no real user to
 // read an actor name off of for that verb.
+// M7.4 "holiday.upcoming": "Europe Day — day off Mon 11 May".
+function holidayLine(payload: unknown): string {
+  if (!payload || typeof payload !== "object") return "";
+  const p = payload as { name?: unknown; observedDate?: unknown };
+  const name = typeof p.name === "string" ? p.name : "";
+  if (typeof p.observedDate !== "string") return name;
+  const day = new Date(`${p.observedDate}T12:00:00Z`).toLocaleDateString(undefined, {
+    weekday: "short",
+    day: "numeric",
+    month: "short",
+    timeZone: "UTC",
+  });
+  return `${name} — day off ${day}`;
+}
+
 function formSubmitterName(payload: unknown): string | null {
   if (!payload || typeof payload !== "object") return null;
   const name = (payload as { submitterName?: unknown }).submitterName;
@@ -144,13 +159,23 @@ export function NotificationsBell() {
                         to: "/w/$workspaceId/daily-report",
                         params: { workspaceId: n.workspaceId },
                       });
+                    } else if (n.verb === "holiday.upcoming") {
+                      navigate({
+                        to: "/w/$workspaceId/holidays",
+                        params: { workspaceId: n.workspaceId },
+                      });
                     }
                   }}
                   className={`border-border block w-full border-b px-2 py-2 text-left text-xs last:border-b-0 ${
                     n.readAt ? "" : "bg-muted/50"
                   } hover:bg-muted`}
                 >
-                  {STANDALONE_VERBS.has(n.verb) ? (
+                  {n.verb === "holiday.upcoming" ? (
+                    <span>
+                      <span className="font-medium">Public holiday:</span>{" "}
+                      {holidayLine(n.payloadJson)}
+                    </span>
+                  ) : STANDALONE_VERBS.has(n.verb) ? (
                     <span className="font-medium">{NOTIFICATION_VERB_LABELS[n.verb]}</span>
                   ) : completedTitle ? (
                     <>

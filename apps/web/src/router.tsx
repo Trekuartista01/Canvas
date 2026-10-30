@@ -33,6 +33,7 @@ import { myTasksRoute } from "./routes/workspace.$workspaceId.my-tasks";
 import { dailyReportRoute } from "./routes/workspace.$workspaceId.daily-report";
 import { dailyReportViewRoute } from "./routes/workspace.$workspaceId.daily-reports.$reportId";
 import { teamReportsRoute } from "./routes/workspace.$workspaceId.team-reports";
+import { holidaysRoute } from "./routes/workspace.$workspaceId.holidays";
 import { peopleDirectoryRoute } from "./routes/workspace.$workspaceId.people";
 import { personProfileRoute } from "./routes/workspace.$workspaceId.people.$userId";
 import { newWorkspaceRoute } from "./routes/workspaces.new";
@@ -53,6 +54,7 @@ const routeTree = rootRoute.addChildren([
     dailyReportRoute,
     dailyReportViewRoute,
     teamReportsRoute,
+    holidaysRoute,
     peopleDirectoryRoute,
     personProfileRoute,
     listRoute,

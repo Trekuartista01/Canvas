@@ -1,4 +1,14 @@
-import { index, jsonb, pgEnum, pgTable, text, timestamp, unique, uuid } from "drizzle-orm/pg-core";
+import {
+  index,
+  integer,
+  jsonb,
+  pgEnum,
+  pgTable,
+  text,
+  timestamp,
+  unique,
+  uuid,
+} from "drizzle-orm/pg-core";
 import { uuidv7 } from "uuidv7";
 import { users } from "./auth";
 
@@ -25,6 +35,11 @@ export const workspaces = pgTable("workspaces", {
   name: text("name").notNull(),
   slug: text("slug").notNull().unique(),
   plan: text("plan").notNull().default("internal"),
+  // M7.4: how many days ahead everyone hears about an upcoming public holiday.
+  holidayNoticeDays: integer("holiday_notice_days").notNull().default(2),
+  // M7.4: set once the Kosovo fixed-date holidays have been seeded, so a
+  // calendar HR has emptied on purpose is never re-seeded.
+  holidaysSeededAt: timestamp("holidays_seeded_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 

@@ -3,6 +3,7 @@ import { cn } from "@/lib/utils";
 import type { PeopleAction, WorkspaceAction } from "@canvas/shared";
 import { Link, useRouterState } from "@tanstack/react-router";
 import {
+  CalendarDays,
   CheckSquare,
   ClipboardCheck,
   ClipboardList,
@@ -83,6 +84,8 @@ const NAV_GROUPS: { label: string; entries: NavEntry[] }[] = [
         icon: ClipboardCheck,
         requires: "report:viewTeam",
       },
+      // M7.4: everyone sees the calendar; HR edits it there.
+      { label: "Holidays", to: "/w/$workspaceId/holidays", icon: CalendarDays },
     ],
   },
   {

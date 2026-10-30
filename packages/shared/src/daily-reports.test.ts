@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { isReminderDue, isWorkingDay, todayReportDate } from "./daily-reports";
+import { isReminderDue, todayReportDate } from "./daily-reports";
+import { isWorkingDay } from "./holidays";
 
 const at = (iso: string) => new Date(iso);
 
