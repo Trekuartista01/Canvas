@@ -59,6 +59,7 @@ export default defineConfig({
       "/image-assets": "http://localhost:3001",
       "/ai-references": "http://localhost:3001",
       "/export": "http://localhost:3001",
+      "/leave-documents": "http://localhost:3001",
       "/ws": { target: "ws://localhost:3001", ws: true },
     },
   },

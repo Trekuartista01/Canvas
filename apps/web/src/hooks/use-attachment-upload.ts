@@ -3,7 +3,7 @@ import { useState } from "react";
 
 export type AttachmentTarget = { taskId: string };
 
-function putWithProgress(
+export function putWithProgress(
   url: string,
   file: File,
   contentType: string,

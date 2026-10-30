@@ -159,6 +159,16 @@ export function NotificationsBell() {
                         to: "/w/$workspaceId/daily-report",
                         params: { workspaceId: n.workspaceId },
                       });
+                    } else if (n.verb === "leave.requested") {
+                      navigate({
+                        to: "/w/$workspaceId/leave-approvals",
+                        params: { workspaceId: n.workspaceId },
+                      });
+                    } else if (n.verb.startsWith("leave.")) {
+                      navigate({
+                        to: "/w/$workspaceId/leave",
+                        params: { workspaceId: n.workspaceId },
+                      });
                     } else if (n.verb === "holiday.upcoming") {
                       navigate({
                         to: "/w/$workspaceId/holidays",

@@ -2,6 +2,7 @@ import {
   index,
   integer,
   jsonb,
+  numeric,
   pgEnum,
   pgTable,
   text,
@@ -37,6 +38,11 @@ export const workspaces = pgTable("workspaces", {
   plan: text("plan").notNull().default("internal"),
   // M7.4: how many days ahead everyone hears about an upcoming public holiday.
   holidayNoticeDays: integer("holiday_notice_days").notNull().default(2),
+  // M7.5: default vacation entitlement, working days a year (HR confirms;
+  // per-employee overrides live in leave_balances.entitlement_days).
+  defaultVacationDays: numeric("default_vacation_days", { precision: 5, scale: 1, mode: "number" })
+    .notNull()
+    .default(20),
   // M7.4: set once the Kosovo fixed-date holidays have been seeded, so a
   // calendar HR has emptied on purpose is never re-seeded.
   holidaysSeededAt: timestamp("holidays_seeded_at", { withTimezone: true }),

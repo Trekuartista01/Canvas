@@ -28,6 +28,7 @@ import { timeEntryRouter } from "./routers/time-entry";
 import { peopleRouter } from "./routers/people";
 import { dailyReportRouter } from "./routers/daily-report";
 import { holidayRouter } from "./routers/holiday";
+import { leaveRouter } from "./routers/leave";
 import { workloadRouter } from "./routers/workload";
 import { workspaceRouter } from "./routers/workspace";
 import { publicProcedure, router } from "./trpc";
@@ -64,6 +65,7 @@ export const appRouter = router({
   people: peopleRouter,
   dailyReport: dailyReportRouter,
   holiday: holidayRouter,
+  leave: leaveRouter,
   search: searchRouter,
   aiUsage: aiUsageRouter,
 });

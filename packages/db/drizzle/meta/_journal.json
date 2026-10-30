@@ -421,6 +421,13 @@
       "when": 1793353737458,
       "tag": "0059_mute_nuke",
       "breakpoints": true
+    },
+    {
+      "idx": 60,
+      "version": "7",
+      "when": 1793354922246,
+      "tag": "0060_glossy_excalibur",
+      "breakpoints": true
     }
   ]
 }

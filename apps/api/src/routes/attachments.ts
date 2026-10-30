@@ -8,6 +8,7 @@ import { getSessionUser } from "../auth/session";
 import { logActivity } from "../lib/activity";
 import { sanitizeFilenameForKey, sanitizeForHeader } from "../lib/filename";
 import { processImage } from "../lib/image-processing";
+import { canViewLeaveDocument } from "../lib/leave";
 import { isInlineSafeMimeType, safeContentType } from "../lib/mime-safety";
 import { getMembershipRole } from "../lib/membership";
 import {
@@ -156,6 +157,11 @@ async function streamAttachment(
 
   const role = await getMembershipRole(attachment.workspaceId, user.id);
   if (!can(user, "attachment:view", { type: "workspace", role })) {
+    return reply.code(403).send({ error: "Forbidden" });
+  }
+  // M7.5: a leave document (doctor's note) is private to the employee and
+  // whoever may approve their leave, not the whole workspace.
+  if ((await canViewLeaveDocument(user, attachment)) === false) {
     return reply.code(403).send({ error: "Forbidden" });
   }
   const key = kind === "thumb" ? attachment.thumbKey : attachment.fileKey;

@@ -76,6 +76,19 @@ public_holiday_notices(id, workspace_id fk, holiday_id fk, observed_date, -- "ho
                   sent_at, uniq(workspace_id, holiday_id, observed_date))
 -- workspaces also carry holiday_notice_days (default 2, 0 = off) and
 -- holidays_seeded_at (fixed holidays seeded once).
+
+leave_requests   (id, workspace_id fk, user_id fk,                      -- M7.5
+                  type enum('sick','vacation','personal','maternity','paternity','emergency'),
+                  start_date, end_date, working_days numeric,           -- computed server-side, kept
+                  reason, status enum('pending','approved','rejected','cancelled'),
+                  decided_by fk users null, decided_at, decision_note,
+                  recorded_by fk users null,                            -- HR recorded it (approved at once)
+                  document_attachment_id fk attachments null)          -- private to employee + approvers
+leave_balances   (id, workspace_id fk, user_id fk, year,
+                  entitlement_days null,                                -- null = workspace default
+                  carried_over_days null,                               -- null = rollover not run yet
+                  uniq(user_id, workspace_id, year))
+-- workspaces.default_vacation_days (default 20).
 ```
 
 ## Image Brain

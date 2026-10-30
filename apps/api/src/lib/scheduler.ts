@@ -5,6 +5,7 @@ import { getEmailClient } from "../email";
 import { logActivity } from "./activity";
 import { sendDailyReportReminders } from "./daily-report-reminders";
 import { sendHolidayNotices } from "./holiday-notices";
+import { applyLeaveCarryOver } from "./leave-carry-over";
 import { seedMissingHolidayCalendars } from "./working-days";
 import { buildDigestEmail } from "./digest";
 import { nextOrderKey } from "./order";
@@ -197,4 +198,6 @@ export async function runSchedulerTick() {
   await seedMissingHolidayCalendars(new Date().getUTCFullYear());
   await sendHolidayNotices();
   await sendDailyReportReminders();
+  // M7.5: unused vacation carries into the new year (once per person per year).
+  await applyLeaveCarryOver();
 }

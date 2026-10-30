@@ -4,6 +4,7 @@ import type { PeopleAction, WorkspaceAction } from "@canvas/shared";
 import { Link, useRouterState } from "@tanstack/react-router";
 import {
   CalendarDays,
+  CalendarRange,
   CheckSquare,
   ClipboardCheck,
   ClipboardList,
@@ -16,6 +17,7 @@ import {
   LayoutGrid,
   NotebookPen,
   Palette,
+  Plane,
   PenSquare,
   Sparkles,
   UserCog,
@@ -86,6 +88,15 @@ const NAV_GROUPS: { label: string; entries: NavEntry[] }[] = [
       },
       // M7.4: everyone sees the calendar; HR edits it there.
       { label: "Holidays", to: "/w/$workspaceId/holidays", icon: CalendarDays },
+      // M7.5 leave.
+      { label: "Leave", to: "/w/$workspaceId/leave", icon: Plane },
+      {
+        label: "Leave approvals",
+        to: "/w/$workspaceId/leave-approvals",
+        icon: ClipboardCheck,
+        requires: "leave:approve",
+      },
+      { label: "Who's off", to: "/w/$workspaceId/whos-off", icon: CalendarRange },
     ],
   },
   {

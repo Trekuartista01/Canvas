@@ -77,6 +77,14 @@ export const realtimeEventSchema = z.discriminatedUnion("entity", [
     workspaceId: z.string().uuid(),
     kind,
   }),
+  // M7.5: a leave request was made, decided, cancelled or recorded (or a
+  // balance changed) — refreshes balances, approvals and who's-off.
+  z.object({
+    entity: z.literal("leave"),
+    id: z.string().uuid(),
+    workspaceId: z.string().uuid(),
+    kind,
+  }),
 ]);
 
 export type RealtimeEvent = z.infer<typeof realtimeEventSchema>;

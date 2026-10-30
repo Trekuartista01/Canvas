@@ -2453,3 +2453,67 @@ Developers no longer need Docker. Dev runs `pnpm dev` (api + web + worker via tu
 - Scheduler jobs against the local DB with fixed clocks: Christmas 2026 notice not sent on 22 Dec (3 days before), sent on 23 Dec (one per workspace), and a rerun on 24 Dec sent nothing new (same ledger and email counts). The daily-report reminder sent 0 on Fri 25 Dec at 16:50 and 143 on Thu 24 Dec. Test rows deleted afterwards.
 - New `holidays.spec.ts` (pinned to 2027): the seeded calendar shows Independence Day etc., Labour Day (Sat) has its day off on Mon 3 May; "No movable holidays entered for 2027" shows; HR clicks "+ Orthodox Easter Monday" (date prefilled 2027-05-03) and adds it; the banner clears and Labour Day's day off moves to Tue 4 May; a staff member sees the same calendar with no edit controls.
 - Full Playwright run at CI parity (`CI=1`, retries off, local Postgres/Redis/RustFS containers): **71/71 passed**. Phase-2 smoke test green.
+
+## 2026-10-30 M7.5: Leave management — done
+
+### Built
+
+- **Schema** (migration `0060`): `leave_type` / `leave_status` enums; `leave_requests` (type, dates, `working_days` numeric, reason, status, `decided_by/at`, `decision_note`, `recorded_by`, `document_attachment_id`); `leave_balances` (workspace, user, year, `entitlement_days`, `carried_over_days`, unique per user + workspace + year); `workspaces.default_vacation_days` (default 20).
+- **Rules** (`apps/api/src/lib/leave-balance.ts`, pure, 19 tests):
+  - Only vacation consumes balance.
+  - `computeVacationBalance`: used = approved, pending counted separately; remaining = total − used; available = remaining − pending.
+  - Overlap with any pending or approved request of any type, both ends inclusive.
+  - No end-before-start, no zero-working-day ranges, no request crossing 31 Dec.
+  - Vacation can't exceed available.
+  - `approvalBlocker` re-checks the balance at approval time.
+  - `carryOverFrom` = max(0, available).
+  - Writing the tests caught a real bug: `findOverlap` compared `undefined !== undefined` and so ignored every overlap for a new request.
+- **Working days** come from M7.4's `countWorkingDays(workspaceId, from, to)`: weekends and observed public holidays excluded. They're computed server-side at request time and stored on the row.
+- **`leave` router**:
+  - `mine` (balance for a year, my requests, `canApprove`/`canRecord`) and `preview` (live working days, available days and the rule problem while the form is filled in).
+  - `request`: pending; notifies the requester's manager + HR, falling back to the owner.
+  - `decide`: approve, or reject with a required note; `leave:approve` over the requester, never yourself; notifies the employee.
+  - `cancel`: the employee withdraws a pending request; HR can cancel pending or approved leave and the employee is notified.
+  - `record`: HR records leave for someone, approved immediately, `recorded_by` set, employee notified.
+  - `team`: requests in the caller's scope, each vacation request with the person's remaining balance.
+  - `calendar`: who's off; everyone sees names and dates, the leave type only for people in the viewer's scope.
+  - `balances`, `setBalance`, `setDefaultVacationDays`: HR (`leave:recordForOthers`).
+  - `presignDocument` / `confirmDocument` for a supporting document.
+  - Every mutation writes an activity row. New realtime entity `leave`.
+- **Leave documents are private.** A doctor's note is an attachments row with no task, stored under `leave-documents/<workspace>/<id>/`. The `/uploads/:id` route now also runs `canViewLeaveDocument`: only the employee and whoever may approve their leave can download it, and before it's linked to a request only the uploader. Other task-less attachments (AI references) are unaffected because they're identified by key prefix. The confirm step checks the key matches this workspace + attachment id, and a document can only be attached once, by its own uploader.
+- **Carry-over** (`lib/leave-carry-over.ts`, scheduler tick): every active member gets a balance row for the current Kosovo year with `carried_over_days` = carry from last year's row, set only where it's still null (`ON CONFLICT … DO UPDATE … WHERE carried_over_days IS NULL`). Effectively one query a tick once done. A `leave.carried_over` activity row is written when the carry is > 0.
+- **PDF**: `GET /leave-documents/:id/confirmation.pdf` (approved leave only; employee or approver). Built with **pdf-lib 1.17.1**, added to `apps/api`, since the repo had no PDF library. One A4 page: workspace, employee (+ job title), type, dates, working days, reason, approved by/on, "recorded by HR" when applicable, a signature line, and a reference + generated time in Kosovo time. Characters the standard font can't draw (Cyrillic, emoji) become "?" instead of failing; Albanian ë/ç render. 2 tests.
+- **UI** (People group):
+  - **Leave** (everyone): balance cards per year (entitlement, carried over, used, pending, remaining); the request form with live "N working days · X available" and the rule message (submit disabled while there's a problem); an optional supporting-document upload; my requests (virtualized) with status, decision note, Cancel for pending, Download PDF for approved.
+  - **Leave approvals** (`leave:approve`): requests waiting or all, with Approve / Turn down (reason required) and the person's remaining days. HR also gets **Record leave** (person picker + the same form) and **Balances** (virtualized table: entitlement override, carried over, used, pending, remaining, plus the workspace default).
+  - **Who's off** (everyone): month grid of approved leave on working days, plus a list for the month.
+- Bell: leave notifications open Leave approvals (new request) or My leave.
+
+### Decisions
+
+- **The default 20 working days is a workspace setting HR can change** (Balances tab). A per-employee entitlement override is a `leave_balances.entitlement_days` value; blank means the default.
+- **Carry-over only from a tracked year.** A year counts as tracked if the member has a balance row for it, which this job creates. So the first year Canvas runs, and a new hire's first year, carry 0 instead of a phantom full year from before anything was recorded. No cap and no expiry, since the brief didn't specify one; HR can edit "carried over" by hand.
+- **Pending vacation counts as spent at rollover**, so approving an old-year request later can't push that year below zero. If HR edits last year's numbers after the rollover, this year's carry isn't recomputed; HR adjusts it in Balances.
+- **Approvers** follow M7.1's `leave:approve` matrix: super admin, HR, operations manager (everyone), staff manager (direct reports only). Nobody decides on their own leave, including HR recording leave for themselves.
+- Pending requests count against the balance, so two pending requests can't together overspend it.
+- Whole days only for now; `working_days` is numeric so half days can be added later.
+- Leave crossing the new year must be split, because each request belongs to one year's balance.
+- `working_days` is stored at request time; a holiday HR adds later doesn't rewrite existing requests.
+- Who's off shows the leave type only to people who could see that person's leave anyway (sick leave is personal).
+
+### Verified
+
+- `pnpm check` green; `pnpm test`: API 328 (+19 leave rules, +2 PDF), shared 95, db 7, web 15.
+- `0060` applied to the local DB.
+- Against the local DB:
+  - Carry-over on 30 Oct 2026 created a 2026 row for all 941 active members, each carrying 0 (2025 untracked); a rerun created nothing.
+  - Simulating 1 Jan 2027 with 3 approved days in 2026, Sam carried 17; a rerun created nothing.
+  - Leave-document access: an unlinked upload is visible to the uploader only; once linked, to the employee and the approver; task attachments untouched (null → normal path).
+  - Simulated rows deleted afterwards.
+- New `leave.spec.ts`:
+  - The owner adds a staff member, who signs in (no Leave approvals in his nav) and sees 20 days for 2027.
+  - A weekend-only range shows "no working days".
+  - He requests Mon 1 – Fri 5 Mar 2027 ("5 working days"): Pending 5, Remaining 15. An overlapping range is refused.
+  - The manager sees "20 of 20 vacation days left in 2027" and approves.
+  - Staff's view updates live: Approved, Used 5, Pending 0, Remaining 15. The confirmation PDF downloads (`application/pdf`, `%PDF-`). Who's off shows him on 3 Mar 2027.
+- Full Playwright run at CI parity (`CI=1`, retries off, local Postgres/Redis/RustFS containers): **72/72 passed**. Phase-2 smoke test green.
