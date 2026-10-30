@@ -2517,3 +2517,55 @@ Developers no longer need Docker. Dev runs `pnpm dev` (api + web + worker via tu
   - The manager sees "20 of 20 vacation days left in 2027" and approves.
   - Staff's view updates live: Approved, Used 5, Pending 0, Remaining 15. The confirmation PDF downloads (`application/pdf`, `%PDF-`). Who's off shows him on 3 Mar 2027.
 - Full Playwright run at CI parity (`CI=1`, retries off, local Postgres/Redis/RustFS containers): **72/72 passed**. Phase-2 smoke test green.
+
+## 2026-10-30 M7.6: Contracts & company documents — done
+
+### Built
+
+- **Schema** (migration `0061`): `contract_kind` enum; `employment_contracts` (kind, `parent_contract_id` self-FK for annexes/amendments, title, start/expiry dates, `attachment_id`, `uploaded_by`, soft delete); `contract_expiry_notices` (ledger, unique contract + threshold + expiry date, so extending a contract re-arms its notices); `company_document_categories` (soft delete); `company_documents` (category, title, current `attachment_id`, soft delete); `company_document_versions` (every version including the current one, unique per document + version).
+- **One private-upload path** (`lib/private-upload.ts`): `presignPrivateUpload` / `confirmPrivateUpload` / `requirePrivateAttachment` / `signedDownloadUrl`, the same presign → direct PUT → confirm flow as task attachments. The key prefix marks the kind of file: `leave-documents/`, `contracts/`, `company-documents/`. Confirm checks the key is exactly the one handed out for this workspace + attachment id and that the object landed. M7.5's leave documents now use it too, replacing their own copy.
+- **One download rule for private files** (`lib/private-attachments.ts`, used by `/uploads/:id`):
+  - Leave documents: as in M7.5.
+  - Contract files: the employee whose **current** contract file it is, or HR (`contract:manage`). A file replaced since is HR-only.
+  - Company documents: any active member.
+- **Signed download URLs**: `contract.downloadUrl` and `companyDocument.downloadUrl` check permission, then return a 2-minute presigned GET. `getPresignedUrl` gained an optional file name, which sets `Content-Disposition: attachment` with the original name (RFC 5987 encoded).
+- **`contract` router**:
+  - `mine` (own documents only), `list` and `forPerson` (HR), each with `daysLeft`.
+  - `presignUpload` / `confirmUpload`, `create` (an annex/amendment must point at one of the same person's contracts; a contract has no parent; the expiry can't be before the start; a file can only be filed once).
+  - `update` (title/dates, or replace the file; the old attachment row is kept and the activity row records `previousAttachmentId`), `delete` (soft), `downloadUrl`.
+  - All of it needs `contract:manage` except `mine`/`downloadUrl` for the employee's own documents.
+- **`companyDocument` router**:
+  - Everyone: `list` (categories + documents with current file and version count; a document in a deleted category shows under "Other"), `versions`, `downloadUrl` (current or a given version).
+  - HR (new people action **`companyDocument:manage`**, super admin + HR): category create/rename/delete, `presignUpload` / `confirmUpload`, `create` (writes version 1), `replace` (new version row + the current pointer moves, in a transaction), `update` (title/category), `delete` (soft).
+- **Expiry notices** (`lib/contract-expiry.ts`, scheduler tick):
+  - Pure `contractNoticesDue(today, expiry)` in shared (5 tests, with `daysUntil`) gives every threshold (30, 7) we're at or inside of, up to the expiry day.
+  - Each due threshold is claimed in the ledger; if anything new was claimed, one in-app + email notice goes to HR and super admins (never the employee).
+  - A notice missed while the worker was down still goes out. A contract filed 5 days before it ends gets one message, not two.
+  - The bell shows "Contract expiring: <name> — in N days" and opens Contracts.
+- **UI** (People group):
+  - **My contract** (everyone): own contract with its annexes indented, dates, expiry badge, Download.
+  - **Contracts** (`contract:manage`): virtualized list of all contracts (search, "Expiring within 30 days" filter), "File a document" (employee, kind, parent for annexes, title, dates, file), and per row: inline expiry date, Download, Replace file, Delete.
+  - **Company documents** (everyone): grouped by category (virtualized), Download, version history with downloads of older versions. HR also gets add document / add category, move to category, upload new version, delete.
+
+### Decisions
+
+- **Company documents get their own permission** (`companyDocument:manage`) instead of reusing `contract:manage`. Same roles today (HR + super admin), but the library isn't about contracts. It's added to `PEOPLE_ACTIONS` and the `can()` matrix test.
+- **Contracts keep the old file on replace** (the brief asked for version history only on company documents). The old row stays for audit, reachable only by HR; its id is in the `contract.replaced` activity payload. There's no contract version list in the UI.
+- **Expiry notices go to HR and super admins only**, not the employee (the brief: "notifies HR").
+- **Downloads use signed URLs** from these pages, as the brief asks. The `/uploads/:id` stream route still exists for these attachments and applies the same rules, so nothing is reachable there that the signed-URL path wouldn't hand out.
+- Size cap 50 MB for contracts and company documents.
+
+### Verified
+
+- `pnpm check` green; `pnpm test`: shared 100 (+5), API 329 (+1 matrix row for the new action), db 7, web 15.
+- `0061` applied to the local DB.
+- Against the local DB with fixed clocks:
+  - **Expiry notices:** none at 31 days; one at 30 days; a rerun the next day added nothing. On 28 Nov the main contract got its 7-day notice and a late-filed annex got both thresholds claimed with **one** message. Only HR was notified.
+  - **Contract file access:** Sam can open his own contract file, Tina (another staff member) can't, HR can; a replaced annex's old file is HR-only.
+  - Test rows deleted afterwards.
+- New `documents.spec.ts`:
+  - HR files a contract (expiring 2030) and a salary annex for Sam, and a contract for Tina, then replaces the annex file.
+  - HR creates a "Policies" category, adds "Leave policy", uploads version 2; the history shows v1 + current.
+  - Sam (no Contracts link in his nav) sees only his contract and annex, never Tina's. Both download via signed URLs with the right file names (the annex as its replacement).
+  - Sam sees the company document without management controls and downloads the current version.
+- Full Playwright run at CI parity (`CI=1`, retries off, local Postgres/Redis/RustFS containers): **73/73 passed**. Phase-2 smoke test green.

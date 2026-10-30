@@ -23,3 +23,4 @@ export * from "./people";
 export * from "./daily-reports";
 export * from "./holidays";
 export * from "./leave";
+export * from "./documents";

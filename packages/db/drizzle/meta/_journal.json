@@ -428,6 +428,13 @@
       "when": 1793354922246,
       "tag": "0060_glossy_excalibur",
       "breakpoints": true
+    },
+    {
+      "idx": 61,
+      "version": "7",
+      "when": 1793355970512,
+      "tag": "0061_open_mesmero",
+      "breakpoints": true
     }
   ]
 }

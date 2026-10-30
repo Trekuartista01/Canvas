@@ -260,6 +260,7 @@ describe("can() — People (M7.1)", () => {
     "report:viewTeam": ["super_admin", "hr", "operation_manager", "staff_manager"],
     "performance:view": ["super_admin", "hr", "operation_manager", "staff_manager"],
     "holiday:manage": ["super_admin", "hr"],
+    "companyDocument:manage": ["super_admin", "hr"],
     "tasks:manageTeam": ["super_admin", "hr", "operation_manager", "staff_manager"],
   };
 

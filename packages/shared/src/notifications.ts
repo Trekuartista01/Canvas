@@ -30,4 +30,6 @@ export const NOTIFICATION_VERB_LABELS: Record<string, string> = {
   "leave.rejected": "turned down your leave request",
   "leave.recorded": "recorded leave for you",
   "leave.cancelled": "cancelled your leave",
+  // M7.6 — rendered with the employee and days left from the payload.
+  "contract.expiring": "Contract expiring soon",
 };

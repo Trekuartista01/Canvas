@@ -52,6 +52,8 @@ export const PEOPLE_ACTIONS = [
   "report:viewTeam",
   "performance:view",
   "holiday:manage",
+  // M7.6: the company document library (everyone reads it; HR keeps it).
+  "companyDocument:manage",
   "tasks:manageTeam",
 ] as const;
 export type PeopleAction = (typeof PEOPLE_ACTIONS)[number];

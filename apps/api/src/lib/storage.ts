@@ -138,10 +138,26 @@ export async function getPresignedUploadUrl(
 // specifically about not exposing the bucket to the browser directly; this is a
 // different boundary (server -> external API), where a short-lived
 // presigned URL is the standard, simplest way to hand off image bytes.
-export async function getPresignedUrl(key: string, expiresInSeconds = 300): Promise<string> {
-  return getSignedUrl(s3, new GetObjectCommand({ Bucket: env.S3_BUCKET, Key: key }), {
-    expiresIn: expiresInSeconds,
-  });
+export async function getPresignedUrl(
+  key: string,
+  expiresInSeconds = 300,
+  // M7.6: set for browser downloads (contracts, company documents) — served
+  // as an attachment under its original name instead of rendered inline.
+  downloadFileName?: string,
+): Promise<string> {
+  return getSignedUrl(
+    s3,
+    new GetObjectCommand({
+      Bucket: env.S3_BUCKET,
+      Key: key,
+      ...(downloadFileName
+        ? {
+            ResponseContentDisposition: `attachment; filename="${downloadFileName.replace(/["\\\r\n]/g, "_")}"; filename*=UTF-8''${encodeURIComponent(downloadFileName)}`,
+          }
+        : {}),
+    }),
+    { expiresIn: expiresInSeconds },
+  );
 }
 
 export async function deleteObject(key: string) {

@@ -63,6 +63,15 @@ function holidayLine(payload: unknown): string {
   return `${name} — day off ${day}`;
 }
 
+// M7.6 "contract.expiring": "Sam Staff — in 7 days".
+function contractLine(payload: unknown): string {
+  if (!payload || typeof payload !== "object") return "";
+  const p = payload as { employeeName?: unknown; daysLeft?: unknown };
+  const name = typeof p.employeeName === "string" ? p.employeeName : "";
+  if (typeof p.daysLeft !== "number") return name;
+  return `${name} — ${p.daysLeft === 0 ? "today" : `in ${p.daysLeft} day${p.daysLeft === 1 ? "" : "s"}`}`;
+}
+
 function formSubmitterName(payload: unknown): string | null {
   if (!payload || typeof payload !== "object") return null;
   const name = (payload as { submitterName?: unknown }).submitterName;
@@ -159,6 +168,11 @@ export function NotificationsBell() {
                         to: "/w/$workspaceId/daily-report",
                         params: { workspaceId: n.workspaceId },
                       });
+                    } else if (n.verb === "contract.expiring") {
+                      navigate({
+                        to: "/w/$workspaceId/contracts",
+                        params: { workspaceId: n.workspaceId },
+                      });
                     } else if (n.verb === "leave.requested") {
                       navigate({
                         to: "/w/$workspaceId/leave-approvals",
@@ -184,6 +198,11 @@ export function NotificationsBell() {
                     <span>
                       <span className="font-medium">Public holiday:</span>{" "}
                       {holidayLine(n.payloadJson)}
+                    </span>
+                  ) : n.verb === "contract.expiring" ? (
+                    <span>
+                      <span className="font-medium">Contract expiring:</span>{" "}
+                      {contractLine(n.payloadJson)}
                     </span>
                   ) : STANDALONE_VERBS.has(n.verb) ? (
                     <span className="font-medium">{NOTIFICATION_VERB_LABELS[n.verb]}</span>

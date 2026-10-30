@@ -6,6 +6,7 @@ import { logActivity } from "./activity";
 import { sendDailyReportReminders } from "./daily-report-reminders";
 import { sendHolidayNotices } from "./holiday-notices";
 import { applyLeaveCarryOver } from "./leave-carry-over";
+import { sendContractExpiryNotices } from "./contract-expiry";
 import { seedMissingHolidayCalendars } from "./working-days";
 import { buildDigestEmail } from "./digest";
 import { nextOrderKey } from "./order";
@@ -200,4 +201,6 @@ export async function runSchedulerTick() {
   await sendDailyReportReminders();
   // M7.5: unused vacation carries into the new year (once per person per year).
   await applyLeaveCarryOver();
+  // M7.6: HR hears 30 and 7 days before a contract expires.
+  await sendContractExpiryNotices();
 }

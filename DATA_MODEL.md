@@ -89,6 +89,21 @@ leave_balances   (id, workspace_id fk, user_id fk, year,
                   carried_over_days null,                               -- null = rollover not run yet
                   uniq(user_id, workspace_id, year))
 -- workspaces.default_vacation_days (default 20).
+
+employment_contracts(id, workspace_id fk, user_id fk,                   -- M7.6
+                  kind enum('contract','annex','amendment'),
+                  parent_contract_id fk employment_contracts null,      -- annex/amendment → its contract
+                  title, start_date, expiry_date null,
+                  attachment_id fk attachments,                         -- contracts/… key: employee + HR only
+                  uploaded_by fk users, deleted_at)                     -- replace keeps the old attachment row
+contract_expiry_notices(id, contract_id fk, threshold_days, expiry_date, -- 30/7-day ledger
+                  sent_at, uniq(contract_id, threshold_days, expiry_date))
+company_document_categories(id, workspace_id fk, name, deleted_at)
+company_documents(id, workspace_id fk, category_id fk null, title,
+                  attachment_id fk attachments,                         -- current version
+                  uploaded_by fk users, deleted_at)
+company_document_versions(id, document_id fk, attachment_id fk, version,
+                  uploaded_by fk users, uniq(document_id, version))     -- every version, current included
 ```
 
 ## Image Brain

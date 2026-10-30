@@ -37,6 +37,9 @@ import { holidaysRoute } from "./routes/workspace.$workspaceId.holidays";
 import { leaveRoute } from "./routes/workspace.$workspaceId.leave";
 import { leaveApprovalsRoute } from "./routes/workspace.$workspaceId.leave-approvals";
 import { whosOffRoute } from "./routes/workspace.$workspaceId.whos-off";
+import { myContractRoute } from "./routes/workspace.$workspaceId.my-contract";
+import { contractsRoute } from "./routes/workspace.$workspaceId.contracts";
+import { companyDocumentsRoute } from "./routes/workspace.$workspaceId.company-documents";
 import { peopleDirectoryRoute } from "./routes/workspace.$workspaceId.people";
 import { personProfileRoute } from "./routes/workspace.$workspaceId.people.$userId";
 import { newWorkspaceRoute } from "./routes/workspaces.new";
@@ -61,6 +64,9 @@ const routeTree = rootRoute.addChildren([
     leaveRoute,
     leaveApprovalsRoute,
     whosOffRoute,
+    myContractRoute,
+    contractsRoute,
+    companyDocumentsRoute,
     peopleDirectoryRoute,
     personProfileRoute,
     listRoute,

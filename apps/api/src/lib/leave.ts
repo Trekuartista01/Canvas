@@ -6,6 +6,7 @@ import type { SessionUser } from "../auth/session";
 import { computeVacationBalance, yearOf, type LeaveLike } from "./leave-balance";
 import { findMembership, getPeopleContext, listActiveMemberIds } from "./membership";
 import { assertCanPeople } from "./permissions";
+import { PRIVATE_PREFIXES } from "./private-upload";
 
 export async function loadLeaveRequests(workspaceId: string, userId: string): Promise<LeaveLike[]> {
   return db
@@ -159,7 +160,6 @@ export async function leaveApproverIds(workspaceId: string, requesterId: string)
  * employee and their approvers — or, before it's linked to a request, the
  * uploader — may download one. Returns null for a non-leave attachment.
  */
-export const LEAVE_DOCUMENT_KEY_PREFIX = "leave-documents/";
 
 export async function canViewLeaveDocument(
   user: SessionUser,
@@ -167,7 +167,7 @@ export async function canViewLeaveDocument(
 ): Promise<boolean | null> {
   // AI references etc. are task-less attachments too — the key prefix is
   // what marks a leave document.
-  if (!attachment.fileKey?.startsWith(LEAVE_DOCUMENT_KEY_PREFIX)) return null;
+  if (!attachment.fileKey?.startsWith(PRIVATE_PREFIXES.leave)) return null;
   const linked = await db
     .select({ userId: schema.leaveRequests.userId })
     .from(schema.leaveRequests)

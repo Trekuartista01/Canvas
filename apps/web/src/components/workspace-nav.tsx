@@ -10,7 +10,9 @@ import {
   ClipboardList,
   Clock3,
   Contact,
+  FileSignature,
   FileText,
+  FolderOpen,
   Gauge,
   Home,
   Images,
@@ -97,6 +99,15 @@ const NAV_GROUPS: { label: string; entries: NavEntry[] }[] = [
         requires: "leave:approve",
       },
       { label: "Who's off", to: "/w/$workspaceId/whos-off", icon: CalendarRange },
+      // M7.6: own contract for everyone, every contract for HR, shared library.
+      { label: "My contract", to: "/w/$workspaceId/my-contract", icon: FileSignature },
+      {
+        label: "Contracts",
+        to: "/w/$workspaceId/contracts",
+        icon: FileSignature,
+        requires: "contract:manage",
+      },
+      { label: "Company documents", to: "/w/$workspaceId/company-documents", icon: FolderOpen },
     ],
   },
   {

@@ -194,6 +194,7 @@ const PEOPLE_MATRIX: Record<PeopleAction, { roles: readonly PeopleRole[]; team?:
     team: true,
   },
   "holiday:manage": { roles: ["super_admin", "hr"] },
+  "companyDocument:manage": { roles: ["super_admin", "hr"] },
   // M7.2: also "approve"/"reject"/"transfer" on tasks. Besides these roles,
   // the task's creator qualifies (target.isCreator) — see lib/task-transition.ts.
   "tasks:manageTeam": {

@@ -29,6 +29,8 @@ import { peopleRouter } from "./routers/people";
 import { dailyReportRouter } from "./routers/daily-report";
 import { holidayRouter } from "./routers/holiday";
 import { leaveRouter } from "./routers/leave";
+import { contractRouter } from "./routers/contract";
+import { companyDocumentRouter } from "./routers/company-document";
 import { workloadRouter } from "./routers/workload";
 import { workspaceRouter } from "./routers/workspace";
 import { publicProcedure, router } from "./trpc";
@@ -66,6 +68,8 @@ export const appRouter = router({
   dailyReport: dailyReportRouter,
   holiday: holidayRouter,
   leave: leaveRouter,
+  contract: contractRouter,
+  companyDocument: companyDocumentRouter,
   search: searchRouter,
   aiUsage: aiUsageRouter,
 });

@@ -70,7 +70,7 @@ Replaces the separate Seri HR app. Full prompts per milestone: `PHASE7_PROMPTS.m
 - M7.3 Daily reports + read receipts + 16:45 weekday reminder. ✅ Done.
 - M7.4 Kosovo public holidays calendar + notifications + working-days helper. ✅ Done.
 - M7.5 Leave management (types, approval, balance rules, carry-over, PDF). ✅ Done.
-- M7.6 Contracts (expiry alerts, My Contract) + company document library.
+- M7.6 Contracts (expiry alerts, My Contract) + company document library. ✅ Done.
 - M7.7 Payroll (encrypted ID/IBAN, HR-only, audited, Excel/PDF export).
 - M7.8 Performance report, Employee of the Month, Engagements board.
 - M7.9 Seri import (mongodump → Canvas, dry-run first).

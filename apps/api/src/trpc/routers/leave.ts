@@ -16,12 +16,9 @@ import {
 } from "@canvas/shared";
 import { TRPCError } from "@trpc/server";
 import { and, asc, desc, eq, gte, inArray, lte } from "drizzle-orm";
-import { uuidv7 } from "uuidv7";
 import type { SessionUser } from "../../auth/session";
 import { logActivity } from "../../lib/activity";
-import { sanitizeFilenameForKey } from "../../lib/filename";
 import {
-  LEAVE_DOCUMENT_KEY_PREFIX,
   assertCanActOnLeaveOf,
   findBalanceRow,
   getVacationBalance,
@@ -34,7 +31,12 @@ import { activeMembershipCondition, getMembershipRole } from "../../lib/membersh
 import { notifyUsers } from "../../lib/notify";
 import { assertCanPeople, canPeopleAction, requireActiveMember } from "../../lib/permissions";
 import { publish } from "../../lib/realtime";
-import { getPresignedUploadUrl, headObject } from "../../lib/storage";
+import {
+  PRIVATE_PREFIXES,
+  confirmPrivateUpload,
+  presignPrivateUpload,
+  requirePrivateAttachment,
+} from "../../lib/private-upload";
 import { countWorkingDays } from "../../lib/working-days";
 import { protectedProcedure, router } from "../trpc";
 
@@ -67,19 +69,11 @@ async function assertUsableDocument(
   attachmentId?: string,
 ) {
   if (!attachmentId) return;
-  const attachment = await db.query.attachments.findFirst({
-    where: eq(schema.attachments.id, attachmentId),
-  });
+  await requirePrivateAttachment(PRIVATE_PREFIXES.leave, workspaceId, attachmentId, uploaderId);
   const linked = await db.query.leaveRequests.findFirst({
     where: eq(schema.leaveRequests.documentAttachmentId, attachmentId),
   });
-  if (
-    !attachment ||
-    attachment.workspaceId !== workspaceId ||
-    attachment.uploaderId !== uploaderId ||
-    !attachment.fileKey?.startsWith(LEAVE_DOCUMENT_KEY_PREFIX) ||
-    linked
-  ) {
+  if (linked) {
     throw new TRPCError({ code: "BAD_REQUEST", message: "That document can't be attached" });
   }
 }
@@ -481,47 +475,13 @@ export const leaveRouter = router({
     .input(presignLeaveDocumentSchema)
     .mutation(async ({ ctx, input }) => {
       await requireActiveMember(ctx.user, input.workspaceId);
-      const attachmentId = uuidv7();
-      const key = `${LEAVE_DOCUMENT_KEY_PREFIX}${input.workspaceId}/${attachmentId}/${sanitizeFilenameForKey(input.fileName)}`;
-      return { attachmentId, key, uploadUrl: await getPresignedUploadUrl(key, input.mime) };
+      return presignPrivateUpload(PRIVATE_PREFIXES.leave, input);
     }),
 
   confirmDocument: protectedProcedure
     .input(confirmLeaveDocumentSchema)
     .mutation(async ({ ctx, input }) => {
       await requireActiveMember(ctx.user, input.workspaceId);
-      if (
-        !input.key.startsWith(
-          `${LEAVE_DOCUMENT_KEY_PREFIX}${input.workspaceId}/${input.attachmentId}/`,
-        )
-      ) {
-        throw new TRPCError({ code: "BAD_REQUEST", message: "Unexpected upload key" });
-      }
-      const head = await headObject(input.key);
-      if (!head) throw new TRPCError({ code: "BAD_REQUEST", message: "Upload did not complete" });
-      const [attachment] = await db
-        .insert(schema.attachments)
-        .values({
-          id: input.attachmentId,
-          workspaceId: input.workspaceId,
-          uploaderId: ctx.user.id,
-          fileKey: input.key,
-          fileName: input.fileName,
-          mime: input.mime,
-          sizeBytes: head.ContentLength ?? 0,
-        })
-        .returning();
-      if (!attachment) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
-      await logActivity(
-        input.workspaceId,
-        ctx.user.id,
-        "attachment",
-        attachment.id,
-        "attachment.created",
-        {
-          leaveDocument: true,
-        },
-      );
-      return { id: attachment.id, fileName: attachment.fileName };
+      return confirmPrivateUpload(PRIVATE_PREFIXES.leave, ctx.user.id, input);
     }),
 });
