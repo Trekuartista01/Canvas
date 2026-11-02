@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  backupSizeFinding,
   configFindings,
   corsFinding,
   migrationFinding,
@@ -81,6 +82,41 @@ describe("migrationFinding", () => {
     expect(migrationFinding(64, 64).level).toBe("ok");
     expect(migrationFinding(64, 60).detail).toContain("pnpm db:migrate");
     expect(migrationFinding(60, 64).level).toBe("warn");
+  });
+});
+
+describe("configFindings — Supabase Storage", () => {
+  const supabase = {
+    ...good,
+    S3_ENDPOINT: "https://abcdef.storage.supabase.co/storage/v1/s3",
+    S3_REGION: "eu-west-3",
+    S3_FORCE_PATH_STYLE: "true",
+  };
+
+  it("accepts the Supabase Storage S3 endpoint with path-style and its region", () => {
+    expect(
+      configFindings(supabase).filter((f) => f.level !== "ok" && f.check.startsWith("S3")),
+    ).toEqual([]);
+    expect(configFindings(supabase).find((f) => f.check === "S3_ENDPOINT")?.detail).toMatch(
+      /Supabase Storage/,
+    );
+  });
+
+  it("requires path-style and a real region", () => {
+    expect(levels({ ...supabase, S3_FORCE_PATH_STYLE: "false" }).S3_FORCE_PATH_STYLE).toBe("fail");
+    expect(levels({ ...supabase, S3_REGION: "auto" }).S3_REGION).toBe("warn");
+  });
+});
+
+describe("backupSizeFinding", () => {
+  const MB = 1024 * 1024;
+  it("is fine with no backups or a small one", () => {
+    expect(backupSizeFinding(null, 50 * MB).level).toBe("ok");
+    expect(backupSizeFinding(3 * MB, 50 * MB).detail).toBe("newest is 3.0 MB");
+  });
+  it("warns past 80% of the per-file limit, and never without one", () => {
+    expect(backupSizeFinding(41 * MB, 50 * MB).level).toBe("warn");
+    expect(backupSizeFinding(400 * MB, null).level).toBe("ok");
   });
 });
 

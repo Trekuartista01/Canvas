@@ -5,7 +5,7 @@
  *   pnpm preflight            # treats .env as production (what PM2 runs)
  *   pnpm preflight --local    # same checks without the production rules
  *
- * Read-only apart from one tiny probe object in R2 (written and deleted).
+ * Read-only apart from one tiny probe object in storage (written and deleted).
  * Never prints a secret. Exits 1 if anything is a ✗.
  */
 import { config } from "dotenv";
@@ -17,6 +17,7 @@ import {
   DeleteObjectCommand,
   GetObjectCommand,
   HeadBucketCommand,
+  ListObjectsV2Command,
   PutObjectCommand,
   S3Client,
 } from "@aws-sdk/client-s3";
@@ -25,11 +26,14 @@ import IORedis from "ioredis";
 import pg from "pg";
 import { pgPoolConfig } from "../../../packages/db/src/connection";
 import {
+  backupSizeFinding,
   configFindings,
   corsFinding,
+  isSupabaseStorage,
   migrationFinding,
   nodeVersionFinding,
   pgDumpFinding,
+  SUPABASE_FREE_FILE_LIMIT,
   type Finding,
 } from "../src/lib/preflight";
 
@@ -148,7 +152,8 @@ try {
   redis.disconnect();
 }
 
-// 5. R2: bucket, write/read/delete with the app's token, and the browser CORS rule.
+// 5. Storage (Supabase Storage or R2): bucket, write/read/delete with the
+// app's keys, the browser CORS rule, and the nightly backup's size.
 const s3 = new S3Client({
   endpoint: env.S3_ENDPOINT,
   region: env.S3_REGION || "auto",
@@ -172,7 +177,7 @@ try {
   await s3.send(new DeleteObjectCommand({ Bucket: bucket, Key: probeKey }));
   add({
     level: body === "ok" ? "ok" : "fail",
-    check: "R2 bucket",
+    check: "Storage bucket",
     detail:
       body === "ok"
         ? `${bucket}: read/write/delete with the app token`
@@ -194,8 +199,23 @@ try {
     },
   });
   add(corsFinding(origin, preflight.status, preflight.headers));
+
+  // Newest backups/ object (backup-db.mjs names them by date, so the
+  // listing's last key is the newest).
+  const listed = await s3.send(new ListObjectsV2Command({ Bucket: bucket, Prefix: "backups/" }));
+  const newest = (listed.Contents ?? [])
+    .sort((a, b) => (a.Key ?? "").localeCompare(b.Key ?? ""))
+    .at(-1);
+  const supabaseStorage = (() => {
+    try {
+      return isSupabaseStorage(new URL(env.S3_ENDPOINT ?? ""));
+    } catch {
+      return false;
+    }
+  })();
+  add(backupSizeFinding(newest?.Size ?? null, supabaseStorage ? SUPABASE_FREE_FILE_LIMIT : null));
 } catch (err) {
-  add({ level: "fail", check: "R2 bucket", detail: `${bucket}: ${errorText(err)}` });
+  add({ level: "fail", check: "Storage bucket", detail: `${bucket}: ${errorText(err)}` });
 }
 
 // 6. Email.

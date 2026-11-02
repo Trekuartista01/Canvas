@@ -12,9 +12,9 @@
 | DB | Supabase Postgres (pgvector) + Drizzle ORM, via the Session pooler (TLS, small pools) | Migrations as code; free hosted Postgres with pgvector, no local DB server |
 | Realtime | WebSocket (fastify-websocket) publishing invalidation events; clients refetch via TanStack Query | Simple, replace with CRDT only for Docs |
 | Jobs | BullMQ + Redis (local: WSL in dev, apt on the server) | Image generation runs async; notifications |
-| Storage | Cloudflare R2 (S3 API), bucket per environment | Images are the hot path — no egress fees |
+| Storage | Supabase Storage through its S3 protocol, a private bucket per environment (prod: `canvas-prod`, in the database's project) | Any S3-compatible store works (code is plain S3: presigned PUT/GET, path-style). R2 was the first choice (no egress fees) but Cloudflare billing doesn't accept Kosovo cards (2026-11-02) |
 | Auth | Lucia or Auth.js; sessions in Postgres | Google OAuth + email/password |
-| Deploy | No Docker. Dev: `pnpm dev` + Supabase/R2 dev resources. Prod: PM2 (`ecosystem.config.cjs`) + Caddy on an Oracle Always Free VM, nightly `pg_dump` to R2 | €0 hosting, one public origin |
+| Deploy | No Docker. Dev: `pnpm dev` + Supabase dev resources (or local containers). Prod: PM2 (`ecosystem.config.cjs`) + Caddy on an Oracle Always Free VM, nightly `pg_dump` to R2 | €0 hosting, one public origin |
 
 ## 2. System diagram
 

@@ -1,5 +1,5 @@
 // Nightly database backup: pg_dump (custom format) of DATABASE_URL -> gzip
-// -> the R2 bucket under backups/YYYY-MM-DD.dump.gz, keeping the newest 14.
+// -> the storage bucket (Supabase Storage via S3) under backups/YYYY-MM-DD.dump.gz, keeping the newest 14.
 // Run via scripts/backup-db.sh (cron on the prod VM — see DEPLOYMENT.md).
 // Plain .mjs (not tsup-built) so it runs on the server with nothing but
 // node + this package's installed dependencies. Needs `pg_dump` on PATH at

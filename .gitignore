@@ -15,3 +15,6 @@ minio-data
 
 # M7.9 Seri importer output (describes real people — never commit)
 .seri-import
+
+# Secrets kept next to deploy files (e.g. deploy/storage.env) — never committed.
+*.env

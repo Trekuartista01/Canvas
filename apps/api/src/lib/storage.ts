@@ -19,7 +19,7 @@ export const s3 = new S3Client({
     accessKeyId: env.S3_ACCESS_KEY_ID,
     secretAccessKey: env.S3_SECRET_ACCESS_KEY,
   },
-  // Cloudflare R2: newer AWS SDKs attach CRC checksum headers/params to
+  // Non-AWS stores (Supabase Storage, R2): newer AWS SDKs attach CRC checksum headers/params to
   // every PutObject by default, including presigned URLs — the browser's
   // direct PUT then has to reproduce a checksum it never computed. Only send
   // checksums when an operation actually requires one.
@@ -28,10 +28,10 @@ export const s3 = new S3Client({
 });
 
 // A throwaway S3-compatible server (CI's e2e job) starts empty, so the app
-// creates the bucket and its CORS rule itself. Cloudflare R2 (dev and prod)
-// is never managed from here: the bucket is pre-created and its CORS rule
-// set in the Cloudflare dashboard (docs/LOCAL_SETUP.md, DEPLOYMENT.md), and
-// the app's R2 token is object-scoped — it can't create buckets or edit CORS.
+// creates the bucket and its CORS rule itself. Hosted storage (Supabase
+// Storage in prod, DEPLOYMENT.md step 2; R2 also works) is never managed
+// from here: the bucket is pre-created in its dashboard, along with any CORS
+// rule it needs.
 function isLocalEndpoint(endpoint: string) {
   return /localhost|127\.0\.0\.1/i.test(endpoint);
 }
@@ -42,7 +42,7 @@ export async function ensureBucketExists() {
       await s3.send(new HeadBucketCommand({ Bucket: env.S3_BUCKET }));
     } catch (err) {
       console.warn(
-        `storage: bucket "${env.S3_BUCKET}" isn't reachable at ${env.S3_ENDPOINT} — create it in the Cloudflare dashboard and check the S3_* credentials:`,
+        `storage: bucket "${env.S3_BUCKET}" isn't reachable at ${env.S3_ENDPOINT} — create it in the storage dashboard and check the S3_* credentials:`,
         err instanceof Error ? err.message : err,
       );
     }
@@ -100,6 +100,18 @@ export async function getObject(key: string) {
 // Returns null if the object doesn't exist (a confirmUpload call for a PUT
 // that never actually landed) rather than throwing — the caller treats
 // "not there" as an ordinary validation failure, not a server error.
+/**
+ * Did the direct upload arrive with the Content-Type its presigned URL was
+ * signed for? Supabase Storage (unlike AWS) doesn't enforce the signed type
+ * on the PUT itself, so the confirm step checks it instead. Parameters
+ * ("; charset=…") and case are ignored; a store that reports no type passes.
+ */
+export function uploadedTypeMatches(storedType: string | undefined, signedType: string) {
+  if (!storedType) return true;
+  const base = (t: string) => t.split(";")[0]!.trim().toLowerCase();
+  return base(storedType) === base(signedType);
+}
+
 export async function headObject(key: string) {
   try {
     return await s3.send(new HeadObjectCommand({ Bucket: env.S3_BUCKET, Key: key }));
@@ -115,10 +127,10 @@ export async function headObject(key: string) {
 // @fastify/multipart before ever reaching S3. Downloads are untouched:
 // GET /uploads/:id still streams through the app with a permission check
 // on every request, so the bucket still isn't reachable by the browser for
-// reads. Signing the PUT with a fixed ContentType means the object can
-// only be uploaded with that exact Content-Type header — the presigned
-// URL can't be reused to upload a differently-typed file than what was
-// authorized.
+// reads. The PUT is signed with a fixed ContentType. AWS enforces it on
+// the upload itself; Supabase Storage doesn't, so both confirm steps check
+// the stored type with uploadedTypeMatches() and refuse (and delete) a
+// file that arrived as a different type than was authorized.
 export async function getPresignedUploadUrl(
   key: string,
   contentType: string,

@@ -23,6 +23,7 @@ import {
   getPresignedUploadUrl,
   headObject,
   putObject,
+  uploadedTypeMatches,
 } from "../../lib/storage";
 import { requireTask, workspaceIdForTask } from "../../lib/task-queries";
 import { protectedProcedure, router } from "../trpc";
@@ -111,6 +112,10 @@ export const attachmentRouter = router({
     const head = await headObject(input.key);
     if (!head) {
       throw new TRPCError({ code: "BAD_REQUEST", message: "Upload did not complete" });
+    }
+    if (!uploadedTypeMatches(head.ContentType, input.mime)) {
+      await deleteObject(input.key);
+      throw new TRPCError({ code: "BAD_REQUEST", message: "The file arrived as a different type" });
     }
 
     let thumbKey: string | null = null;

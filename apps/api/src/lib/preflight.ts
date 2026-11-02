@@ -1,7 +1,7 @@
 /**
  * M7.10 production preflight — the pure checks behind `pnpm preflight`
  * (apps/api/scripts/preflight.ts). Each returns a list of findings; the
- * script adds the ones that need a network (DB, Redis, R2, SMTP).
+ * script adds the ones that need a network (DB, Redis, storage, SMTP).
  */
 export type Level = "ok" | "warn" | "fail";
 export interface Finding {
@@ -90,18 +90,37 @@ export function configFindings(env: Record<string, string | undefined>): Finding
     out.push(warn("REDIS_URL", `${redis.hostname} — Redis is expected on this VM (127.0.0.1)`));
   } else out.push(ok("REDIS_URL", "local, with a password"));
 
+  // File storage: Supabase Storage's S3 endpoint (DEPLOYMENT.md step 2) or,
+  // where a card is accepted, Cloudflare R2. Any other S3 host only warns.
   const s3 = parseUrl(env.S3_ENDPOINT);
-  if (!s3 || s3.protocol !== "https:")
-    out.push(fail("S3_ENDPOINT", "must be the https:// R2 endpoint"));
-  else if (!s3.hostname.endsWith(".r2.cloudflarestorage.com")) {
+  const supabase = !!s3 && isSupabaseStorage(s3);
+  const r2 = !!s3 && s3.hostname.endsWith(".r2.cloudflarestorage.com");
+  if (!s3 || s3.protocol !== "https:") {
+    out.push(fail("S3_ENDPOINT", "must be the https:// storage endpoint (Supabase Storage → S3)"));
+  } else if (supabase) out.push(ok("S3_ENDPOINT", `Supabase Storage (${s3.hostname})`));
+  else if (r2) out.push(ok("S3_ENDPOINT", `Cloudflare R2 (${s3.hostname})`));
+  else {
     out.push(
       warn(
         "S3_ENDPOINT",
-        `${s3.hostname} isn't an R2 endpoint — fine only if you meant another S3 host`,
+        `${s3.hostname} isn't Supabase Storage or R2 — fine only if you meant it`,
       ),
     );
-  } else out.push(ok("S3_ENDPOINT", s3.hostname));
-  if (env.S3_ENDPOINT?.includes("r2.cloudflarestorage.com")) {
+  }
+  if (supabase) {
+    if (env.S3_FORCE_PATH_STYLE !== "true") {
+      out.push(fail("S3_FORCE_PATH_STYLE", "Supabase Storage needs S3_FORCE_PATH_STYLE=true"));
+    }
+    if (!env.S3_REGION || env.S3_REGION === "auto" || env.S3_REGION === "us-east-1") {
+      out.push(
+        warn(
+          "S3_REGION",
+          "use the project's region from Storage → Settings → S3 Connection (e.g. eu-west-3)",
+        ),
+      );
+    }
+  }
+  if (r2) {
     if (env.S3_REGION !== "auto") out.push(warn("S3_REGION", "R2 wants S3_REGION=auto"));
     if (env.S3_FORCE_PATH_STYLE !== "false")
       out.push(warn("S3_FORCE_PATH_STYLE", "R2 wants S3_FORCE_PATH_STYLE=false"));
@@ -160,21 +179,44 @@ export function migrationFinding(expected: number, applied: number): Finding {
   );
 }
 
+export function isSupabaseStorage(endpoint: URL) {
+  return (
+    endpoint.hostname.endsWith(".supabase.co") && endpoint.pathname.startsWith("/storage/v1/s3")
+  );
+}
+
+// Supabase's free plan caps a single file at 50 MB, and the nightly backup is
+// one file — warn well before it stops fitting.
+export const SUPABASE_FREE_FILE_LIMIT = 50 * 1024 * 1024;
+
+/** The newest nightly backup's size, against the storage's per-file limit. */
+export function backupSizeFinding(newestBytes: number | null, limitBytes: number | null): Finding {
+  if (newestBytes === null) return ok("Backups", "none yet (the nightly cron writes the first)");
+  const mb = (newestBytes / 1024 / 1024).toFixed(1);
+  if (limitBytes !== null && newestBytes > limitBytes * 0.8) {
+    return warn(
+      "Backups",
+      `newest is ${mb} MB — close to the ${limitBytes / 1024 / 1024} MB per-file limit; raise it (paid plan) before backups stop fitting`,
+    );
+  }
+  return ok("Backups", `newest is ${mb} MB`);
+}
+
 /** Does a CORS preflight response let the browser PUT an upload from `origin`? */
 export function corsFinding(origin: string, status: number, headers: Headers): Finding {
   const allowOrigin = headers.get("access-control-allow-origin");
   const allowMethods = (headers.get("access-control-allow-methods") ?? "").toUpperCase();
   if (status >= 400 || !allowOrigin) {
     return fail(
-      "R2 CORS",
-      `uploads from ${origin} are blocked — add the CORS rule from DEPLOYMENT.md to the bucket`,
+      "Storage CORS",
+      `uploads from ${origin} are blocked — check the bucket's CORS settings (DEPLOYMENT.md step 2)`,
     );
   }
   if (allowOrigin !== "*" && allowOrigin !== origin) {
-    return fail("R2 CORS", `allows ${allowOrigin}, not ${origin}`);
+    return fail("Storage CORS", `allows ${allowOrigin}, not ${origin}`);
   }
   if (allowMethods && !allowMethods.includes("PUT")) {
-    return fail("R2 CORS", "PUT isn't an allowed method");
+    return fail("Storage CORS", "PUT isn't an allowed method");
   }
-  return ok("R2 CORS", `browser uploads from ${origin} allowed`);
+  return ok("Storage CORS", `browser uploads from ${origin} allowed`);
 }

@@ -1,4 +1,4 @@
-// Restore test (M7.10): download a nightly backup from the R2 bucket in .env
+// Restore test (M7.10): download a nightly backup from the storage bucket in .env
 // (backups/YYYY-MM-DD.dump.gz, written by backup-db.mjs) and pg_restore it
 // into ANOTHER database — canvas-dev — to prove the backups actually work.
 //

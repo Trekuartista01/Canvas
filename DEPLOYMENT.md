@@ -5,14 +5,15 @@ This walks through putting Canvas online for the first time, assuming you've nev
 **What runs where**
 
 - **Database:** a Supabase project `canvas-prod` (free tier, Postgres + pgvector).
-- **Files and backups:** a Cloudflare R2 bucket `canvas-prod` (free tier, 10 GB).
+- **Files and backups:** a private Supabase Storage bucket `canvas-prod` in the same project, used through its S3 protocol (free tier: 1 GB total, 50 MB per file; upgrade the Supabase plan when it fills). Cloudflare R2 also works but needs a card Cloudflare accepts, and Kosovo cards aren't.
+- **Address:** no domain needed. The VM's free [sslip.io](https://sslip.io) hostname, e.g. `canvas.141-147-12-34.sslip.io` for IP `141.147.12.34`, with a real HTTPS certificate (step 5).
 - **App server:** one Oracle Cloud _Always Free_ Ubuntu VM. On it:
   - PM2 keeps two processes running (`ecosystem.config.cjs`):
     - `canvas-api`: the API plus the built web app, from one origin, listening on `127.0.0.1:3001` only;
     - `canvas-worker`: background jobs and the scheduler (reminders, notices, Employee of the Month…).
   - Caddy terminates HTTPS on ports 80/443 and forwards to the API.
   - Redis (localhost only, with a password) holds the job queues.
-  - A nightly cron job backs the database up to R2.
+  - A nightly cron job backs the database up to the storage bucket.
 
 No Docker anywhere. For a development machine see `docs/LOCAL_SETUP.md`.
 
@@ -36,30 +37,19 @@ Free projects pause after 7 days with no activity. A live app's traffic and the 
 
 ✅ Check: you have the Session pooler URI with your password in it.
 
-## 2. Cloudflare R2: file storage
+## 2. Supabase Storage: files and backups
 
-1. [dash.cloudflare.com](https://dash.cloudflare.com) → **R2 Object Storage** → **Create bucket** → name `canvas-prod`, location _Automatic_ (or EU).
-2. Bucket → **Settings → CORS Policy → Add CORS policy**, paste (with your real domain):
-   ```json
-   [
-     {
-       "AllowedOrigins": ["https://canvas.your-domain.com"],
-       "AllowedMethods": ["GET", "PUT"],
-       "AllowedHeaders": ["content-type"],
-       "ExposeHeaders": ["ETag"],
-       "MaxAgeSeconds": 3600
-     }
-   ]
-   ```
-   Browsers upload attachments straight to R2, so without this rule every upload fails.
-3. R2 overview → **Manage R2 API Tokens** → **Create API token**:
-   - Permissions: **Object Read & Write**. Specify bucket: **`canvas-prod` only**. TTL: forever.
-   - Copy the **Access Key ID** and **Secret Access Key** (shown once) → `S3_ACCESS_KEY_ID` / `S3_SECRET_ACCESS_KEY`.
-   - Copy the **S3 endpoint** shown on the same page (`https://<account-id>.r2.cloudflarestorage.com`) → `S3_ENDPOINT` (without the `/canvas-prod` at the end).
+Same Supabase project as step 1 — no other account, no card.
 
-The app never creates buckets or changes CORS on R2; both are dashboard-only.
+1. **Storage → New bucket** → name `canvas-prod`, **Public bucket: off**. Leave the size and MIME limits empty (the app enforces its own, 20–25 MB). Canvas only ever hands out short-lived signed links, so files are never public.
+2. **Storage → Settings → S3 Connection**: make sure **Enable connection via S3 protocol** is on. Note the **Endpoint** (`https://<ref>.storage.supabase.co/storage/v1/s3`) → `S3_ENDPOINT`, and the **Region** (e.g. `eu-west-3`) → `S3_REGION`.
+3. **S3 Access Keys → New access key** (description `canvas-prod-server`) → copy the **Access key ID** and **Secret access key** (shown once) → `S3_ACCESS_KEY_ID` / `S3_SECRET_ACCESS_KEY`. These keys can reach every bucket in the project: they only ever go in the server's `.env`.
 
-✅ Check: you have the endpoint, the key pair and the CORS rule saved.
+No CORS rule is needed: Supabase Storage already answers browsers from any origin, and every upload or download URL is signed and short-lived. The app never creates buckets; it does check, at upload confirmation, that each file arrived with the type its link was signed for (Supabase doesn't enforce that itself).
+
+Limits on the free plan: **1 GB** in total and **50 MB** per file. Uploads are capped at 20–25 MB; the nightly backup is one file, and `pnpm preflight` warns when it passes 40 MB. When storage gets full, upgrade the Supabase plan.
+
+✅ Check: the bucket exists (private) and you have the endpoint, region and key pair saved.
 
 ## 3. Oracle Cloud: the server
 
@@ -161,16 +151,16 @@ Fill it in from this checklist (`.env.example` explains each line too):
 | `DATABASE_URL`                                                        | yes         | Supabase Session pooler URI with your password (step 1.2)                                                               |
 | `SUPABASE_CA_CERT`                                                    | optional    | path to the downloaded certificate, e.g. `/home/ubuntu/canvas-app/prod-ca.crt` (step 1.4)                               |
 | `REDIS_URL`                                                           | yes         | the line printed by `setup-server.sh` (`cat ~/.canvas-redis-url`)                                                       |
-| `S3_ENDPOINT`                                                         | yes         | `https://<account-id>.r2.cloudflarestorage.com` (step 2.3)                                                              |
-| `S3_REGION` / `S3_FORCE_PATH_STYLE`                                   | yes         | `auto` / `false`                                                                                                        |
+| `S3_ENDPOINT`                                                         | yes         | `https://<ref>.storage.supabase.co/storage/v1/s3` (step 2.2)                                                            |
+| `S3_REGION` / `S3_FORCE_PATH_STYLE`                                   | yes         | the project's region, e.g. `eu-west-3` (step 2.2) / `true`                                                              |
 | `S3_BUCKET`                                                           | yes         | `canvas-prod`                                                                                                           |
-| `S3_ACCESS_KEY_ID` / `S3_SECRET_ACCESS_KEY`                           | yes         | the R2 token (step 2.3)                                                                                                 |
-| `WEB_URL`                                                             | yes         | `https://canvas.your-domain.com`: no trailing slash                                                                     |
+| `S3_ACCESS_KEY_ID` / `S3_SECRET_ACCESS_KEY`                           | yes         | the Supabase Storage S3 access key (step 2.3)                                                                           |
+| `WEB_URL`                                                             | yes         | `https://canvas.<ip-with-dashes>.sslip.io` (step 5): no trailing slash                                                  |
 | `PAYROLL_ENCRYPTION_KEY`                                              | yes         | generate it on the server, step 4.4. Never invent or reuse one                                                          |
 | `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`, `SMTP_USER`, `SMTP_PASSWORD` | recommended | your mail provider's SMTP settings. Without them, reminders, invites and password emails are only logged, never sent    |
-| `EMAIL_FROM`                                                          | with SMTP   | e.g. `Canvas <no-reply@your-domain.com>` (a sender your SMTP provider allows)                                           |
+| `EMAIL_FROM`                                                          | with SMTP   | e.g. `Canvas <you@gmail.com>`: a sender your SMTP provider allows                                                       |
 | `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET`                           | optional    | Google Cloud console → APIs & Services → Credentials (OAuth client, Web). Leave empty for email + password sign-in only |
-| `GOOGLE_REDIRECT_URI`                                                 | with Google | `https://canvas.your-domain.com/auth/google/callback` (also add it in the Google console)                               |
+| `GOOGLE_REDIRECT_URI`                                                 | with Google | `<WEB_URL>/auth/google/callback` (also add it in the Google console)                                                    |
 | `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `GEMINI_API_KEY`               | optional    | AI providers. Unset = Brain/image generation use mock providers                                                         |
 | `SENTRY_DSN` / `VITE_SENTRY_DSN`                                      | optional    | Sentry project DSN (API / web). `VITE_SENTRY_DSN` must be in `.env` **before** `pnpm build`                             |
 
@@ -236,7 +226,7 @@ pm2 save
 pm2 startup                # prints a sudo command — copy-paste and run it, so PM2 starts on reboot
 ```
 
-`pnpm preflight` checks the production rules for every `.env` value, Node, the build output, the database (reachable, pgvector, migrations), that `pg_dump` is new enough for backups, Redis (with its password), R2 (writes, reads and deletes a probe object, and that the bucket's CORS rule lets the browser upload from `WEB_URL`), SMTP login and, once started, `/health`. It never prints a secret. Fix every ✗ before going on; ! lines are warnings, such as no SMTP or no AI keys.
+`pnpm preflight` checks the production rules for every `.env` value, Node, the build output, the database (reachable, pgvector, migrations), that `pg_dump` is new enough for backups, Redis (with its password), storage (writes, reads and deletes a probe object, checks that browsers may upload from `WEB_URL`, and how big the newest backup is), SMTP login and, once started, `/health`. It never prints a secret. Fix every ✗ before going on; ! lines are warnings, such as no SMTP or no AI keys.
 
 ✅ Check: `pm2 status` shows `canvas-api` and `canvas-worker` **online**, and `curl -s http://127.0.0.1:3001/health` prints `{"ok":true,"checks":{"api":"ok","database":"ok","redis":"ok","storage":"ok"}}`.
 
@@ -252,27 +242,29 @@ The account that creates the workspace is its **admin**: it runs everything exce
    ```
    It prints each change (`seed:roles: … → hr_finance`) and writes them to the HR access log. It refuses — changing nothing — if an email isn't a member, is the owner, is in two lists, or if the workspace already has an HR user (after that, roles are assigned in the app; every change to HR/CEO/Ops roles is emailed to HR).
 
-## 5. Domain and HTTPS
+## 5. Address and HTTPS
 
-1. Where your domain's DNS is managed (e.g. Cloudflare → your domain → **DNS → Records**), add:
-   - Type **A**, name **`canvas`**, IPv4 address: the VM's public IP.
-   - If the DNS is on Cloudflare: **Proxy status: DNS only** (grey cloud). Caddy needs to answer the certificate challenge itself.
-2. Wait until it resolves (usually minutes): on your PC, `nslookup canvas.your-domain.com` shows the VM's IP.
-3. On the server:
+Canvas is internal, so it doesn't need a domain. [sslip.io](https://sslip.io) is a free public DNS service: any name ending in `<ip-with-dashes>.sslip.io` already points at that IP, with nothing to register.
+
+1. Your address is `canvas.<the VM's public IP, dots replaced by dashes>.sslip.io`. For IP `141.147.12.34`: **`canvas.141-147-12-34.sslip.io`**. That's `WEB_URL` with `https://` in front.
+   - The VM's IP must not change: in Oracle, **Compute → Instance → Attached VNICs → the VNIC → IPv4 addresses**, make sure the public IP is **Reserved** (convert it if it says Ephemeral; still free).
+   - Check it resolves: on your PC, `nslookup canvas.141-147-12-34.sslip.io` shows the VM's IP.
+   - Prefer a real name later? Point any domain's A record at the VM, and change the Caddyfile and `WEB_URL` to it.
+2. On the server (with your own address in the `sed` line):
    ```bash
    sudo cp ~/canvas-app/deploy/Caddyfile /etc/caddy/Caddyfile
-   sudo sed -i "s/canvas.example.com/canvas.your-domain.com/" /etc/caddy/Caddyfile
+   sudo sed -i "s/canvas.example.com/canvas.141-147-12-34.sslip.io/" /etc/caddy/Caddyfile
    sudo mkdir -p /var/log/caddy && sudo chown caddy:caddy /var/log/caddy
    sudo caddy validate --config /etc/caddy/Caddyfile
    sudo systemctl reload caddy
    ```
    Caddy fetches a Let's Encrypt certificate on its own and renews it. WebSockets (live updates) pass through without extra config.
 
-✅ Check: `https://canvas.your-domain.com/health` in your browser shows all four checks `ok`, with a padlock.
+✅ Check: `https://canvas.<ip-with-dashes>.sslip.io/health` in your browser shows all four checks `ok`, with a padlock.
 
 ## 6. Nightly backup, and a restore test
 
-`scripts/backup-db.sh` dumps the `public` and `drizzle` schemas with `pg_dump`, gzips the dump and uploads it to the R2 bucket as `backups/YYYY-MM-DD.dump.gz` (Kosovo date). It keeps the newest 14.
+`scripts/backup-db.sh` dumps the `public` and `drizzle` schemas with `pg_dump`, gzips the dump and uploads it to the storage bucket as `backups/YYYY-MM-DD.dump.gz` (Kosovo date). It keeps the newest 14.
 
 1. Run it once by hand:
    ```bash
@@ -299,17 +291,17 @@ Restoring production itself (after a disaster), into a new empty Supabase projec
 ## 7. Verify everything
 
 1. `pnpm preflight` on the server ends with **Ready**.
-2. `https://canvas.your-domain.com/health` → `{"ok":true,…}` with `api`, `database`, `redis`, `storage` all `ok`.
+2. `<WEB_URL>/health` → `{"ok":true,…}` with `api`, `database`, `redis`, `storage` all `ok`.
 3. **Automated smoke test**, from your PC in the repo (it drives a real browser against the live site):
 
    ```powershell
-   $env:SMOKE_BASE_URL="https://canvas.your-domain.com"; pnpm --filter @canvas/e2e test:smoke
+   $env:SMOKE_BASE_URL="https://canvas.141-147-12-34.sslip.io"; pnpm --filter @canvas/e2e test:smoke
    ```
 
    It runs through:
    - health, then signing up an owner, creating a workspace and inviting someone, who joins and is made HR by the owner;
    - HR adding a staff member;
-   - the staff member submits a daily report, uploads a proof photo (straight to R2) and submits the task;
+   - the staff member submits a daily report, uploads a proof photo (straight to storage) and submits the task;
    - the owner approves the task;
    - the staff member requests a week of leave and HR approves it;
    - HR saves an encrypted payroll record and exports payroll to Excel; the staff member and the owner (admin) both get 403 on the export.
@@ -321,7 +313,7 @@ Restoring production itself (after a disaster), into a new empty Supabase projec
    delete from workspaces where name like 'Smoke test %';
    delete from users where email like 'smoke-%@example.com';
    ```
-   (A small proof photo stays in R2; harmless.)
+   (A small proof photo stays in the bucket; harmless.)
 5. By hand: sign up your real account and create the company workspace (you're its admin). Invite HR, the Operations Manager and the CEOs, then give them their roles (4.6). As HR, add the staff with Directory → Add staff and open Holidays to add this year's movable holidays. Real pay and contract data is entered by HR, not by admin.
 
 ## 8. Updating the app
@@ -338,7 +330,7 @@ pnpm preflight
 pm2 reload all
 ```
 
-`pm2 reload` restarts the two processes one at a time. Then check `https://canvas.your-domain.com/health`. If a reload fails, `pm2 logs --lines 50` shows why.
+`pm2 reload` restarts the two processes one at a time. Then check `<WEB_URL>/health`. If a reload fails, `pm2 logs --lines 50` shows why.
 
 Updating a server that ran a version from before payroll (M7.7)? Add the key first ([4.4](#44-payroll-encryption-key)), otherwise the reloaded processes refuse to start.
 
@@ -346,15 +338,16 @@ Never edit an already-applied migration (CLAUDE.md).
 
 ## Troubleshooting
 
-| Symptom                                                  | Likely cause / fix                                                                                                                       |
-| -------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
-| `pm2 status` shows `errored` / restarting                | `pm2 logs canvas-api --lines 50`. `Refusing to start in production …` names the `.env` value to fix. Then run `pnpm preflight`           |
-| Browser can't reach the site, `curl` on the server works | Port 80/443 not open: Oracle security list (3.3) **and** VM firewall (`sudo iptables -L INPUT -n`; re-run `deploy/setup-server.sh`)      |
-| Caddy: "certificate" errors                              | DNS doesn't point at the VM yet, or Cloudflare proxy (orange cloud) is on. `sudo journalctl -u caddy -n 50`                              |
-| Uploads fail in the browser                              | R2 CORS rule missing / wrong domain. `pnpm preflight` reports it as **R2 CORS**                                                          |
-| `/health` shows `database: error`                        | Supabase project paused (free tier, 7 days idle): unpause in the dashboard. Or the Transaction pooler URL (6543) is in use               |
-| Emails never arrive                                      | `SMTP_*` not set (preflight warns), or the provider rejects `EMAIL_FROM`                                                                 |
-| Backup log: `server version mismatch`                    | `pg_dump` older than Supabase's Postgres: re-run `deploy/setup-server.sh`, or set `PG_DUMP=/usr/lib/postgresql/17/bin/pg_dump` in `.env` |
+| Symptom                                                  | Likely cause / fix                                                                                                                                                                                                                                             |
+| -------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `pm2 status` shows `errored` / restarting                | `pm2 logs canvas-api --lines 50`. `Refusing to start in production …` names the `.env` value to fix. Then run `pnpm preflight`                                                                                                                                 |
+| Browser can't reach the site, `curl` on the server works | Port 80/443 not open: Oracle security list (3.3) **and** VM firewall (`sudo iptables -L INPUT -n`; re-run `deploy/setup-server.sh`)                                                                                                                            |
+| Caddy: "certificate" errors                              | Ports 80/443 closed (3.3), or the name in the Caddyfile doesn't match the VM's IP. Caddy retries with a second free CA (ZeroSSL) on its own. `sudo journalctl -u caddy -n 50`. Still failing for a shared-hostname rate limit? Use a free DuckDNS name instead |
+| Uploads fail in the browser                              | Wrong `S3_*` values or S3 protocol off in Supabase (step 2). `pnpm preflight` reports **Storage bucket** / **Storage CORS**                                                                                                                                    |
+| Uploads fail once storage is full                        | The free plan's 1 GB is used up: upgrade the Supabase plan                                                                                                                                                                                                     |
+| `/health` shows `database: error`                        | Supabase project paused (free tier, 7 days idle): unpause in the dashboard. Or the Transaction pooler URL (6543) is in use                                                                                                                                     |
+| Emails never arrive                                      | `SMTP_*` not set (preflight warns), or the provider rejects `EMAIL_FROM`                                                                                                                                                                                       |
+| Backup log: `server version mismatch`                    | `pg_dump` older than Supabase's Postgres: re-run `deploy/setup-server.sh`, or set `PG_DUMP=/usr/lib/postgresql/17/bin/pg_dump` in `.env`                                                                                                                       |
 
 ## Scaling note
 

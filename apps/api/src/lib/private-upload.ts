@@ -4,7 +4,13 @@ import { eq } from "drizzle-orm";
 import { uuidv7 } from "uuidv7";
 import { logActivity } from "./activity";
 import { sanitizeFilenameForKey } from "./filename";
-import { getPresignedUploadUrl, getPresignedUrl, headObject } from "./storage";
+import {
+  deleteObject,
+  getPresignedUploadUrl,
+  getPresignedUrl,
+  headObject,
+  uploadedTypeMatches,
+} from "./storage";
 
 /**
  * Task-less files (leave documents, contracts, company documents) use the
@@ -39,6 +45,10 @@ export async function confirmPrivateUpload(
   }
   const head = await headObject(input.key);
   if (!head) throw new TRPCError({ code: "BAD_REQUEST", message: "Upload did not complete" });
+  if (!uploadedTypeMatches(head.ContentType, input.mime)) {
+    await deleteObject(input.key);
+    throw new TRPCError({ code: "BAD_REQUEST", message: "The file arrived as a different type" });
+  }
   const [attachment] = await db
     .insert(schema.attachments)
     .values({

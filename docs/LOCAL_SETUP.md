@@ -3,7 +3,7 @@
 This guide gets Canvas running on a Windows PC from scratch. You don't need Docker. Locally, the app uses:
 
 - **Supabase**: a free hosted Postgres database (project `canvas-dev`).
-- **Cloudflare R2**: free hosted file storage (bucket `canvas-dev`).
+- **File storage**: a private Supabase Storage bucket `canvas-dev` in the same project (no card needed). Cloudflare R2 works too if you have a card Cloudflare accepts; Kosovo cards aren't.
 - **Redis**: a small queue server, running inside WSL (Linux on Windows).
 
 It takes about 30–45 minutes the first time. Do the steps in order.
@@ -80,7 +80,11 @@ You don't need to enable anything else. The app's migrations turn on the `vector
 
 > Free Supabase projects **pause after 7 days without use**. If the app suddenly can't reach the database, open the Supabase dashboard and click **Restore project**.
 
-## 4. Create the Cloudflare R2 bucket (`canvas-dev`)
+## 4. Create the file storage bucket (`canvas-dev`)
+
+**Recommended: Supabase Storage.** In the `canvas-dev` project → **Storage → New bucket** `canvas-dev` (Public: off). Then **Storage → Settings → S3 Connection**: turn on the S3 protocol, copy the **Endpoint** and **Region**, and create an access key. Fill `.env` as in `.env.example` (`S3_FORCE_PATH_STYLE=true`). No CORS rule is needed. Skip the rest of this step.
+
+**Or Cloudflare R2** (needs a card Cloudflare accepts):
 
 1. Go to <https://dash.cloudflare.com> and sign up.
 2. In the left menu, open **R2 Object Storage**. Cloudflare asks you to add a payment method to enable R2. The free tier (10 GB) is not charged, but a card has to be on file.

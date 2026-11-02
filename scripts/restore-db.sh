@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Restore test: pull a nightly backup from R2 and restore it into canvas-dev
+# Restore test: pull a nightly backup from storage and restore it into canvas-dev
 # (never production). See DEPLOYMENT.md "Nightly backup" and
 # apps/api/scripts/restore-db.mjs. Example:
 #   scripts/restore-db.sh --target "<canvas-dev Session pooler URI>" --yes

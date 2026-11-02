@@ -2793,3 +2793,40 @@ Phase 8 = `docs/hr-ops-spec.md`, added to ROADMAP.md as P8.1–P8.10 (the spec's
 - `pnpm check` green; `pnpm test`: API 380, shared 108, db 11, web 15.
 - `0064` applied to the local DB (1497 staff + 19 staff_manager → 1516 employee; 13 hr_finance; 34 operations_manager; RLS on 65/65 tables). `pnpm db:rollback` restored the exact old roles (including all 19 staff managers) and RLS off; re-migrated cleanly.
 - Full Playwright run at CI parity (`CI=1`, retries off, local containers): **77/77 passed** (+2: `hr-guards.spec.ts`). Phase-2 smoke test green.
+
+## 2026-11-02 M7.10 (deploy): Supabase Storage instead of R2, sslip.io instead of a domain
+
+During the real deploy: Cloudflare billing doesn't accept Kosovo cards, so R2 can't be activated, and Canvas is internal with no domain. Both were decided with the user.
+
+### Decisions
+
+- **File storage = Supabase Storage through its S3 protocol**: a private bucket `canvas-prod` in the same Supabase project as the database. No card needed. Free plan: 1 GB total, 50 MB per file; upgrade the plan when it fills. The code was already plain S3, so it's a configuration change (`S3_ENDPOINT=https://<ref>.storage.supabase.co/storage/v1/s3`, `S3_REGION=<project region>`, `S3_FORCE_PATH_STYLE=true`). R2 still works for anyone who can pay for it.
+- **Address = the VM's free sslip.io hostname** (`canvas.<ip-with-dashes>.sslip.io`) with Caddy's automatic HTTPS. Vercel was considered and rejected: it can't run the long-lived API, WebSockets, the BullMQ worker or LibreOffice (P8.5), and a split frontend would still need an HTTPS hostname for the VM plus cross-site cookies.
+
+### Verified against the real Supabase bucket, before changing anything
+
+- A one-off script used the app's own S3 client settings, a simulated browser origin `https://canvas.141-147-12-34.sslip.io`, and never printed keys. Passed:
+  - HeadBucket;
+  - put/get/delete;
+  - ListObjectsV2 (backup pruning);
+  - presigned PUT with a CORS preflight (`allow-origin: *`, PUT allowed) and a browser-style PUT;
+  - a presigned GET with an attachment filename (contract downloads);
+  - an unsigned URL refused (403, so the bucket is private).
+- **One gap: Supabase doesn't enforce the Content-Type a PUT URL was signed for.** Closed in the app: `uploadedTypeMatches()` (`lib/storage.ts`, 3 tests) runs in both confirm steps (`attachment.confirmUpload`, `confirmPrivateUpload`). A file that arrived as a different type is deleted and refused. The browser always PUTs the announced type, so honest uploads are unaffected. Downloads were already safe either way: an inline allowlist plus `nosniff` through the API, and signed links served from Supabase's own origin as attachments.
+- `pnpm preflight --local` with the bucket's keys: Storage bucket ✓, Storage CORS ✓, Backups ✓.
+
+### Changed
+
+- `lib/preflight.ts`: recognizes Supabase Storage. It requires path-style there, warns on an `auto`/`us-east-1` region, and labels checks "Storage bucket" / "Storage CORS" instead of R2. New `backupSizeFinding` warns when the newest `backups/` object passes 80% of Supabase's 50 MB free per-file limit (4 tests). `scripts/preflight.ts` lists the backups to check it.
+- `csp.test.ts`: the Supabase path-style endpoint gives the storage host as the only `connect-src` origin.
+- DEPLOYMENT.md:
+  - step 2 is now Supabase Storage (bucket, S3 connection, access key, no CORS needed, limits);
+  - step 5 is now "Address and HTTPS" with sslip.io and a reserved public IP;
+  - the `.env` table, verify, update and troubleshooting entries are updated to match.
+- ARCHITECTURE.md storage row, `.env.example` storage block, docs/LOCAL_SETUP.md (Supabase Storage recommended for dev), CLAUDE.md, ROADMAP M7.10 line, and the storage/backup script comments.
+- `.gitignore`: `*.env`, so secrets kept next to deploy files (`deploy/storage.env`) are never committed.
+
+### Verified
+
+- `pnpm check` green; `pnpm test`: API 388, shared 108, db 11, web 15.
+- Full Playwright run at CI parity: **77/77 passed**.

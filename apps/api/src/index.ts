@@ -69,7 +69,7 @@ const app = Fastify({
 // of breakage for exactly this kind of cross-origin file-serving route.
 await app.register(helmet, {
   crossOriginEmbedderPolicy: false,
-  // M7.10: what the built SPA really needs across origins (direct R2
+  // M7.10: what the built SPA really needs across origins (direct storage
   // uploads, Google avatars, blob previews) — see lib/csp.ts.
   contentSecurityPolicy: contentSecurityPolicy({
     ...env,
@@ -148,8 +148,8 @@ app.get("/health", async (_req, reply) => {
     checks.redis = "error";
   }
 
-  // M7.10: file storage too (R2) — cached, so a health poller doesn't turn
-  // into an R2 request every few seconds.
+  // M7.10: file storage too — cached, so a health poller doesn't turn into a
+  // storage request every few seconds.
   checks.storage = (await storageReachable()) ? "ok" : "error";
 
   const ready = Object.values(checks).every((v) => v === "ok");

@@ -16,6 +16,16 @@ describe("storageOrigins", () => {
     ]);
   });
 
+  it("is the storage host for Supabase Storage (path-style)", () => {
+    expect(
+      storageOrigins({
+        S3_ENDPOINT: "https://abcdef.storage.supabase.co/storage/v1/s3",
+        S3_BUCKET: "canvas-prod",
+        S3_FORCE_PATH_STYLE: true,
+      }),
+    ).toEqual(["https://abcdef.storage.supabase.co"]);
+  });
+
   it("is just the endpoint for path-style (local fake S3)", () => {
     expect(
       storageOrigins({
