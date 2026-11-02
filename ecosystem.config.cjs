@@ -12,7 +12,8 @@ module.exports = {
       name: "canvas-api",
       script: "apps/api/dist/index.js",
       cwd: __dirname,
-      env: { NODE_ENV: "production", DB_POOL_MAX: "5" },
+      // 127.0.0.1: only Caddy (same VM) can reach the API — see DEPLOYMENT.md.
+      env: { NODE_ENV: "production", DB_POOL_MAX: "5", API_HOST: "127.0.0.1" },
       max_memory_restart: "700M",
       time: true,
     },

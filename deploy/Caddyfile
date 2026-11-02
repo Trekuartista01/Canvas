@@ -1,0 +1,27 @@
+# Canvas production — /etc/caddy/Caddyfile (see DEPLOYMENT.md, step 5).
+# Replace canvas.example.com with your real subdomain. Caddy gets and renews
+# the HTTPS certificate on its own once the DNS A record points at this VM
+# and ports 80/443 are open.
+canvas.example.com {
+	# Compress text responses (HTML, JS, JSON). Task attachments upload
+	# straight to Cloudflare R2 from the browser; downloads stream through the API.
+	encode zstd gzip
+
+	# The API (and the built web app) listens on 127.0.0.1:3001 only.
+	# reverse_proxy passes WebSockets (/ws, live updates) through as-is and
+	# sets X-Forwarded-For/-Proto, which the API trusts from 127.0.0.1.
+	reverse_proxy 127.0.0.1:3001
+
+	# Uploads that do go through the API (avatars, image library, AI
+	# references, public form files) — the API caps them at 25 MB too.
+	request_body {
+		max_size 25MB
+	}
+
+	log {
+		output file /var/log/caddy/canvas.log {
+			roll_size 10MiB
+			roll_keep 5
+		}
+	}
+}

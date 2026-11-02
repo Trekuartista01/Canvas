@@ -12,6 +12,13 @@ const DEV_PAYROLL_KEY = Buffer.from("canvas-dev-payroll-key-not-secret")
 
 const envSchema = z.object({
   API_PORT: z.coerce.number().default(3001),
+  // M7.10: production listens on 127.0.0.1 only (ecosystem.config.cjs) —
+  // Caddy on the same VM is the only way in, so port 3001 is never public
+  // even if a firewall rule is wrong.
+  API_HOST: z.string().default("0.0.0.0"),
+  // Serve apps/web/dist from the API outside production too — for running
+  // the built app locally (the production smoke test) without NODE_ENV=production.
+  SERVE_WEB_DIST: z.coerce.boolean().default(false),
   DATABASE_URL: isProd
     ? z.string().min(1)
     : z.string().default("postgres://canvas:canvas@localhost:5432/canvas"),

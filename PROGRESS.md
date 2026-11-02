@@ -2700,3 +2700,37 @@ The brief's step 1 is to inspect the real Seri collections, write `SERI_MAPPING.
 
 1. Run the inspector, write `SERI_MAPPING.md` (each collection/field → Canvas table/column, enum translations, what's dropped), and **stop for review**.
 2. Then the importer: `--dry-run` (default) printing counts + problems, `--commit`; idempotent through a `seri_import_map` (source_collection, source_id, target_table, target_id) table; passwords not imported ("set your password" email after commit); payroll encrypted on the way in; files downloaded from Seri's storage URLs into R2.
+
+## 2026-11-02 M7.10: Production deploy — code and runbook done; the real deploy is next
+
+### Built
+
+- **DEPLOYMENT.md rewritten** to follow the brief's 8 steps exactly, for someone who has never used a server: Supabase `canvas-prod` (Session pooler, pgvector), R2 `canvas-prod` (bucket-scoped token, CORS), the Oracle Always Free ARM VM (ports 80/443 in the security list _and_ iptables), server install, `.env` checklist (where each value comes from, `PAYROLL_ENCRYPTION_KEY` via openssl), DNS + Caddy, the nightly backup cron + a restore test, verification, and "updating the app".
+- **`deploy/setup-server.sh`** (idempotent): timezone Europe/Belgrade, Node 22, pnpm via corepack, PM2, Redis from `deploy/redis-canvas.conf` (127.0.0.1 only, generated `requirepass`, `noeviction`, AOF), Caddy, `postgresql-client-17`, iptables 80/443 persisted. Works as root or through `sudo -E`.
+- **`deploy/Caddyfile`**: reverse proxy to `127.0.0.1:3001` (WebSockets pass through), zstd/gzip, 25 MB body cap, rolled log.
+- **API hardening:**
+  - `API_HOST`: PM2 starts the API on 127.0.0.1, so only Caddy can reach it.
+  - `trustProxy` now trusts only loopback, so a direct client can't spoof `X-Forwarded-For` past the per-IP auth rate limit.
+  - `/health` also checks storage (`HeadBucket`, cached for 60 s).
+  - `SERVE_WEB_DIST` serves the built SPA outside production, for running the smoke test locally.
+- **Content-Security-Policy** (`lib/csp.ts`, tests): helmet's default `default-src 'self'` blocked every direct-to-R2 upload in the built app (found by the smoke test). `connect-src` now allows the bucket's origins (path-style and virtual-hosted) and Sentry; `img-src` allows `data:`/`blob:`/Google avatars; `media-src` allows `blob:`; `upgrade-insecure-requests` is sent only over https.
+- **`pnpm preflight`** (`scripts/preflight.ts` + pure `lib/preflight.ts`, tests): checks Node ≥ 22.13, production config (no localhost/dev creds, https `WEB_URL`, Session pooler not 6543, payroll key…), DB version + pgvector + all migrations applied, `pg_dump` major ≥ server, Redis PING, R2 bucket + a CORS preflight from `WEB_URL`, SMTP login, and the running app's `/health`. Ends with **Ready** or the list of failures.
+- **Restore test**: `scripts/restore-db.sh` → `apps/api/scripts/restore-db.mjs` downloads the newest (or `--date`) `backups/*.dump.gz` from R2, `pg_restore --clean`s the `public` + `drizzle` schemas into `--target`, and prints row counts. It requires `--yes` and refuses when the target is `.env`'s `DATABASE_URL`.
+- **Production smoke test**: `apps/e2e/smoke/phase7.smoke.ts` + `playwright.smoke.config.ts` (`pnpm --filter @canvas/e2e test:smoke`, `SMOKE_BASE_URL`). It runs against a live site with no webServer and no test hooks: health → sign up → workspace → invite → add staff → daily report → proof photo to R2 → approval → leave (5 working days) → approve → encrypted payroll save → xlsx export, and checks the staff member gets 403. DEPLOYMENT.md step 7 has the SQL to delete its data afterwards (user/workspace FKs all cascade or set null).
+
+### Decisions
+
+- **Node 22 LTS, not the brief's Node 20**: the rest of the toolchain already requires it, and preflight enforces ≥ 22.13.
+- The smoke test has its own Playwright config and folder, so the regular suite (`pnpm test:e2e`, with webServer and test hooks) is unchanged.
+- `git config core.fileMode false` on this Windows checkout. Otherwise git saw the `.sh` scripts drop from 755 to 644 and would have committed that, which would break the cron on the server. The index keeps 755.
+- Known gap: `z.coerce.boolean()` reads any non-empty string (including `"false"`) as true, for every boolean in `env.ts`. DEPLOYMENT.md says never to set the dangerous ones in production. It's left as is.
+
+### Verified
+
+- `pnpm check` green; `pnpm test`: API 374 (+20 CSP/preflight), shared 103, db 7, web 15.
+- Full Playwright run at CI parity (`CI=1`, retries off, local containers): **75/75 passed**. Phase-2 smoke test green.
+
+### Next
+
+- Do the real deploy by following DEPLOYMENT.md step by step: Supabase `canvas-prod`, R2, the Oracle VM, DNS, the cron + restore test, `pnpm preflight` → Ready, and the live smoke test → `1 passed`. Then mark M7.10 ✅ in ROADMAP.md.
+- M7.9 is still waiting for the Seri data.

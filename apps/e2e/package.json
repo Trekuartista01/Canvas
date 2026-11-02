@@ -6,7 +6,8 @@
   "scripts": {
     "test:e2e": "playwright test",
     "typecheck": "tsc --noEmit",
-    "lint": "eslint tests playwright.config.ts"
+    "lint": "eslint tests smoke playwright.config.ts playwright.smoke.config.ts",
+    "test:smoke": "playwright test -c playwright.smoke.config.ts"
   },
   "dependencies": {
     "@canvas/db": "workspace:*",

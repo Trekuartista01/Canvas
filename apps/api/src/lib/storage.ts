@@ -163,3 +163,13 @@ export async function getPresignedUrl(
 export async function deleteObject(key: string) {
   await s3.send(new DeleteObjectCommand({ Bucket: env.S3_BUCKET, Key: key }));
 }
+
+/** M7.10 health check: can we reach the bucket with these credentials? */
+export async function bucketReachable(): Promise<boolean> {
+  try {
+    await s3.send(new HeadBucketCommand({ Bucket: env.S3_BUCKET }));
+    return true;
+  } catch {
+    return false;
+  }
+}

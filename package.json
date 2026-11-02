@@ -20,7 +20,8 @@
     "db:generate": "pnpm --filter @canvas/db db:generate",
     "db:migrate": "pnpm --filter @canvas/db db:migrate",
     "start": "pnpm --filter @canvas/api start",
-    "start:worker": "pnpm --filter @canvas/api worker:start"
+    "start:worker": "pnpm --filter @canvas/api worker:start",
+    "preflight": "pnpm --filter @canvas/api preflight --"
   },
   "devDependencies": {
     "@eslint/js": "^9.17.0",

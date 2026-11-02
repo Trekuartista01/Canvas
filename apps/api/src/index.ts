@@ -13,7 +13,8 @@ import { sql } from "drizzle-orm";
 import { db } from "@canvas/db";
 import { env } from "./env";
 import { initSentry, Sentry } from "./lib/sentry";
-import { ensureBucketExists } from "./lib/storage";
+import { contentSecurityPolicy } from "./lib/csp";
+import { bucketReachable, ensureBucketExists } from "./lib/storage";
 import { redisConnection } from "./queues/connection";
 import { registerAiReferenceRoutes } from "./routes/ai-references";
 import { registerAttachmentRoutes } from "./routes/attachments";
@@ -49,7 +50,10 @@ const app = Fastify({
   logger: true,
   // Required behind a TLS terminator so req.protocol / hostname (and
   // req.ip, for rate limiting) reflect the client rather than the internal hop.
-  trustProxy: true,
+  // Only the loopback hop is trusted (Caddy on the same VM in production;
+  // Vite's proxy in dev): a client talking to the API directly can't spoof
+  // X-Forwarded-For to dodge the per-IP auth rate limit.
+  trustProxy: ["127.0.0.1", "::1"],
   routerOptions: { maxParamLength: 5000 },
 });
 
@@ -63,7 +67,15 @@ const app = Fastify({
 // never embedded as a cross-origin subresource of another origin's COEP'd
 // page, and leaving it on has no benefit here while being a common source
 // of breakage for exactly this kind of cross-origin file-serving route.
-await app.register(helmet, { crossOriginEmbedderPolicy: false });
+await app.register(helmet, {
+  crossOriginEmbedderPolicy: false,
+  // M7.10: what the built SPA really needs across origins (direct R2
+  // uploads, Google avatars, blob previews) — see lib/csp.ts.
+  contentSecurityPolicy: contentSecurityPolicy({
+    ...env,
+    VITE_SENTRY_DSN: process.env.VITE_SENTRY_DSN,
+  }),
+});
 await app.register(cors, { origin: env.WEB_URL, credentials: true });
 await app.register(cookie);
 await app.register(multipart, { limits: { fileSize: MAX_UPLOAD_BYTES } });
@@ -95,7 +107,7 @@ registerDocRealtimeRoutes(app);
 // apps/web/dist as a sibling of this file's own build output
 // (apps/api/dist/index.js -> ../../web/dist). Dev keeps using Vite's own
 // dev server instead — apps/web/dist won't exist there, so this is a no-op.
-if (process.env.NODE_ENV === "production") {
+if (process.env.NODE_ENV === "production" || env.SERVE_WEB_DIST) {
   const webDist = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../web/dist");
   await app.register(staticFiles, { root: webDist });
   // @fastify/static's own not-found fallback (wildcard: true, the default)
@@ -111,6 +123,13 @@ if (process.env.NODE_ENV === "production") {
 
 // Captures unhandled route errors when SENTRY_DSN is set (no-op otherwise).
 Sentry.setupFastifyErrorHandler(app);
+
+let storageCheck: { at: number; ok: boolean } | null = null;
+async function storageReachable() {
+  if (storageCheck && Date.now() - storageCheck.at < 60_000) return storageCheck.ok;
+  storageCheck = { at: Date.now(), ok: await bucketReachable() };
+  return storageCheck.ok;
+}
 
 app.get("/health", async (_req, reply) => {
   const checks: Record<string, "ok" | "error"> = { api: "ok" };
@@ -129,6 +148,10 @@ app.get("/health", async (_req, reply) => {
     checks.redis = "error";
   }
 
+  // M7.10: file storage too (R2) — cached, so a health poller doesn't turn
+  // into an R2 request every few seconds.
+  checks.storage = (await storageReachable()) ? "ok" : "error";
+
   const ready = Object.values(checks).every((v) => v === "ok");
   return reply.code(ready ? 200 : 503).send({ ok: ready, checks });
 });
@@ -136,8 +159,8 @@ app.get("/health", async (_req, reply) => {
 await ensureBucketExists();
 
 app
-  .listen({ port: env.API_PORT, host: "0.0.0.0" })
-  .then(() => app.log.info(`api listening on :${env.API_PORT}`))
+  .listen({ port: env.API_PORT, host: env.API_HOST })
+  .then(() => app.log.info(`api listening on ${env.API_HOST}:${env.API_PORT}`))
   .catch((err) => {
     app.log.error(err);
     process.exit(1);

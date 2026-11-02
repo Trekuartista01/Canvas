@@ -8,5 +8,5 @@
     // config's ES2022-only lib doesn't include those.
     "lib": ["ES2022", "DOM"]
   },
-  "include": ["tests", "playwright.config.ts"]
+  "include": ["tests", "smoke", "playwright.config.ts", "playwright.smoke.config.ts"]
 }
