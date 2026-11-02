@@ -1,6 +1,13 @@
 import { fileURLToPath } from "node:url";
 import { expect, test, type Page } from "@playwright/test";
-import { createWorkspaceAndOpen, logIn, signUp, uniqueEmail } from "./helpers";
+import {
+  createWorkspaceAndOpen,
+  logIn,
+  openAsHr,
+  signUp,
+  uniqueEmail,
+  workspaceIdFrom,
+} from "./helpers";
 
 const DOC_FIXTURE = fileURLToPath(new URL("../fixtures/test-doc.txt", import.meta.url));
 const IMAGE_FIXTURE = fileURLToPath(new URL("../fixtures/test-image.png", import.meta.url));
@@ -14,7 +21,6 @@ async function addStaff(page: Page, name: string) {
   await form.getByLabel("Full name").fill(name);
   await form.getByLabel("Email").fill(email);
   await form.getByLabel("Initial password").fill(PASSWORD);
-  await form.getByLabel("Role").selectOption("staff");
   const created = page.waitForResponse((res) => res.url().includes("people.createStaff"));
   await page.getByTestId("add-staff-submit").click();
   expect((await created).ok()).toBe(true);
@@ -48,13 +54,15 @@ async function fileContract(
 }
 
 test("M7.6 documents: HR files contracts, each employee sees only their own; company library with versions", async ({
-  page,
+  page: ownerPage,
   browser,
 }) => {
   test.setTimeout(150_000);
 
-  await signUp(page, "Hana HR");
-  await createWorkspaceAndOpen(page, "Documents Workspace");
+  await signUp(ownerPage, "Olsi Owner");
+  await createWorkspaceAndOpen(ownerPage, "Documents Workspace");
+  // P8.1: contracts are HR's (the owner is admin, never HR).
+  const { hrPage: page } = await openAsHr(browser, workspaceIdFrom(ownerPage));
   const samEmail = await addStaff(page, "Sam Staff");
   await addStaff(page, "Tina Other");
 
@@ -138,6 +146,11 @@ test("M7.6 documents: HR files contracts, each employee sees only their own; com
   const docDownload = staff.waitForEvent("download");
   await staffDoc.getByRole("button", { name: "Download" }).click();
   expect((await docDownload).suggestedFilename()).toBe("test-image.png");
+
+  // The owner (admin) has no Contracts page (no admin bypass, P8.1).
+  await ownerPage.reload();
+  await expect(ownerPage.getByRole("link", { name: "Directory" })).toBeVisible();
+  await expect(ownerPage.getByRole("link", { name: "Contracts", exact: true })).toHaveCount(0);
 
   await staffContext.close();
 });

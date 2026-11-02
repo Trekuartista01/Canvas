@@ -49,7 +49,7 @@ export const createStaffSchema = employeeProfileFieldsSchema.extend({
   name: z.string().trim().min(1).max(100),
   email: emailSchema,
   password: passwordSchema,
-  peopleRole: peopleRoleEnum.default("staff"),
+  peopleRole: peopleRoleEnum.default("employee"),
   managerUserId: userId.nullable().optional(),
 });
 

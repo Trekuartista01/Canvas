@@ -19,10 +19,9 @@ export async function getAssigneeIds(taskId: string) {
 }
 
 /**
- * May `user` approve, reject or transfer this task? tasks:manageTeam,
- * resolved per task: an assignee's direct manager passes the staff-manager
- * team check, and the task's creator passes outright — unless they're
- * also an assignee, so nobody approves their own work.
+ * May `user` approve, reject or transfer this task? tasks:manageTeam, plus
+ * the task's creator passes outright — unless they're also an assignee, so
+ * nobody approves their own work.
  */
 export async function isTaskApprover(
   user: SessionUser,
@@ -32,26 +31,11 @@ export async function isTaskApprover(
 ) {
   const people = await getPeopleContext(workspaceId, user.id);
   if (!people) return false;
-  const reportsToMe =
-    assigneeIds.length > 0
-      ? await db
-          .select({ userId: schema.memberships.userId })
-          .from(schema.memberships)
-          .where(
-            and(
-              eq(schema.memberships.workspaceId, workspaceId),
-              eq(schema.memberships.managerUserId, user.id),
-              inArray(schema.memberships.userId, assigneeIds),
-            ),
-          )
-          .limit(1)
-      : [];
   return can(user, "tasks:manageTeam", {
     type: "people",
     peopleRole: people.peopleRole,
     target: {
       isSelf: false,
-      isDirectReport: reportsToMe.length > 0,
       isCreator: task.createdBy === user.id && !assigneeIds.includes(user.id),
     },
   });

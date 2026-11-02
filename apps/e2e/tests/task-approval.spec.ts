@@ -1,6 +1,14 @@
 import { fileURLToPath } from "node:url";
 import { expect, test } from "@playwright/test";
-import { createSpaceAndList, createWorkspaceAndOpen, logIn, signUp, uniqueEmail } from "./helpers";
+import {
+  createSpaceAndList,
+  createWorkspaceAndOpen,
+  logIn,
+  openAsHr,
+  signUp,
+  uniqueEmail,
+  workspaceIdFrom,
+} from "./helpers";
 
 const IMAGE_FIXTURE = fileURLToPath(new URL("../fixtures/test-image.png", import.meta.url));
 const PASSWORD = "initial-pass-123";
@@ -11,20 +19,22 @@ test("M7.2 approval: manager assigns with proof required → staff submits with 
 }) => {
   test.setTimeout(120_000);
 
-  // The owner (super admin) adds a staff member and creates a list.
+  // HR adds a staff member; the owner (admin) creates a list and manages the task.
   await signUp(page, "Mira Manager");
   await createWorkspaceAndOpen(page, "Approval Workspace");
-  await page.getByRole("link", { name: "Directory" }).click();
+  const { hrPage } = await openAsHr(browser, workspaceIdFrom(page));
+  await hrPage.getByRole("link", { name: "Directory" }).click();
   const staffEmail = uniqueEmail("staff");
-  await page.getByTestId("people-add-staff").click();
-  const form = page.getByTestId("add-staff-form");
+  await hrPage.getByTestId("people-add-staff").click();
+  const form = hrPage.getByTestId("add-staff-form");
   await form.getByLabel("Full name").fill("Sam Staff");
   await form.getByLabel("Email").fill(staffEmail);
   await form.getByLabel("Initial password").fill(PASSWORD);
-  await form.getByLabel("Role").selectOption("staff");
-  const created = page.waitForResponse((res) => res.url().includes("people.createStaff"));
-  await page.getByTestId("add-staff-submit").click();
+  const created = hrPage.waitForResponse((res) => res.url().includes("people.createStaff"));
+  await hrPage.getByTestId("add-staff-submit").click();
   expect((await created).ok()).toBe(true);
+  await hrPage.context().close();
+  await page.reload();
 
   await createSpaceAndList(page, "Operations", "Store visits");
 

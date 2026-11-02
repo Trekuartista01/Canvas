@@ -9,8 +9,8 @@ import { notifyUsers } from "./notify";
 import { loadHolidayChecker } from "./working-days";
 
 /**
- * M7.3: from 16:45 Kosovo time on working days, reminds every active staff
- * member who hasn't submitted today's daily report — in-app and by email.
+ * M7.3: from 16:45 Kosovo time on working days, reminds every active
+ * employee who hasn't submitted today's daily report — in-app and by email.
  * Runs on every scheduler tick; the daily_report_reminders row is claimed
  * before anything is sent, so each person is reminded at most once a day
  * however many ticks (or workers) see them.
@@ -64,8 +64,8 @@ export async function sendDailyReportReminders(now = new Date()) {
     .where(
       and(
         activeMembershipCondition,
-        // The owner is always super admin, whatever is stored (effectivePeopleRole).
-        eq(schema.memberships.peopleRole, "staff"),
+        // The owner is always admin, whatever is stored (effectivePeopleRole).
+        eq(schema.memberships.peopleRole, "employee"),
         ne(schema.memberships.role, "owner"),
         isNull(schema.dailyReports.id),
         isNull(schema.dailyReportReminders.id),

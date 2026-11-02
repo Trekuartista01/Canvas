@@ -3,6 +3,7 @@ import { eq } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
 import { getSessionUser } from "../auth/session";
 import { logActivity } from "../lib/activity";
+import { writeAudit } from "../lib/audit";
 import { loadPayrollRows } from "../lib/payroll";
 import { buildPayrollPdf, buildPayrollXlsx } from "../lib/payroll-export";
 import { canPeopleAction } from "../lib/permissions";
@@ -11,7 +12,7 @@ const XLSX_TYPE = "application/vnd.openxmlformats-officedocument.spreadsheetml.s
 
 // M7.7: the whole payroll table, decrypted, as Excel or PDF. A REST route
 // for real download headers (like export.ts). payroll:view only; every
-// export is an audit row.
+// export is an audit row (activity + audit_log). HR only — never admin (P8.1).
 export function registerPayrollExportRoutes(app: FastifyInstance) {
   app.get<{ Params: { workspaceId: string; format: string } }>(
     "/payroll-export/:workspaceId/payroll.:format",
@@ -32,6 +33,14 @@ export function registerPayrollExportRoutes(app: FastifyInstance) {
       await logActivity(workspaceId, user.id, "payroll", workspaceId, "payroll.exported", {
         format,
         rows: rows.length,
+      });
+      await writeAudit({
+        workspaceId,
+        actorId: user.id,
+        action: "payroll.exported",
+        entity: "payroll",
+        ip: req.ip,
+        payload: { format, rows: rows.length },
       });
 
       const now = new Date();

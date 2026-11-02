@@ -15,18 +15,18 @@ import { users } from "./auth";
 
 export const membershipRole = pgEnum("membership_role", ["owner", "admin", "member", "guest"]);
 
-// M7.1 People (HR) role — orthogonal to `membership_role`, which keeps
-// governing workspace/content permissions (rank + custom roles). This one
-// governs the HR side: directory, staff management, leave, payroll, team
-// reporting. Hand-synced with PEOPLE_ROLES in packages/shared. The
-// workspace owner is always treated as super_admin regardless of the value
-// stored here (see effectivePeopleRole).
+// People role — orthogonal to `membership_role`, which keeps governing
+// workspace/content permissions (rank + custom roles). This one governs HR
+// data, clients, board management and role assignment (P8.1,
+// docs/hr-ops-spec.md). Hand-synced with PEOPLE_ROLES in packages/shared.
+// The workspace owner is always treated as admin regardless of the value
+// stored here (see effectivePeopleRole) — never as HR.
 export const peopleRole = pgEnum("people_role", [
-  "super_admin",
-  "hr",
-  "operation_manager",
-  "staff_manager",
-  "staff",
+  "admin",
+  "ceo",
+  "hr_finance",
+  "operations_manager",
+  "employee",
 ]);
 
 export const workspaces = pgTable("workspaces", {
@@ -102,10 +102,10 @@ export const memberships = pgTable(
     // (still the floor, and still what owner-protection/invites read).
     customRoleId: uuid("custom_role_id").references(() => customRoles.id, { onDelete: "set null" }),
     // M7.1: replaces the old is_operations_manager flag — people_role
-    // 'operation_manager' is who task.ts's notifyOperationsManagers reaches.
-    peopleRole: peopleRole("people_role").notNull().default("staff"),
-    // "Reports to" — the direct manager. Staff managers act only on members
-    // whose managerUserId is themselves (can()'s team-scoped people actions).
+    // 'operations_manager' is who task.ts's notifyOperationsManagers reaches.
+    peopleRole: peopleRole("people_role").notNull().default("employee"),
+    // "Reports to" — the direct manager, shown on the profile. Since P8.1 it
+    // grants no permissions (the staff_manager role is gone).
     managerUserId: uuid("manager_user_id").references(() => users.id, { onDelete: "set null" }),
   },
   (table) => [

@@ -1,7 +1,14 @@
 import { db, schema } from "@canvas/db";
 import { expect, test, type Page } from "@playwright/test";
 import { and, eq } from "drizzle-orm";
-import { createSpaceAndList, createWorkspaceAndOpen, logIn, signUp, uniqueEmail } from "./helpers";
+import {
+  createSpaceAndList,
+  createWorkspaceAndOpen,
+  logIn,
+  openAsHr,
+  signUp,
+  uniqueEmail,
+} from "./helpers";
 
 const PASSWORD = "initial-pass-123";
 
@@ -13,7 +20,6 @@ async function addStaff(page: Page, name: string) {
   await form.getByLabel("Full name").fill(name);
   await form.getByLabel("Email").fill(email);
   await form.getByLabel("Initial password").fill(PASSWORD);
-  await form.getByLabel("Role").selectOption("staff");
   const created = page.waitForResponse((res) => res.url().includes("people.createStaff"));
   await page.getByTestId("add-staff-submit").click();
   expect((await created).ok()).toBe(true);
@@ -32,8 +38,11 @@ test("M7.8: Employee of the Month from last month's tasks (test hook), banner + 
   await signUp(page, "Mira Manager");
   await createWorkspaceAndOpen(page, "Performance Workspace");
   const workspaceId = page.url().match(/\/w\/([^/]+)/)![1]!;
-  const samEmail = await addStaff(page, "Sam Staff");
-  await addStaff(page, "Tina Other");
+  // P8.1: HR adds people; the owner (admin) follows performance.
+  const { hrPage } = await openAsHr(browser, workspaceId);
+  const samEmail = await addStaff(hrPage, "Sam Staff");
+  await addStaff(hrPage, "Tina Other");
+  await hrPage.context().close();
   await createSpaceAndList(page, "Ops", "Field work");
 
   // Seed tasks straight into the DB: last month's history can't be made

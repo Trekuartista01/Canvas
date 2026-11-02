@@ -3,6 +3,8 @@ import {
   createStaffSchema,
   effectivePeopleRole,
   PEOPLE_ACTIONS,
+  PEOPLE_ROLE_LABELS,
+  PRIVILEGED_PEOPLE_ROLES,
   peopleDirectorySchema,
   peopleMemberSchema,
   setEmployeeStatusSchema,
@@ -20,15 +22,19 @@ import { alias } from "drizzle-orm/pg-core";
 import { can } from "../../auth/can";
 import type { SessionUser } from "../../auth/session";
 import { hashPassword } from "../../auth/password";
+import { emailUsers } from "../../email/send-email";
 import { logActivity } from "../../lib/activity";
+import { writeAudit } from "../../lib/audit";
 import {
   activeMembershipCondition,
   findMembership,
   getMembershipContext,
   getMembershipRole,
   getPeopleContext,
+  listHrUserIds,
 } from "../../lib/membership";
-import { assertCanPeople } from "../../lib/permissions";
+import { notifyUsers } from "../../lib/notify";
+import { assertCanPeople, requireActiveMember } from "../../lib/permissions";
 import { getCustomRoleDeltas } from "../../lib/space-overrides";
 import { protectedProcedure, router } from "../trpc";
 
@@ -123,8 +129,13 @@ export const peopleRouter = router({
     return { role, peopleRole: people.peopleRole, actions };
   }),
 
+  // Name, photo, position, department, email — nothing confidential.
+  // Deactivated people only for HR.
   directory: protectedProcedure.input(peopleDirectorySchema).query(async ({ ctx, input }) => {
     await assertCanPeople(ctx.user, input.workspaceId, "people:viewDirectory");
+    if (input.includeInactive) {
+      await assertCanPeople(ctx.user, input.workspaceId, "people:manageStaff");
+    }
     const manager = alias(schema.users, "manager");
 
     const rows = await db
@@ -163,11 +174,20 @@ export const peopleRouter = router({
     }));
   }),
 
+  // Directory roles see the public part of anyone's profile; the
+  // confidential part (personal details, employment start) only HR and the
+  // person themselves — stripped here, never just hidden in the UI.
   profile: protectedProcedure.input(peopleMemberSchema).query(async ({ ctx, input }) => {
-    await assertCanPeople(ctx.user, input.workspaceId, "people:viewProfile", {
-      targetUserId: input.userId,
-    });
+    const isSelf = input.userId === ctx.user.id;
+    if (isSelf) await requireActiveMember(ctx.user, input.workspaceId);
+    else await assertCanPeople(ctx.user, input.workspaceId, "people:viewDirectory");
     const membership = await requireTargetMembership(input.workspaceId, input.userId);
+    const confidential = await canPeople(
+      ctx.user,
+      input.workspaceId,
+      "people:viewProfile",
+      input.userId,
+    );
     const [user, profile, manager] = await Promise.all([
       db.query.users.findFirst({ where: eq(schema.users.id, input.userId) }),
       db.query.employeeProfiles.findFirst({
@@ -180,8 +200,16 @@ export const peopleRouter = router({
     if (!user) throw new TRPCError({ code: "NOT_FOUND" });
 
     const canManage = await canPeople(ctx.user, input.workspaceId, "people:manageStaff");
-    // Contact/personal details only for HR-side roles and the person themselves.
-    const showPersonal = canManage || input.userId === ctx.user.id;
+    if (confidential && !isSelf) {
+      await writeAudit({
+        workspaceId: input.workspaceId,
+        actorId: ctx.user.id,
+        action: "person.profile_viewed",
+        entity: "person",
+        entityId: input.userId,
+        ip: ctx.ip,
+      });
+    }
 
     return {
       userId: user.id,
@@ -197,8 +225,8 @@ export const peopleRouter = router({
       deactivatedAt: profile?.deactivatedAt ?? null,
       jobTitle: profile?.jobTitle ?? null,
       department: profile?.department ?? null,
-      employmentStartDate: profile?.employmentStartDate ?? null,
-      personal: showPersonal
+      employmentStartDate: confidential ? (profile?.employmentStartDate ?? null) : null,
+      personal: confidential
         ? {
             phone: profile?.phone ?? null,
             address: profile?.address ?? null,
@@ -208,18 +236,19 @@ export const peopleRouter = router({
           }
         : null,
       canManage,
-      canAssignSuperAdmin: await canPeople(ctx.user, input.workspaceId, "people:assignSuperAdmin"),
+      canAssignRoles: await canPeople(ctx.user, input.workspaceId, "roles:assign"),
     };
   }),
 
   // HR creates the account directly; the new member signs in with the
   // initial password. An email that already has an account is refused —
   // attaching someone's existing account without their consent is exactly
-  // what the invite flow (accepted by the account holder) is for.
+  // what the invite flow (accepted by the account holder) is for. Anything
+  // but "employee" is a role assignment, which is admin's alone.
   createStaff: protectedProcedure.input(createStaffSchema).mutation(async ({ ctx, input }) => {
     await assertCanPeople(ctx.user, input.workspaceId, "people:manageStaff");
-    if (input.peopleRole === "super_admin") {
-      await assertCanPeople(ctx.user, input.workspaceId, "people:assignSuperAdmin");
+    if (input.peopleRole !== "employee") {
+      await assertCanPeople(ctx.user, input.workspaceId, "roles:assign");
     }
     const existing = await db.query.users.findFirst({ where: eq(schema.users.email, input.email) });
     if (existing) {
@@ -260,6 +289,14 @@ export const peopleRouter = router({
       name: user.name,
       peopleRole: input.peopleRole,
     });
+    await writeAudit({
+      workspaceId: input.workspaceId,
+      actorId: ctx.user.id,
+      action: "person.created",
+      entity: "person",
+      entityId: user.id,
+      ip: ctx.ip,
+    });
     return { userId: user.id };
   }),
 
@@ -280,39 +317,75 @@ export const peopleRouter = router({
         "person.profile_updated",
         { fields: Object.keys(values) },
       );
+      await writeAudit({
+        workspaceId: input.workspaceId,
+        actorId: ctx.user.id,
+        action: "person.profile_updated",
+        entity: "person",
+        entityId: input.userId,
+        ip: ctx.ip,
+        payload: { fields: Object.keys(values) },
+      });
       return { userId: input.userId };
     }),
 
+  // Admin only (roles:assign). Admin can never make themselves HR, and every
+  // change to who holds hr_finance, ceo or operations_manager is audited and
+  // announced to every HR user, in-app and by email (spec §1).
   setRole: protectedProcedure.input(setPeopleRoleSchema).mutation(async ({ ctx, input }) => {
-    await assertCanPeople(ctx.user, input.workspaceId, "people:manageStaff", {
+    await assertCanPeople(ctx.user, input.workspaceId, "roles:assign", {
       targetUserId: input.userId,
     });
     const membership = await requireTargetMembership(input.workspaceId, input.userId);
     if (membership.role === "owner") {
       throw new TRPCError({
         code: "BAD_REQUEST",
-        message: "The workspace owner is always a super admin",
+        message: "The workspace owner is always an admin",
       });
     }
-    if (input.peopleRole === "super_admin" || membership.peopleRole === "super_admin") {
-      await assertCanPeople(ctx.user, input.workspaceId, "people:assignSuperAdmin");
+    if (input.peopleRole === "hr_finance" && input.userId === ctx.user.id) {
+      throw new TRPCError({
+        code: "FORBIDDEN",
+        message: "You can't give yourself the HR/Finance Manager role",
+      });
     }
+    const from = membership.peopleRole;
+    if (from === input.peopleRole) return { userId: input.userId, peopleRole: input.peopleRole };
 
+    // Told before and after the change, so an HR user who loses the role hears too.
+    const hrBefore = await listHrUserIds(input.workspaceId);
     await db
       .update(schema.memberships)
       .set({ peopleRole: input.peopleRole })
       .where(eq(schema.memberships.id, membership.id));
-    await logActivity(
+    const target = await db.query.users.findFirst({ where: eq(schema.users.id, input.userId) });
+    const activity = await logActivity(
       input.workspaceId,
       ctx.user.id,
       "person",
       input.userId,
       "person.role_changed",
-      {
-        from: membership.peopleRole,
-        to: input.peopleRole,
-      },
+      { from, to: input.peopleRole, name: target?.name ?? "" },
     );
+
+    if (
+      PRIVILEGED_PEOPLE_ROLES.includes(from) ||
+      PRIVILEGED_PEOPLE_ROLES.includes(input.peopleRole)
+    ) {
+      await writeAudit({
+        workspaceId: input.workspaceId,
+        actorId: ctx.user.id,
+        action: "person.role_changed",
+        entity: "person",
+        entityId: input.userId,
+        ip: ctx.ip,
+        payload: { from, to: input.peopleRole },
+      });
+      const hrIds = [...new Set([...hrBefore, ...(await listHrUserIds(input.workspaceId))])];
+      await notifyUsers(activity.id, hrIds);
+      const line = `${ctx.user.name} changed roles: ${target?.name ?? "someone"} is now ${PEOPLE_ROLE_LABELS[input.peopleRole]}.`;
+      void emailUsers(hrIds, "Canvas: a role was changed", line);
+    }
     return { userId: input.userId, peopleRole: input.peopleRole };
   }),
 
@@ -357,9 +430,6 @@ export const peopleRouter = router({
     if (input.userId === ctx.user.id) {
       throw new TRPCError({ code: "BAD_REQUEST", message: "You can't deactivate yourself" });
     }
-    if (membership.peopleRole === "super_admin") {
-      await assertCanPeople(ctx.user, input.workspaceId, "people:assignSuperAdmin");
-    }
 
     const inactive = input.status === "inactive";
     await upsertProfile(membership.id, {
@@ -373,6 +443,14 @@ export const peopleRouter = router({
       input.userId,
       inactive ? "person.deactivated" : "person.reactivated",
     );
+    await writeAudit({
+      workspaceId: input.workspaceId,
+      actorId: ctx.user.id,
+      action: inactive ? "person.deactivated" : "person.reactivated",
+      entity: "person",
+      entityId: input.userId,
+      ip: ctx.ip,
+    });
     return { userId: input.userId, status: input.status };
   }),
 });

@@ -61,7 +61,7 @@ Rule: **do not start a phase until the previous phase's acceptance criteria pass
 ## Sizing reality check
 Phases 0–2 ≈ 6–8 weeks part-time — that's your usable product. Phases 3–5 ≈ 3–4 months more. Phase 6 as needed. "All ClickUp features" at enterprise polish is a multi-year surface — the phase gates keep you shipping something real the whole way.
 
-## Phase 7 — People (HR) + slim-down (current phase)
+## Phase 7 — People (HR) + slim-down
 Replaces the separate Seri HR app. Full prompts per milestone: `PHASE7_PROMPTS.md`. Timezone Europe/Belgrade; Kosovo holidays.
 - M7.0a Remove SSO/SCIM, public API/keys/webhooks, importers, GitHub PR links, desktop app, Goals, Chat. ✅ Done — these Phase 4–6 items are removed.
 - M7.0b Drop Docker: Supabase Postgres + Cloudflare R2 + local Redis; PM2 + Caddy on an Oracle Always Free VM; nightly DB backup to R2. ✅ Done.
@@ -76,3 +76,17 @@ Replaces the separate Seri HR app. Full prompts per milestone: `PHASE7_PROMPTS.m
 - M7.9 Seri import (mongodump → Canvas, dry-run first).
 - M7.10 Production deploy (Oracle Always Free + Supabase + R2, €0).
 - ✅ Accept: staff submits daily report and a proof-backed task, manager approves; leave request deducts working days correctly around a Kosovo holiday; payroll export works for HR only; app runs in prod without Docker.
+
+## Phase 8 — HR/Finance + Operations Manager (current phase)
+Spec: `docs/hr-ops-spec.md` (build order = its 10 phases). Added 2026-11-02, built alongside the open M7.9/M7.10. Decisions where the spec and the codebase differed are in PROGRESS.md.
+- P8.1 Roles (admin, ceo, hr_finance, operations_manager, employee), one permission map, no admin bypass for HR data, audit_log, RLS deny-all, `pnpm seed:roles`, reversible migrations (`pnpm db:rollback`).
+- P8.2 Kosovo working-day calculator + official holidays (seed 2026/2027, weekend substitution setting).
+- P8.3 People confidential fields, archiving, leave allowances.
+- P8.4 Leave request → HR notifications (in-app + email) → Leave Approvals → approve/reject.
+- P8.5 Vendim generation (DOCX + PDF via LibreOffice), private storage, download/regenerate.
+- P8.6 Contracts page (drag-and-drop, private files) + daily contract-ending alert.
+- P8.7 Payroll guard + My Pay Details confirmation modal.
+- P8.8 Smart Search scoping (HR / Ops scopes, filtered before ranking).
+- P8.9 Tasks → Trello-style Boards (Board = Space, columns = Lists).
+- P8.10 Clients page + auto-detect.
+- ✅ Accept: the spec's acceptance checklist.

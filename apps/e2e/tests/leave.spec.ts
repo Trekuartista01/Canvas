@@ -1,5 +1,12 @@
 import { expect, test, type Page } from "@playwright/test";
-import { createWorkspaceAndOpen, logIn, signUp, uniqueEmail } from "./helpers";
+import {
+  createWorkspaceAndOpen,
+  logIn,
+  openAsHr,
+  signUp,
+  uniqueEmail,
+  workspaceIdFrom,
+} from "./helpers";
 
 const PASSWORD = "initial-pass-123";
 
@@ -19,14 +26,16 @@ async function goToYear(page: Page, target: number) {
 const stat = (page: Page, label: string) =>
   page.getByTestId("leave-balance").locator("div", { hasText: label }).locator("p").nth(1);
 
-test("M7.5 leave: staff requests vacation → manager approves → balance decreases, PDF downloads", async ({
-  page,
+test("M7.5 leave: staff requests vacation → HR approves → balance decreases, PDF downloads", async ({
+  page: ownerPage,
   browser,
 }) => {
   test.setTimeout(120_000);
 
-  await signUp(page, "Mira Manager");
-  await createWorkspaceAndOpen(page, "Leave Workspace");
+  await signUp(ownerPage, "Olsi Owner");
+  await createWorkspaceAndOpen(ownerPage, "Leave Workspace");
+  // P8.1: only HR approves leave (never the owner/admin).
+  const { hrPage: page } = await openAsHr(browser, workspaceIdFrom(ownerPage));
   await page.getByRole("link", { name: "Directory" }).click();
   const staffEmail = uniqueEmail("staff");
   await page.getByTestId("people-add-staff").click();
@@ -34,7 +43,6 @@ test("M7.5 leave: staff requests vacation → manager approves → balance decre
   await form.getByLabel("Full name").fill("Sam Staff");
   await form.getByLabel("Email").fill(staffEmail);
   await form.getByLabel("Initial password").fill(PASSWORD);
-  await form.getByLabel("Role").selectOption("staff");
   const created = page.waitForResponse((res) => res.url().includes("people.createStaff"));
   await page.getByTestId("add-staff-submit").click();
   expect((await created).ok()).toBe(true);
@@ -75,7 +83,10 @@ test("M7.5 leave: staff requests vacation → manager approves → balance decre
   await leaveForm.getByLabel("Last day").fill("2027-03-08");
   await expect(leaveForm.getByRole("alert")).toContainText("Overlaps vacation");
 
-  // The manager approves it.
+  // The owner (admin) has no approvals page; HR approves it.
+  await ownerPage.reload();
+  await expect(ownerPage.getByRole("link", { name: "Directory" })).toBeVisible();
+  await expect(ownerPage.getByRole("link", { name: "Leave approvals" })).toHaveCount(0);
   await page.getByRole("link", { name: "Leave approvals" }).click();
   const row = page.getByTestId("leave-approval-Sam Staff");
   await expect(row).toContainText("5 days");

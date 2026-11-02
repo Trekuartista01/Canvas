@@ -1,6 +1,6 @@
 import { db, schema } from "@canvas/db";
 import { effectivePeopleRole, type PeopleRole } from "@canvas/shared";
-import { and, eq, isNull, or, type SQL } from "drizzle-orm";
+import { and, eq, isNull, ne, or, type SQL } from "drizzle-orm";
 
 /**
  * The membership row plus its employee-profile status, including
@@ -82,4 +82,27 @@ export async function listActiveMemberIds(workspaceId: string, extra?: SQL) {
     )
     .where(and(eq(schema.memberships.workspaceId, workspaceId), activeMembershipCondition, extra));
   return rows.map((r) => r.userId);
+}
+
+/**
+ * Active members whose effective people role is `role` — the stored value,
+ * except that the owner is always admin (effectivePeopleRole), so an owner
+ * row never counts as HR, CEO or operations manager.
+ */
+export async function listActiveMemberIdsWithRole(workspaceId: string, role: PeopleRole) {
+  if (role === "admin") {
+    return listActiveMemberIds(
+      workspaceId,
+      or(eq(schema.memberships.peopleRole, "admin"), eq(schema.memberships.role, "owner")),
+    );
+  }
+  return listActiveMemberIds(
+    workspaceId,
+    and(eq(schema.memberships.peopleRole, role), ne(schema.memberships.role, "owner")),
+  );
+}
+
+/** Every current HR/Finance user — the only people HR notices go to (spec §1). */
+export async function listHrUserIds(workspaceId: string) {
+  return listActiveMemberIdsWithRole(workspaceId, "hr_finance");
 }

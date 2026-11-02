@@ -75,6 +75,10 @@ Config picks the default per workspace; the UI never knows which provider ran. V
 - **Soft deletes** on user-visible entities (`deleted_at`).
 - **Ordering:** fractional indexing (`order_key` string) for tasks within status columns and lists — avoids reorder cascades.
 - **Permissions:** role on workspace membership + per-space overrides. Check in one `can(user, action, resource)` helper; never inline.
+  - **People roles (P8.1):** `admin` (everything except HR data), `ceo` and `operations_manager` (one shared set: boards, clients), `hr_finance` (the only role that sees HR data), `employee`. Named permissions map to roles in one place, `PEOPLE_ROLE_PERMISSIONS` (`packages/shared/src/people.ts`). The workspace owner is always `admin`; there's no admin/owner bypass for HR data, HR files, HR notifications or HR activity.
+  - **Audit:** HR access and role changes go to `audit_log` (with the client IP), readable by HR only.
+  - **RLS:** every table has Row Level Security on with no policies, so Supabase's Data API (anon/authenticated) reads nothing; the app connects as the tables' owner. New tables must enable it too (checked by `apps/e2e/tests/hr-guards.spec.ts`).
+- **Migrations:** from 0064 on, every migration has a hand-written `packages/db/drizzle/down/<tag>.down.sql`; `pnpm db:rollback` undoes the newest one.
 - **Activity log:** append-only `activity` table from Phase 1 (feeds notifications, later audit log).
 - **Realtime protocol:** server emits `{ entity: "task", id, listId, kind: "updated" }`; clients invalidate queries. No payloads over WS in Phase 1.
 - **Public API (Phase 5):** REST mirroring internal tRPC routers, versioned `/api/v1`, API-key auth.

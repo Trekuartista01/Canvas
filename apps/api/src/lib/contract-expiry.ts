@@ -1,22 +1,14 @@
 import { db, schema } from "@canvas/db";
 import { contractNoticesDue, daysUntil, todayReportDate } from "@canvas/shared";
-import { and, eq, gte, inArray, isNotNull, isNull, or } from "drizzle-orm";
+import { and, eq, gte, inArray, isNotNull, isNull } from "drizzle-orm";
 import { getEmailClient } from "../email";
 import { env } from "../env";
 import { logActivity } from "./activity";
-import { listActiveMemberIds } from "./membership";
+import { listHrUserIds } from "./membership";
 import { notifyUsers } from "./notify";
 
-/** Who looks after contracts: HR and super admins (the owner always is one). */
-async function contractManagerIds(workspaceId: string) {
-  return listActiveMemberIds(
-    workspaceId,
-    or(
-      inArray(schema.memberships.peopleRole, ["hr", "super_admin"]),
-      eq(schema.memberships.role, "owner"),
-    ),
-  );
-}
+/** Who looks after contracts: HR only — never admin or the owner (spec §1). */
+const contractManagerIds = listHrUserIds;
 
 /**
  * M7.6: tells HR 30 and 7 days before an employment contract (or annex)

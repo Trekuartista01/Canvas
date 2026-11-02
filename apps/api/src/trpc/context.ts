@@ -10,7 +10,8 @@ export async function createContext({ req, res }: CreateFastifyContextOptions) {
     user = result?.user ?? null;
   }
 
-  return { req, res, user, sessionId: sessionId ?? null };
+  // The client's address for audit_log (lib/audit.ts).
+  return { req, res, user, sessionId: sessionId ?? null, ip: req.ip ?? null };
 }
 
 export type Context = Awaited<ReturnType<typeof createContext>>;

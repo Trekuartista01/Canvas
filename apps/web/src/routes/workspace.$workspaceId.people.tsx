@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label";
 import { useMyAccess } from "@/hooks/use-my-access";
 import { Avatar } from "@/lib/avatar";
 import { trpc } from "@/lib/trpc";
-import { PEOPLE_ROLE_LABELS, PEOPLE_ROLES, type PeopleRole } from "@canvas/shared";
+import { PEOPLE_ROLE_LABELS } from "@canvas/shared";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { createRoute, Link, Navigate } from "@tanstack/react-router";
 import { Contact, UserPlus } from "lucide-react";
@@ -30,8 +30,10 @@ function PeopleDirectoryPage() {
   const [adding, setAdding] = useState(false);
 
   const allowed = access.can("people:viewDirectory");
+  // Deactivated people: HR only (the server refuses everyone else).
+  const canManage = access.can("people:manageStaff");
   const directory = trpc.people.directory.useQuery(
-    { workspaceId, includeInactive },
+    { workspaceId, includeInactive: includeInactive && canManage },
     { enabled: allowed },
   );
 
@@ -69,7 +71,7 @@ function PeopleDirectoryPage() {
           <h1 className="text-lg font-semibold">People</h1>
           <p className="text-muted-foreground text-xs">Everyone in this workspace.</p>
         </div>
-        {access.can("people:manageStaff") && !adding && (
+        {canManage && !adding && (
           <Button size="sm" onClick={() => setAdding(true)} data-testid="people-add-staff">
             <UserPlus className="h-4 w-4" aria-hidden />
             Add staff
@@ -77,13 +79,7 @@ function PeopleDirectoryPage() {
         )}
       </div>
 
-      {adding && (
-        <AddStaffForm
-          workspaceId={workspaceId}
-          canAssignSuperAdmin={access.can("people:assignSuperAdmin")}
-          onDone={() => setAdding(false)}
-        />
-      )}
+      {adding && <AddStaffForm workspaceId={workspaceId} onDone={() => setAdding(false)} />}
 
       <div className="flex flex-wrap items-center gap-2">
         <Input
@@ -95,16 +91,18 @@ function PeopleDirectoryPage() {
           className="h-8 max-w-xs text-xs"
           data-testid="people-search"
         />
-        <select
-          aria-label="Show"
-          value={includeInactive ? "all" : "active"}
-          onChange={(e) => setIncludeInactive(e.target.value === "all")}
-          className="border-border bg-background h-8 rounded border text-xs"
-          data-testid="people-status-filter"
-        >
-          <option value="active">Active only</option>
-          <option value="all">Active and deactivated</option>
-        </select>
+        {canManage && (
+          <select
+            aria-label="Show"
+            value={includeInactive ? "all" : "active"}
+            onChange={(e) => setIncludeInactive(e.target.value === "all")}
+            className="border-border bg-background h-8 rounded border text-xs"
+            data-testid="people-status-filter"
+          >
+            <option value="active">Active only</option>
+            <option value="all">Active and deactivated</option>
+          </select>
+        )}
         <span className="text-muted-foreground text-xs">{rows.length} people</span>
       </div>
 
@@ -159,21 +157,14 @@ function PeopleDirectoryPage() {
   );
 }
 
-function AddStaffForm({
-  workspaceId,
-  canAssignSuperAdmin,
-  onDone,
-}: {
-  workspaceId: string;
-  canAssignSuperAdmin: boolean;
-  onDone: () => void;
-}) {
+// HR adds people as employees; other roles are assigned by admin on the
+// person's profile (P8.1 — roles:assign).
+function AddStaffForm({ workspaceId, onDone }: { workspaceId: string; onDone: () => void }) {
   const utils = trpc.useUtils();
   const members = trpc.workspace.members.useQuery({ workspaceId });
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [peopleRole, setPeopleRole] = useState<PeopleRole>("staff");
   const [managerUserId, setManagerUserId] = useState("");
   const [draft, setDraft] = useState<EmployeeProfileDraft>(EMPTY_PROFILE_DRAFT);
 
@@ -192,13 +183,10 @@ function AddStaffForm({
       name,
       email,
       password,
-      peopleRole,
       managerUserId: managerUserId || null,
       ...draft,
     });
   }
-
-  const roles = PEOPLE_ROLES.filter((r) => r !== "super_admin" || canAssignSuperAdmin);
 
   return (
     <form
@@ -245,23 +233,6 @@ function AddStaffForm({
             value={password}
             onChange={(e) => setPassword(e.target.value)}
           />
-        </div>
-        <div className="space-y-1">
-          <Label htmlFor="staff-role" className="text-xs">
-            Role
-          </Label>
-          <select
-            id="staff-role"
-            value={peopleRole}
-            onChange={(e) => setPeopleRole(e.target.value as PeopleRole)}
-            className="border-border bg-background h-9 w-full rounded-md border px-2 text-sm"
-          >
-            {roles.map((r) => (
-              <option key={r} value={r}>
-                {PEOPLE_ROLE_LABELS[r]}
-              </option>
-            ))}
-          </select>
         </div>
         <div className="space-y-1">
           <Label htmlFor="staff-manager" className="text-xs">

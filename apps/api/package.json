@@ -15,7 +15,8 @@
     "lint": "eslint src",
     "test": "vitest run",
     "seri:inspect": "tsx scripts/import-seri/inspect.ts",
-    "preflight": "tsx scripts/preflight.ts"
+    "preflight": "tsx scripts/preflight.ts",
+    "seed:roles": "tsx scripts/seed-roles.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.112.3",

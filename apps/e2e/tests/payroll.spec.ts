@@ -1,38 +1,45 @@
 import { db, schema } from "@canvas/db";
 import { expect, test, type Page } from "@playwright/test";
 import { eq } from "drizzle-orm";
-import { createWorkspaceAndOpen, logIn, signUp, uniqueEmail } from "./helpers";
+import {
+  createWorkspaceAndOpen,
+  logIn,
+  openAsHr,
+  signUp,
+  uniqueEmail,
+  workspaceIdFrom,
+} from "./helpers";
 
 const PASSWORD = "initial-pass-123";
 const IBAN = "XK051212012345678906";
 const ID_CARD = "1234567890";
 
-async function addPerson(page: Page, name: string, role: string) {
-  const email = uniqueEmail(role);
+async function addPerson(page: Page, name: string) {
+  const email = uniqueEmail("staff");
   await page.getByRole("link", { name: "Directory" }).click();
   await page.getByTestId("people-add-staff").click();
   const form = page.getByTestId("add-staff-form");
   await form.getByLabel("Full name").fill(name);
   await form.getByLabel("Email").fill(email);
   await form.getByLabel("Initial password").fill(PASSWORD);
-  await form.getByLabel("Role").selectOption(role);
   const created = page.waitForResponse((res) => res.url().includes("people.createStaff"));
   await page.getByTestId("add-staff-submit").click();
   expect((await created).ok()).toBe(true);
   return email;
 }
 
-test("M7.7 payroll: HR edits encrypted pay details, exports, everything audited; staff see only their own, masked", async ({
-  page,
+test("M7.7 payroll: HR edits encrypted pay details, exports, everything audited; staff see only their own, masked; admin sees none of it", async ({
+  page: ownerPage,
   browser,
 }) => {
   test.setTimeout(150_000);
 
-  await signUp(page, "Hana HR");
-  await createWorkspaceAndOpen(page, "Payroll Workspace");
-  const workspaceId = page.url().match(/\/w\/([^/]+)/)![1]!;
-  const samEmail = await addPerson(page, "Sam Staff", "staff");
-  const moEmail = await addPerson(page, "Mo Manager", "staff_manager");
+  await signUp(ownerPage, "Olsi Owner");
+  await createWorkspaceAndOpen(ownerPage, "Payroll Workspace");
+  const workspaceId = workspaceIdFrom(ownerPage);
+  // P8.1: the owner is admin, never HR — payroll is done by an HR user.
+  const { hrPage: page } = await openAsHr(browser, workspaceId);
+  const samEmail = await addPerson(page, "Sam Staff");
 
   // HR fills in Sam's record from the table's drawer.
   await page.getByRole("link", { name: "Payroll" }).click();
@@ -106,17 +113,13 @@ test("M7.7 payroll: HR edits encrypted pay details, exports, everything audited;
     403,
   );
 
-  // A staff manager doesn't see payroll either.
-  const moContext = await browser.newContext();
-  const moPage = await moContext.newPage();
-  await logIn(moPage, moEmail, PASSWORD);
-  await moPage.getByRole("link", { name: "Open" }).click();
-  await expect(moPage.getByRole("link", { name: "Directory" })).toBeVisible();
-  await expect(moPage.getByRole("link", { name: "Payroll", exact: true })).toHaveCount(0);
-  expect((await moPage.request.get(`/payroll-export/${workspaceId}/payroll.pdf`)).status()).toBe(
+  // The owner (admin) doesn't see payroll either — no admin bypass (P8.1).
+  await ownerPage.reload();
+  await expect(ownerPage.getByRole("link", { name: "Directory" })).toBeVisible();
+  await expect(ownerPage.getByRole("link", { name: "Payroll", exact: true })).toHaveCount(0);
+  expect((await ownerPage.request.get(`/payroll-export/${workspaceId}/payroll.pdf`)).status()).toBe(
     403,
   );
 
   await samContext.close();
-  await moContext.close();
 });

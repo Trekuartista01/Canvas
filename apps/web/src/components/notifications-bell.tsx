@@ -1,4 +1,4 @@
-import { NOTIFICATION_VERB_LABELS } from "@canvas/shared";
+import { NOTIFICATION_VERB_LABELS, PEOPLE_ROLE_LABELS, type PeopleRole } from "@canvas/shared";
 import { formatRelativeTime } from "@/lib/format";
 import { trpc } from "@/lib/trpc";
 import { useNavigate } from "@tanstack/react-router";
@@ -70,6 +70,18 @@ function contractLine(payload: unknown): string {
   const name = typeof p.employeeName === "string" ? p.employeeName : "";
   if (typeof p.daysLeft !== "number") return name;
   return `${name} — ${p.daysLeft === 0 ? "today" : `in ${p.daysLeft} day${p.daysLeft === 1 ? "" : "s"}`}`;
+}
+
+// P8.1 "person.role_changed": "Sam Staff is now HR/Finance Manager".
+function roleChangeLine(payload: unknown): string {
+  if (!payload || typeof payload !== "object") return "";
+  const p = payload as { name?: unknown; to?: unknown };
+  const name = typeof p.name === "string" ? p.name : "someone";
+  const role =
+    typeof p.to === "string" && p.to in PEOPLE_ROLE_LABELS
+      ? PEOPLE_ROLE_LABELS[p.to as PeopleRole]
+      : String(p.to ?? "");
+  return `${name} is now ${role}`;
 }
 
 function formSubmitterName(payload: unknown): string | null {
@@ -198,6 +210,11 @@ export function NotificationsBell() {
                     <span>
                       <span className="font-medium">Public holiday:</span>{" "}
                       {holidayLine(n.payloadJson)}
+                    </span>
+                  ) : n.verb === "person.role_changed" ? (
+                    <span>
+                      <span className="font-medium">{n.actorName}</span> changed roles:{" "}
+                      {roleChangeLine(n.payloadJson)}
                     </span>
                   ) : n.verb === "contract.expiring" ? (
                     <span>

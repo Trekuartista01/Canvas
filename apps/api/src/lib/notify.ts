@@ -1,6 +1,5 @@
 import { db, schema } from "@canvas/db";
-import { eq } from "drizzle-orm";
-import { listActiveMemberIds } from "./membership";
+import { listActiveMemberIds, listActiveMemberIdsWithRole } from "./membership";
 
 // Shared by every notification-creating call site (comment @mentions,
 // task assignment, urgent-priority broadcasts) — a bare insert against an
@@ -25,13 +24,13 @@ export async function notifyWorkspace(
   await notifyUsers(activityId, userIds);
 }
 
-// Every active member whose people_role is 'operation_manager' (M7.1 —
+// Every active Operations Manager (people_role 'operations_manager' — M7.1
 // replaced the old is_operations_manager flag). Split out from
 // notifyOperationsManagers so a caller notifying about several activities in
 // the same workspace (e.g. task.bulkUpdate) can look this up once instead of
 // re-querying membership per activity.
 export async function getOperationsManagerIds(workspaceId: string): Promise<string[]> {
-  return listActiveMemberIds(workspaceId, eq(schema.memberships.peopleRole, "operation_manager"));
+  return listActiveMemberIdsWithRole(workspaceId, "operations_manager");
 }
 
 // Used when a task reaches a done-kind status, same "who should hear about

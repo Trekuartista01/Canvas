@@ -103,7 +103,7 @@ test("task-completion forms: bind a form to a task, an anonymous submitter attac
   await expect(bobPage.getByLabel("Notifications")).toBeVisible();
 
   await page.getByRole("link", { name: "Open" }).click();
-  await setPeopleRole(page, bobEmail, "operation_manager");
+  await setPeopleRole(page, bobEmail, "operations_manager");
 
   await createSpaceAndList(page, "Delivery", "Assets");
   await page.getByRole("button", { name: "Board", exact: true }).click();

@@ -5,6 +5,7 @@ import {
   createWorkspaceAndOpen,
   inviteAndGetLink,
   logIn,
+  setPeopleRole,
   signUp,
 } from "../tests/helpers";
 
@@ -40,13 +41,12 @@ async function addStaff(page: Page, name: string, email: string) {
   await form.getByLabel("Full name").fill(name);
   await form.getByLabel("Email").fill(email);
   await form.getByLabel("Initial password").fill(PASSWORD);
-  await form.getByLabel("Role").selectOption("staff");
   const created = page.waitForResponse((res) => res.url().includes("people.createStaff"));
   await page.getByTestId("add-staff-submit").click();
   expect((await created).ok()).toBe(true);
 }
 
-test("Phase-7 smoke: health → sign up → workspace → invite → daily report → proof approval → leave → HR-only payroll export", async ({
+test("Phase-7 smoke: health → sign up → workspace → invite → HR role → daily report → proof approval → leave → HR-only payroll export", async ({
   page,
   browser,
 }) => {
@@ -58,19 +58,29 @@ test("Phase-7 smoke: health → sign up → workspace → invite → daily repor
     checks: { api: "ok", database: "ok", redis: "ok", storage: "ok" },
   });
 
-  // 2. Sign up → workspace → invite.
+  // 2. Sign up → workspace → invite. The invitee becomes HR: the owner is
+  // admin, never HR (P8.1), and admin assigns roles.
   await signUp(page, "Smoke Owner", smokeEmail("owner"));
   await createWorkspaceAndOpen(page, `Smoke test ${stamp}`);
   const workspaceId = page.url().match(/\/w\/([^/]+)/)![1]!;
   // Invites are sent from the workspace list.
   await page.getByRole("link", { name: "All workspaces" }).click();
-  const invite = await inviteAndGetLink(page, smokeEmail("invitee"));
+  const hrEmail = smokeEmail("hr");
+  const invite = await inviteAndGetLink(page, hrEmail);
   expect(invite).toContain("/invite/");
+  const hrContext = await browser.newContext();
+  const hr = await hrContext.newPage();
+  await signUp(hr, "Smoke HR", hrEmail);
+  await hr.goto(invite);
+  await hr.getByRole("button", { name: /Accept & join/ }).click();
   await page.goto(`/w/${workspaceId}`);
+  await setPeopleRole(page, hrEmail, "hr_finance");
+  await hr.getByRole("link", { name: "Open" }).click();
 
-  // A staff member (HR creates accounts directly) and a task needing a proof photo.
+  // HR creates a staff account; the owner sets a task needing a proof photo.
   const staffEmail = smokeEmail("staff");
-  await addStaff(page, "Smoke Staff", staffEmail);
+  await addStaff(hr, "Smoke Staff", staffEmail);
+  await page.reload();
   await createSpaceAndList(page, "Smoke", "Smoke list");
   await page.getByTestId("new-task-button").click();
   const dialog = page.getByTestId("new-task-dialog");
@@ -107,7 +117,7 @@ test("Phase-7 smoke: health → sign up → workspace → invite → daily repor
   await expect(approval).toContainText("Waiting for a manager to approve it.");
   await staff.getByRole("button", { name: "Close task details" }).click();
 
-  // 4. Owner approves the task.
+  // 4. The owner (admin, who manages tasks) approves it.
   await page.reload();
   await page.getByRole("button", { name: "Board", exact: true }).click();
   await page
@@ -119,7 +129,7 @@ test("Phase-7 smoke: health → sign up → workspace → invite → daily repor
   expect((await approved).ok()).toBe(true);
   await page.getByRole("button", { name: "Close task details" }).click();
 
-  // 5. Staff requests a week of vacation next year; the owner approves.
+  // 5. Staff requests a week of vacation next year; HR approves.
   const week = nextYearsQuietWeek();
   await staff.getByRole("link", { name: "Leave", exact: true }).click();
   const leave = staff.getByTestId("leave-form");
@@ -130,27 +140,33 @@ test("Phase-7 smoke: health → sign up → workspace → invite → daily repor
   await staff.getByTestId("leave-submit").click();
   await expect(staff.getByTestId(`leave-request-${week.from}`)).toContainText("Pending");
 
-  await page.getByRole("link", { name: "Leave approvals" }).click();
-  const decided = page.waitForResponse((res) => res.url().includes("leave.decide"));
-  await page.getByTestId("leave-approval-Smoke Staff").getByTestId("leave-approve").click();
+  await hr.getByRole("link", { name: "Leave approvals" }).click();
+  const decided = hr.waitForResponse((res) => res.url().includes("leave.decide"));
+  await hr.getByTestId("leave-approval-Smoke Staff").getByTestId("leave-approve").click();
   expect((await decided).ok()).toBe(true);
   await expect(staff.getByTestId(`leave-request-${week.from}`)).toContainText("Approved");
 
-  // 6. Payroll: HR saves a record (encrypted) and exports; staff are refused.
-  await page.getByRole("link", { name: "Payroll" }).click();
-  await page.getByTestId("payroll-row-Smoke Staff").click();
-  const drawer = page.getByTestId("payroll-drawer");
+  // 6. Payroll: HR saves a record (encrypted) and exports; staff and the
+  // owner (admin) are refused.
+  await hr.getByRole("link", { name: "Payroll" }).click();
+  await hr.getByTestId("payroll-row-Smoke Staff").click();
+  const drawer = hr.getByTestId("payroll-drawer");
   await drawer.getByLabel("Net salary (EUR / month)").fill("500");
   await drawer.getByLabel("IBAN").fill("XK051212012345678906");
-  const saved = page.waitForResponse((res) => res.url().includes("payroll.upsert"));
+  const saved = hr.waitForResponse((res) => res.url().includes("payroll.upsert"));
   await drawer.getByTestId("payroll-save").click();
   expect((await saved).ok()).toBe(true);
-  const xlsx = await page.request.get(`/payroll-export/${workspaceId}/payroll.xlsx`);
+  const xlsx = await hr.request.get(`/payroll-export/${workspaceId}/payroll.xlsx`);
   expect(xlsx.ok()).toBe(true);
   expect((await xlsx.body()).subarray(0, 2).toString()).toBe("PK");
   expect((await staff.request.get(`/payroll-export/${workspaceId}/payroll.xlsx`)).status()).toBe(
     403,
   );
 
+  expect((await page.request.get(`/payroll-export/${workspaceId}/payroll.xlsx`)).status()).toBe(
+    403,
+  );
+
   await staffContext.close();
+  await hrContext.close();
 });

@@ -1,5 +1,12 @@
 import { expect, test } from "@playwright/test";
-import { createWorkspaceAndOpen, logIn, signUp, uniqueEmail } from "./helpers";
+import {
+  createWorkspaceAndOpen,
+  logIn,
+  openAsHr,
+  signUp,
+  uniqueEmail,
+  workspaceIdFrom,
+} from "./helpers";
 
 const PASSWORD = "initial-pass-123";
 
@@ -9,20 +16,21 @@ test("M7.3 daily reports: staff submits, a manager opens it, the read receipt sh
 }) => {
   test.setTimeout(90_000);
 
-  // The owner (super admin) adds a staff member.
+  // HR adds a staff member; the owner (admin) follows the team's reports.
   await signUp(page, "Mira Manager");
   await createWorkspaceAndOpen(page, "Reports Workspace");
-  await page.getByRole("link", { name: "Directory" }).click();
+  const { hrPage } = await openAsHr(browser, workspaceIdFrom(page));
+  await hrPage.getByRole("link", { name: "Directory" }).click();
   const staffEmail = uniqueEmail("staff");
-  await page.getByTestId("people-add-staff").click();
-  const form = page.getByTestId("add-staff-form");
+  await hrPage.getByTestId("people-add-staff").click();
+  const form = hrPage.getByTestId("add-staff-form");
   await form.getByLabel("Full name").fill("Sam Staff");
   await form.getByLabel("Email").fill(staffEmail);
   await form.getByLabel("Initial password").fill(PASSWORD);
-  await form.getByLabel("Role").selectOption("staff");
-  const created = page.waitForResponse((res) => res.url().includes("people.createStaff"));
-  await page.getByTestId("add-staff-submit").click();
+  const created = hrPage.waitForResponse((res) => res.url().includes("people.createStaff"));
+  await hrPage.getByTestId("add-staff-submit").click();
   expect((await created).ok()).toBe(true);
+  await hrPage.context().close();
 
   // Before Sam reports, the team view lists him as missing.
   await page.getByRole("link", { name: "Team reports" }).click();

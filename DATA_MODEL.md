@@ -13,6 +13,9 @@ users            (id, email uniq, name, avatar_url, bio null, title null, -- tit
 sessions         (id, user_id fk, expires_at)
 workspaces       (id, name, slug uniq, plan text default 'internal', created_at)
 memberships      (id, workspace_id fk, user_id fk, role enum('owner','admin','member','guest'),
+                  people_role enum('admin','ceo','hr_finance',          -- P8.1; owner is always admin,
+                    'operations_manager','employee') default 'employee', -- never HR
+                  manager_user_id fk users null,                        -- reports to (no permissions)
                   uniq(workspace_id, user_id))
 
 spaces           (id, workspace_id fk, name, icon, order_key,
@@ -109,7 +112,12 @@ payroll_records  (id, workspace_id fk, user_id fk,                      -- M7.7,
                   net_salary_eur numeric(12,2),
                   id_card_number_enc, iban_enc,                         -- AES-256-GCM, PAYROLL_ENCRYPTION_KEY
                   bank_name, account_holder, updated_by fk users,
-                  updated_at, uniq(workspace_id, user_id))              -- reads/edits/exports → activity
+                  updated_at, uniq(workspace_id, user_id))              -- reads/edits/exports → activity + audit_log
+
+audit_log        (id, workspace_id fk, actor_id fk users null,          -- P8.1, HR reads only (hr:audit)
+                  action, entity, entity_id null, ip inet null,         -- null actor = system (seed:roles)
+                  payload_json, created_at)                             -- every HR view/download/change + role change
+people_role_backup_0064(membership_id pk, people_role text)             -- pre-P8.1 roles, for the 0064 down migration
 
 employee_of_month(id, workspace_id fk, month text 'YYYY-MM',           -- M7.8, computed on the 1st
                   user_id fk users null,                                -- null = nobody qualified

@@ -240,6 +240,18 @@ pm2 startup                # prints a sudo command — copy-paste and run it, so
 
 ✅ Check: `pm2 status` shows `canvas-api` and `canvas-worker` **online**, and `curl -s http://127.0.0.1:3001/health` prints `{"ok":true,"checks":{"api":"ok","database":"ok","redis":"ok","storage":"ok"}}`.
 
+### 4.6 The first HR, Operations Manager and CEOs (once)
+
+The account that creates the workspace is its **admin**: it runs everything except HR data, which it can never see (not even payroll or contracts). HR/Finance, Operations Manager and CEO are roles admin gives in the app (Directory → a person → Role) — or, for the very first ones, in one go on the server:
+
+1. Everyone signs up (or accepts an invite) so they're members of the workspace.
+2. In `~/canvas-app/.env`, fill `SEED_HR_EMAILS`, `SEED_OPS_EMAILS` and `SEED_CEO_EMAILS` (comma separated).
+3. Run:
+   ```bash
+   cd ~/canvas-app && pnpm seed:roles
+   ```
+   It prints each change (`seed:roles: … → hr_finance`) and writes them to the HR access log. It refuses — changing nothing — if an email isn't a member, is the owner, is in two lists, or if the workspace already has an HR user (after that, roles are assigned in the app; every change to HR/CEO/Ops roles is emailed to HR).
+
 ## 5. Domain and HTTPS
 
 1. Where your domain's DNS is managed (e.g. Cloudflare → your domain → **DNS → Records**), add:
@@ -295,12 +307,12 @@ Restoring production itself (after a disaster), into a new empty Supabase projec
    ```
 
    It runs through:
-   - health, then signing up an owner, creating a workspace and inviting someone;
-   - adding a staff member;
+   - health, then signing up an owner, creating a workspace and inviting someone, who joins and is made HR by the owner;
+   - HR adding a staff member;
    - the staff member submits a daily report, uploads a proof photo (straight to R2) and submits the task;
    - the owner approves the task;
-   - the staff member requests a week of leave and the owner approves it;
-   - the owner saves an encrypted payroll record and exports payroll to Excel, and the staff member gets 403 on the export.
+   - the staff member requests a week of leave and HR approves it;
+   - HR saves an encrypted payroll record and exports payroll to Excel; the staff member and the owner (admin) both get 403 on the export.
 
    It must say `1 passed`.
 
@@ -310,7 +322,7 @@ Restoring production itself (after a disaster), into a new empty Supabase projec
    delete from users where email like 'smoke-%@example.com';
    ```
    (A small proof photo stays in R2; harmless.)
-5. By hand: sign up your real account. Create the company workspace and invite HR. As HR, add a few staff with Directory → Add staff. Open Holidays and add this year's movable holidays.
+5. By hand: sign up your real account and create the company workspace (you're its admin). Invite HR, the Operations Manager and the CEOs, then give them their roles (4.6). As HR, add the staff with Directory → Add staff and open Holidays to add this year's movable holidays. Real pay and contract data is entered by HR, not by admin.
 
 ## 8. Updating the app
 

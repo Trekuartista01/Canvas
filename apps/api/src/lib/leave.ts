@@ -1,10 +1,10 @@
 import { db, schema } from "@canvas/db";
 import { TRPCError } from "@trpc/server";
-import { and, eq, inArray, ne } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import { can, type PeopleAction } from "../auth/can";
 import type { SessionUser } from "../auth/session";
 import { computeVacationBalance, yearOf, type LeaveLike } from "./leave-balance";
-import { findMembership, getPeopleContext, listActiveMemberIds } from "./membership";
+import { getPeopleContext, listHrUserIds } from "./membership";
 import { assertCanPeople } from "./permissions";
 import { PRIVATE_PREFIXES } from "./private-upload";
 
@@ -107,51 +107,23 @@ export async function canViewLeaveOf(user: SessionUser, workspaceId: string, tar
 
 /**
  * Whose leave the viewer may see details of in list views: null = everyone
- * (HR, super admin, operations manager), otherwise these user ids (a staff
- * manager's direct reports, or just yourself).
+ * (HR), otherwise just yourself.
  */
 export async function leaveScopeFor(user: SessionUser, workspaceId: string) {
   const people = await getPeopleContext(workspaceId, user.id);
   if (!people) return [];
-  if (!can(user, "leave:approve", { type: "people", peopleRole: people.peopleRole })) {
-    return [user.id];
-  }
-  if (people.peopleRole !== "staff_manager") return null;
-  const reports = await db
-    .select({ userId: schema.memberships.userId })
-    .from(schema.memberships)
-    .where(
-      and(
-        eq(schema.memberships.workspaceId, workspaceId),
-        eq(schema.memberships.managerUserId, user.id),
-      ),
-    );
-  return [user.id, ...reports.map((r) => r.userId)];
+  return can(user, "leave:approve", { type: "people", peopleRole: people.peopleRole })
+    ? null
+    : [user.id];
 }
 
 /**
- * Who hears about a new leave request: the requester's manager and HR
- * (active members only, never the requester). If that's nobody, the owner.
+ * Who hears about a new leave request: every HR user except the requester.
+ * Nobody else — not the owner or admin — even when there's no HR yet
+ * (spec §1, "no admin bypass").
  */
 export async function leaveApproverIds(workspaceId: string, requesterId: string) {
-  const membership = await findMembership(workspaceId, requesterId);
-  const hrIds = await listActiveMemberIds(workspaceId, eq(schema.memberships.peopleRole, "hr"));
-  const active = new Set(await listActiveMemberIds(workspaceId));
-  const ids = [membership?.managerUserId, ...hrIds].filter(
-    (id): id is string => !!id && id !== requesterId && active.has(id),
-  );
-  if (ids.length > 0) return [...new Set(ids)];
-  const owners = await db
-    .select({ userId: schema.memberships.userId })
-    .from(schema.memberships)
-    .where(
-      and(
-        eq(schema.memberships.workspaceId, workspaceId),
-        eq(schema.memberships.role, "owner"),
-        ne(schema.memberships.userId, requesterId),
-      ),
-    );
-  return owners.map((o) => o.userId);
+  return (await listHrUserIds(workspaceId)).filter((id) => id !== requesterId);
 }
 
 /**

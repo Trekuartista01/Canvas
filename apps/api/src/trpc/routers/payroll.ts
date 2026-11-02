@@ -3,6 +3,7 @@ import { payrollMemberSchema, upsertPayrollSchema, workspaceScopedSchema } from 
 import { TRPCError } from "@trpc/server";
 import { and, desc, eq, inArray, like } from "drizzle-orm";
 import { logActivity } from "../../lib/activity";
+import { writeAudit } from "../../lib/audit";
 import { getMembershipRole } from "../../lib/membership";
 import { encryptPayrollField, loadPayrollRows } from "../../lib/payroll";
 import { assertCanPeople, requireActiveMember } from "../../lib/permissions";
@@ -10,16 +11,32 @@ import { publish } from "../../lib/realtime";
 import { protectedProcedure, router } from "../trpc";
 
 /**
- * M7.7 payroll — HR and super admins only (payroll:view / payroll:manage);
- * managers and staff never reach these procedures, apart from `mine`.
+ * M7.7 payroll — HR only (payroll:view / payroll:manage; never admin, P8.1);
+ * everyone else only reaches `mine`.
  *
  * Audit trail: every read of payroll data (list, a person's record, your
- * own record) and every edit writes an activity row — including the reads
- * done by queries, since who looked at payroll is exactly what the trail is
- * for. Activity payloads carry who/what, never any value.
+ * own record) and every edit writes an activity row and an audit_log row
+ * (with the caller's IP) — including the reads done by queries, since who
+ * looked at payroll is exactly what the trail is for. Payloads carry
+ * who/what, never any value.
  */
-async function audit(workspaceId: string, actorId: string, verb: string, payload: object) {
+async function audit(
+  workspaceId: string,
+  actorId: string,
+  verb: string,
+  payload: { userId?: string; [key: string]: unknown },
+  ip: string | null,
+) {
   await logActivity(workspaceId, actorId, "payroll", workspaceId, verb, payload);
+  await writeAudit({
+    workspaceId,
+    actorId,
+    action: verb,
+    entity: "payroll",
+    entityId: payload.userId ?? null,
+    ip,
+    payload,
+  });
 }
 
 export const payrollRouter = router({
@@ -27,7 +44,13 @@ export const payrollRouter = router({
   list: protectedProcedure.input(workspaceScopedSchema).query(async ({ ctx, input }) => {
     await assertCanPeople(ctx.user, input.workspaceId, "payroll:view");
     const rows = await loadPayrollRows(input.workspaceId, { reveal: false });
-    await audit(input.workspaceId, ctx.user.id, "payroll.list_viewed", { rows: rows.length });
+    await audit(
+      input.workspaceId,
+      ctx.user.id,
+      "payroll.list_viewed",
+      { rows: rows.length },
+      ctx.ip,
+    );
     return rows;
   }),
 
@@ -38,7 +61,7 @@ export const payrollRouter = router({
     });
     const [row] = await loadPayrollRows(input.workspaceId, { reveal: true, userId: input.userId });
     if (!row) throw new TRPCError({ code: "NOT_FOUND" });
-    await audit(input.workspaceId, ctx.user.id, "payroll.viewed", { userId: input.userId });
+    await audit(input.workspaceId, ctx.user.id, "payroll.viewed", { userId: input.userId }, ctx.ip);
     return row;
   }),
 
@@ -88,7 +111,7 @@ export const payrollRouter = router({
     const fields = (
       ["netSalaryEur", "idCardNumber", "bankName", "iban", "accountHolder"] as const
     ).filter((f) => input[f] !== undefined);
-    await audit(workspaceId, ctx.user.id, "payroll.updated", { userId, fields });
+    await audit(workspaceId, ctx.user.id, "payroll.updated", { userId, fields }, ctx.ip);
     await publish(workspaceId, { entity: "payroll", id: record.id, workspaceId, kind: "updated" });
     return { id: record.id };
   }),
@@ -97,7 +120,13 @@ export const payrollRouter = router({
   mine: protectedProcedure.input(workspaceScopedSchema).query(async ({ ctx, input }) => {
     await requireActiveMember(ctx.user, input.workspaceId);
     const [row] = await loadPayrollRows(input.workspaceId, { reveal: false, userId: ctx.user.id });
-    await audit(input.workspaceId, ctx.user.id, "payroll.self_viewed", { userId: ctx.user.id });
+    await audit(
+      input.workspaceId,
+      ctx.user.id,
+      "payroll.self_viewed",
+      { userId: ctx.user.id },
+      ctx.ip,
+    );
     return row?.recordId
       ? {
           netSalaryEur: row.netSalaryEur,

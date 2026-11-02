@@ -2734,3 +2734,62 @@ The brief's step 1 is to inspect the real Seri collections, write `SERI_MAPPING.
 
 - Do the real deploy by following DEPLOYMENT.md step by step: Supabase `canvas-prod`, R2, the Oracle VM, DNS, the cron + restore test, `pnpm preflight` → Ready, and the live smoke test → `1 passed`. Then mark M7.10 ✅ in ROADMAP.md.
 - M7.9 is still waiting for the Seri data.
+
+## 2026-11-02 P8.1: Roles, one permission map, no admin bypass, audit_log, RLS, seed:roles
+
+Phase 8 = `docs/hr-ops-spec.md`, added to ROADMAP.md as P8.1–P8.10 (the spec's build order). Plan approved 2026-11-02.
+
+### Decisions where the spec and the codebase differed (asked and answered)
+
+- **Roles:** super_admin → `admin`, hr → `hr_finance`, operation_manager → `operations_manager`, staff → `employee`, new `ceo`. `staff_manager` is dropped (its 19 local holders became employees), and with it every "direct reports only" rule. Only HR approves leave.
+- **The owner is always `admin`, never HR** (`effectivePeopleRole`). Admin has no HR permission at all.
+- **Stack:** existing tools instead of the spec's literal ones. The browser never talks to Supabase, so "RLS" means deny-all on every table (Supabase's Data API reads nothing). Email goes through the existing `EmailClient` behind a new `sendEmail()` (Resend could be one more client later). Scheduled jobs stay on the BullMQ tick. The script is `pnpm seed:roles`, not `npm run`.
+- **Boards (P8.9):** Board = Space, columns = Lists; task status stays a separate field.
+- **Leave rules (P8.2/P8.4/P8.6):** the spec replaces the cross-year split, the over-balance block, the 30/7-day contract alerts and the computed holiday substitute.
+
+### Built
+
+- **One permission map:** `PEOPLE_ROLE_PERMISSIONS` in `packages/shared/src/people.ts`. HR data actions (`people:viewProfile`, `people:manageStaff`, `leave:*`, `payroll:*`, `contract:manage`, `holiday:manage`, `hr:audit`) belong to `hr_finance` alone. `ceo` and `operations_manager` share one set (team views + `clients:manage` + `boards:manageAll`). Admin adds `roles:assign` and `companyDocument:manage`. `can()` reads the map; the staff-manager `team` branch, `teamScopeFor` and the direct-report checks are gone. Named permissions keep the codebase's `area:verb` style (`hr:audit`, not `hr.view`).
+- **Migration `0064`:**
+  - `people_role` rebuilt with the new values. Every old value is first copied to `people_role_backup_0064`, so the down migration restores roles exactly, staff_manager included.
+  - `audit_log (workspace, actor, action, entity, entity_id, ip inet, payload, created_at)`.
+  - `ENABLE ROW LEVEL SECURITY` on every public table, with no policies.
+- **Reversible migrations:** `packages/db/drizzle/down/<tag>.down.sql` and `pnpm db:rollback` (`packages/db/src/rollback.ts`). It refuses unless the journal's newest migration is the newest applied, runs the down file and drops the drizzle row in one transaction. A unit test requires a down file for every migration from 0064 on.
+- **No admin bypass, checked path by path:**
+  - **HR notifications:** contract expiry, leave requests and role changes go only to `listHrUserIds()` (active members with `hr_finance` who aren't the owner). The old "nobody else → tell the owner" leave fallback is removed.
+  - **Admin activity feed:** the Admin page's workspace feed (`activity.listWorkspace` / `entityTypes`) no longer shows HR entity types (`payroll`, `contract`, `leave_request`, `leave_balance`, `person`), except `person.role_changed`.
+  - **Files and export:** private contract and leave files already went through `can()`, so admin is refused now. Workspace export only covers tasks; the Brain reads no HR tables.
+- **People router:**
+  - **Directory:** for admin/ceo/ops/HR, with public fields only. Deactivated people are shown to HR only.
+  - **`profile`:** directory roles get the public part. Personal details and employment start are stripped server-side unless the caller is HR or the person themselves; HR viewing someone else's profile is audited.
+  - **`createStaff`:** HR only, and only `employee` (any other role needs `roles:assign`).
+  - **`setRole`:** admin only. Never on the owner. Admin can't give themselves `hr_finance`. A change to or from hr_finance/ceo/operations_manager writes `audit_log`, an in-app `person.role_changed` notice and an email to every HR user before and after the change.
+  - **Auditing:** `setStatus`, `updateProfile` and `createStaff` are audited.
+- **Audit:**
+  - `lib/audit.ts` `writeAudit()`; the tRPC context now carries `ip` (`req.ip`; trustProxy is loopback-only).
+  - Payroll's existing activity audit and the export route also write `audit_log`.
+  - `audit.list` (`hr:audit`) returns it; the Access log tab comes in P8.7.
+- **`pnpm seed:roles`** (`apps/api/scripts/seed-roles.ts` + pure `lib/seed-roles.ts`, 4 tests) reads `SEED_HR_EMAILS` / `SEED_OPS_EMAILS` / `SEED_CEO_EMAILS` (+ `SEED_WORKSPACE_ID` when there's more than one workspace). It refuses, changing nothing, when HR already exists, there's no HR email, or an email is in two lists, isn't a member or is the owner. Changes are written to `audit_log` with no actor.
+- **UI:**
+  - The nav already follows `myAccess`, so admin loses Payroll, Contracts and Leave approvals.
+  - The profile page splits Role (admin) from Reports to / details / status (HR), and never offers HR to yourself.
+  - The Add staff form has no role picker.
+  - The bell shows "X changed roles: Y is now HR/Finance Manager".
+- **E2E:**
+  - New helpers `seedMember` / `pageAs` / `openAsHr` give a spec an HR (or any role) session straight from the DB.
+  - Every HR spec now does HR work as HR, and checks that the owner (admin) is refused.
+  - `people.spec.ts` is rewritten around role assignment.
+  - The smoke test bootstraps HR through invite → owner assigns the role, since it can't seed a production DB.
+  - New `hr-guards.spec.ts`: 31 HR procedures/REST routes, called with real ids, return 403 for the owner, an admin, a CEO, an Operations Manager and an employee, and 200 for HR. Directory roles get profiles with `personal: null`. Nothing was changed by the refused calls. A second test asserts every public table has RLS on.
+
+### Notes
+
+- There are no Clients routes yet, so the "employees and HR get 403 on every Clients route" half of the phase-1 tests lands with P8.10 (`clients:manage` already exists and is tested at the `can()` level).
+- Role-change emails are sent fire-and-forget after the change; the mock client only logs. The e2e checks the in-app notice.
+- `pnpm format` also formatted `docs/hr-ops-spec.md` (Markdown layout only).
+
+### Verified
+
+- `pnpm check` green; `pnpm test`: API 380, shared 108, db 11, web 15.
+- `0064` applied to the local DB (1497 staff + 19 staff_manager → 1516 employee; 13 hr_finance; 34 operations_manager; RLS on 65/65 tables). `pnpm db:rollback` restored the exact old roles (including all 19 staff managers) and RLS off; re-migrated cleanly.
+- Full Playwright run at CI parity (`CI=1`, retries off, local containers): **77/77 passed** (+2: `hr-guards.spec.ts`). Phase-2 smoke test green.

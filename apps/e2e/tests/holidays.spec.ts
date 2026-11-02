@@ -1,5 +1,12 @@
 import { expect, test, type Page } from "@playwright/test";
-import { createWorkspaceAndOpen, logIn, signUp, uniqueEmail } from "./helpers";
+import {
+  createWorkspaceAndOpen,
+  logIn,
+  openAsHr,
+  signUp,
+  uniqueEmail,
+  workspaceIdFrom,
+} from "./helpers";
 
 const PASSWORD = "initial-pass-123";
 
@@ -18,13 +25,15 @@ async function goToYear(page: Page, target: number) {
 }
 
 test("M7.4 holidays: seeded Kosovo calendar, HR adds a movable holiday, weekend days move, staff can read it", async ({
-  page,
+  page: ownerPage,
   browser,
 }) => {
   test.setTimeout(90_000);
 
-  await signUp(page, "Hana HR");
-  await createWorkspaceAndOpen(page, "Holiday Workspace");
+  await signUp(ownerPage, "Olsi Owner");
+  await createWorkspaceAndOpen(ownerPage, "Holiday Workspace");
+  // P8.1: HR keeps the calendar (the owner is admin, never HR).
+  const { hrPage: page } = await openAsHr(browser, workspaceIdFrom(ownerPage));
   await page.getByRole("link", { name: "Holidays" }).click();
   await expect(page.getByTestId("holidays-page")).toBeVisible();
   await goToYear(page, 2027);
@@ -63,7 +72,6 @@ test("M7.4 holidays: seeded Kosovo calendar, HR adds a movable holiday, weekend 
   await staffForm.getByLabel("Full name").fill("Sam Staff");
   await staffForm.getByLabel("Email").fill(staffEmail);
   await staffForm.getByLabel("Initial password").fill(PASSWORD);
-  await staffForm.getByLabel("Role").selectOption("staff");
   const staffCreated = page.waitForResponse((res) => res.url().includes("people.createStaff"));
   await page.getByTestId("add-staff-submit").click();
   expect((await staffCreated).ok()).toBe(true);
@@ -76,6 +84,12 @@ test("M7.4 holidays: seeded Kosovo calendar, HR adds a movable holiday, weekend 
   await goToYear(staff, 2027);
   await expect(staff.getByTestId("holiday-Orthodox Easter Monday")).toBeVisible();
   await expect(staff.getByTestId("holiday-add")).toHaveCount(0);
+
+  // So does the owner (admin): reading, not managing.
+  await ownerPage.getByRole("link", { name: "Holidays" }).click();
+  await goToYear(ownerPage, 2027);
+  await expect(ownerPage.getByTestId("holiday-Orthodox Easter Monday")).toBeVisible();
+  await expect(ownerPage.getByTestId("holiday-add")).toHaveCount(0);
 
   await staffContext.close();
 });

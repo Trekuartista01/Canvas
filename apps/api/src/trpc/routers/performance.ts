@@ -9,7 +9,7 @@ import {
 import { and, desc, eq, gte } from "drizzle-orm";
 import { can } from "../../auth/can";
 import { getPeopleContext } from "../../lib/membership";
-import { assertCanPeople, requireActiveMember, teamScopeFor } from "../../lib/permissions";
+import { assertCanPeople, requireActiveMember } from "../../lib/permissions";
 import {
   classifyTasks,
   completedOnTime,
@@ -18,7 +18,7 @@ import {
 } from "../../lib/performance";
 import {
   loadAssignedTasks,
-  scopedMembers,
+  activeMembers,
   type EomBreakdownEntry,
 } from "../../lib/performance-data";
 import { protectedProcedure, router } from "../trpc";
@@ -33,11 +33,10 @@ function weekStarts(from: string, to: string) {
 }
 
 export const performanceRouter = router({
-  // Per-employee summary for the range. A staff manager sees only their reports.
+  // Per-employee summary for the range.
   team: protectedProcedure.input(performanceRangeSchema).query(async ({ ctx, input }) => {
-    const people = await assertCanPeople(ctx.user, input.workspaceId, "performance:view");
-    const scope = await teamScopeFor(input.workspaceId, ctx.user.id, people.peopleRole);
-    const members = await scopedMembers(input.workspaceId, scope);
+    await assertCanPeople(ctx.user, input.workspaceId, "performance:view");
+    const members = await activeMembers(input.workspaceId);
     const tasks = await loadAssignedTasks(
       input.workspaceId,
       members.map((m) => m.userId),
@@ -80,11 +79,10 @@ export const performanceRouter = router({
     };
   }),
 
-  // Live board: one card per active employee in scope.
+  // Live board: one card per active employee.
   engagements: protectedProcedure.input(workspaceScopedSchema).query(async ({ ctx, input }) => {
-    const people = await assertCanPeople(ctx.user, input.workspaceId, "report:viewTeam");
-    const scope = await teamScopeFor(input.workspaceId, ctx.user.id, people.peopleRole);
-    const members = await scopedMembers(input.workspaceId, scope);
+    await assertCanPeople(ctx.user, input.workspaceId, "report:viewTeam");
+    const members = await activeMembers(input.workspaceId);
     const open = await loadAssignedTasks(
       input.workspaceId,
       members.map((m) => m.userId),
@@ -133,11 +131,9 @@ export const performanceRouter = router({
       ranking: EomBreakdownEntry[];
     };
     const people = await getPeopleContext(input.workspaceId, ctx.user.id);
-    // The whole ranking: people who see everyone's performance (not a staff
-    // manager, whose view is limited to their own reports).
+    // The whole ranking: people who see everyone's performance.
     const seesRanking =
       !!people &&
-      people.peopleRole !== "staff_manager" &&
       can(ctx.user, "performance:view", { type: "people", peopleRole: people.peopleRole });
     const winner = row.userId
       ? await db.query.users.findFirst({ where: eq(schema.users.id, row.userId) })

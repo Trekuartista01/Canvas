@@ -1,4 +1,5 @@
-import { expect, type Locator, type Page } from "@playwright/test";
+import { db, schema } from "@canvas/db";
+import { expect, type Browser, type Locator, type Page } from "@playwright/test";
 
 export function uniqueEmail(prefix = "e2e") {
   return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}@example.com`;
@@ -76,7 +77,7 @@ export async function createSpaceAndList(page: Page, spaceName: string, listName
 
 /**
  * From inside a workspace: sets a member's people role from their People
- * profile (M7.1 — e.g. "operation_manager", who hears about finished tasks),
+ * profile (M7.1 — e.g. "operations_manager", who hears about finished tasks),
  * then returns to Home.
  */
 export async function setPeopleRole(page: Page, memberEmail: string, peopleRole: string) {
@@ -87,4 +88,51 @@ export async function setPeopleRole(page: Page, memberEmail: string, peopleRole:
   await roleSet;
   await expect(page.locator("#person-role")).toHaveValue(peopleRole);
   await page.getByRole("link", { name: "Home", exact: true }).click();
+}
+
+export type SeededMember = { userId: string; email: string; name: string; sessionId: string };
+
+/**
+ * P8.1: adds a member with this people role straight to the DB, with a
+ * session, so a spec can act as HR (or ops/ceo/employee) without the
+ * sign-up → invite → assign-role dance. The workspace owner is always admin
+ * and never HR, so every HR flow needs a second person anyway.
+ */
+export async function seedMember(
+  workspaceId: string,
+  name: string,
+  peopleRole: (typeof schema.peopleRole.enumValues)[number],
+): Promise<SeededMember> {
+  const email = uniqueEmail(peopleRole.replace(/_/g, "-"));
+  const [user] = await db.insert(schema.users).values({ email, name }).returning();
+  await db
+    .insert(schema.memberships)
+    .values({ workspaceId, userId: user!.id, role: "member", peopleRole });
+  const [session] = await db
+    .insert(schema.sessions)
+    .values({ userId: user!.id, expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000) })
+    .returning();
+  return { userId: user!.id, email, name, sessionId: session!.id };
+}
+
+/** A fresh browser context signed in as `member`, opened on the workspace. */
+export async function pageAs(browser: Browser, member: SeededMember, workspaceId: string) {
+  const context = await browser.newContext();
+  await context.addCookies([
+    { name: "canvas_session", value: member.sessionId, url: "http://localhost:5183" },
+  ]);
+  const page = await context.newPage();
+  await page.goto(`/w/${workspaceId}`);
+  return page;
+}
+
+/** Shorthand: seed an HR/Finance Manager and open the workspace as them. */
+export async function openAsHr(browser: Browser, workspaceId: string, name = "Hana HR") {
+  const hr = await seedMember(workspaceId, name, "hr_finance");
+  return { hr, hrPage: await pageAs(browser, hr, workspaceId) };
+}
+
+/** The workspace id from a /w/<id>/… URL. */
+export function workspaceIdFrom(page: Page) {
+  return page.url().match(/\/w\/([^/]+)/)![1]!;
 }

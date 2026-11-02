@@ -237,31 +237,42 @@ describe("can", () => {
   });
 });
 
-describe("can() — People (M7.1)", () => {
+describe("can() — People (P8.1 roles)", () => {
   const people = (
     peopleRole: PeopleRole | null,
-    target?: { isSelf: boolean; isDirectReport: boolean },
-  ) => ({ type: "people" as const, peopleRole, target });
-  const report = { isSelf: false, isDirectReport: true };
-  const stranger = { isSelf: false, isDirectReport: false };
-  const self = { isSelf: true, isDirectReport: false };
+    target?: { isSelf: boolean; isCreator?: boolean },
+  ) => ({
+    type: "people" as const,
+    peopleRole,
+    target,
+  });
+  const stranger = { isSelf: false };
+  const self = { isSelf: true };
 
-  // Expected outcome per role for a list-level check (no target).
+  // The spec's permission matrix (docs/hr-ops-spec.md §1), restated here
+  // independently of PEOPLE_ROLE_PERMISSIONS so a change to the map that
+  // breaks the spec fails this test.
+  const HR: PeopleRole[] = ["hr_finance"];
+  const TEAM: PeopleRole[] = ["admin", "ceo", "hr_finance", "operations_manager"];
+  const OPS: PeopleRole[] = ["admin", "ceo", "operations_manager"];
   const MATRIX: Record<PeopleAction, PeopleRole[]> = {
-    "people:viewDirectory": ["super_admin", "hr", "operation_manager", "staff_manager"],
-    "people:viewProfile": ["super_admin", "hr", "operation_manager", "staff_manager"],
-    "people:manageStaff": ["super_admin", "hr"],
-    "people:assignSuperAdmin": ["super_admin"],
-    "leave:approve": ["super_admin", "hr", "operation_manager", "staff_manager"],
-    "leave:recordForOthers": ["super_admin", "hr"],
-    "payroll:view": ["super_admin", "hr"],
-    "payroll:manage": ["super_admin", "hr"],
-    "contract:manage": ["super_admin", "hr"],
-    "report:viewTeam": ["super_admin", "hr", "operation_manager", "staff_manager"],
-    "performance:view": ["super_admin", "hr", "operation_manager", "staff_manager"],
-    "holiday:manage": ["super_admin", "hr"],
-    "companyDocument:manage": ["super_admin", "hr"],
-    "tasks:manageTeam": ["super_admin", "hr", "operation_manager", "staff_manager"],
+    "people:viewDirectory": TEAM,
+    "people:viewProfile": HR,
+    "people:manageStaff": HR,
+    "roles:assign": ["admin"],
+    "leave:approve": HR,
+    "leave:recordForOthers": HR,
+    "payroll:view": HR,
+    "payroll:manage": HR,
+    "contract:manage": HR,
+    "report:viewTeam": TEAM,
+    "performance:view": TEAM,
+    "holiday:manage": HR,
+    "companyDocument:manage": ["admin", "hr_finance"],
+    "tasks:manageTeam": TEAM,
+    "hr:audit": HR,
+    "clients:manage": OPS,
+    "boards:manageAll": OPS,
   };
 
   for (const action of PEOPLE_ACTIONS) {
@@ -270,9 +281,31 @@ describe("can() — People (M7.1)", () => {
         expect(can(user, action, people(role)), `${role} → ${action}`).toBe(
           MATRIX[action].includes(role),
         );
+        // A target that isn't the caller changes nothing.
+        expect(can(user, action, people(role, stranger)), `${role} → ${action} (other)`).toBe(
+          MATRIX[action].includes(role),
+        );
       }
     });
   }
+
+  it("never lets admin, ceo or operations manager reach HR data", () => {
+    for (const role of ["admin", "ceo", "operations_manager"] as const) {
+      for (const action of [
+        "people:viewProfile",
+        "people:manageStaff",
+        "leave:approve",
+        "leave:recordForOthers",
+        "payroll:view",
+        "payroll:manage",
+        "contract:manage",
+        "holiday:manage",
+        "hr:audit",
+      ] as const) {
+        expect(can(user, action, people(role, stranger)), `${role} → ${action}`).toBe(false);
+      }
+    }
+  });
 
   it("denies everything to a non-member / deactivated member", () => {
     for (const action of PEOPLE_ACTIONS) {
@@ -281,40 +314,25 @@ describe("can() — People (M7.1)", () => {
     }
   });
 
-  it("limits a staff manager's team actions to their direct reports", () => {
-    for (const action of [
-      "people:viewProfile",
-      "leave:approve",
-      "report:viewTeam",
-      "performance:view",
-      "tasks:manageTeam",
-    ] as const) {
-      expect(can(user, action, people("staff_manager", report))).toBe(true);
-      expect(can(user, action, people("staff_manager", stranger))).toBe(false);
+  it("lets anyone, including employees, view their own profile but nobody else's", () => {
+    for (const role of PEOPLE_ROLES) {
+      expect(can(user, "people:viewProfile", people(role, self))).toBe(true);
     }
+    expect(can(user, "people:viewProfile", people("employee", stranger))).toBe(false);
+    expect(can(user, "people:viewProfile", people("admin", stranger))).toBe(false);
   });
 
-  it("doesn't let a staff manager act on themselves through a team action", () => {
-    expect(can(user, "leave:approve", people("staff_manager", self))).toBe(false);
-  });
-
-  it("doesn't apply the direct-report limit to roles above staff manager", () => {
-    expect(can(user, "leave:approve", people("operation_manager", stranger))).toBe(true);
-    expect(can(user, "people:viewProfile", people("hr", stranger))).toBe(true);
-  });
-
-  it("lets anyone, including staff, view their own profile but nobody else's", () => {
-    expect(can(user, "people:viewProfile", people("staff", self))).toBe(true);
-    expect(can(user, "people:viewProfile", people("staff", stranger))).toBe(false);
-    expect(can(user, "people:viewProfile", people("staff", report))).toBe(false);
+  it("only honours isSelf for the profile view", () => {
+    expect(can(user, "payroll:view", people("employee", self))).toBe(false);
+    expect(can(user, "leave:approve", people("admin", self))).toBe(false);
   });
 
   it("lets a task's creator manage it (approve/reject/transfer) whatever their role (M7.2)", () => {
-    const creator = { isSelf: false, isDirectReport: false, isCreator: true };
-    expect(can(user, "tasks:manageTeam", people("staff", creator))).toBe(true);
-    expect(can(user, "tasks:manageTeam", people("staff", stranger))).toBe(false);
+    const creator = { isSelf: false, isCreator: true };
+    expect(can(user, "tasks:manageTeam", people("employee", creator))).toBe(true);
+    expect(can(user, "tasks:manageTeam", people("employee", stranger))).toBe(false);
     expect(can(user, "tasks:manageTeam", people(null, creator))).toBe(false);
     // Only tasks:manageTeam honours isCreator.
-    expect(can(user, "leave:approve", people("staff", creator))).toBe(false);
+    expect(can(user, "leave:approve", people("employee", creator))).toBe(false);
   });
 });

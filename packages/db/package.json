@@ -14,7 +14,8 @@
     "test": "vitest run --passWithNoTests",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
-    "db:studio": "drizzle-kit studio"
+    "db:studio": "drizzle-kit studio",
+    "db:rollback": "tsx src/rollback.ts"
   },
   "dependencies": {
     "@opentelemetry/api": "^1.9.1",
@@ -26,6 +27,7 @@
     "@types/pg": "^8.11.10",
     "drizzle-kit": "^0.31.10",
     "typescript": "^5.7.2",
-    "vitest": "^2.1.8"
+    "vitest": "^2.1.8",
+    "tsx": "^4.19.2"
   }
 }

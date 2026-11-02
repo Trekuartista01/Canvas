@@ -1,6 +1,6 @@
 import { db, schema } from "@canvas/db";
 import { TRPCError } from "@trpc/server";
-import { and, eq } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import type { PeopleAction, WorkspaceAction } from "../auth/can";
 import { can } from "../auth/can";
 import type { SessionUser } from "../auth/session";
@@ -63,11 +63,10 @@ export async function assertCanInAnyWorkspace(user: SessionUser, action: Workspa
 }
 
 /**
- * M7.1 People actions. With `targetUserId`, resolves the resource-level half
- * of the check — whether the target is the caller themselves or one of their
- * direct reports — so a staff manager only passes for their own team. Without
- * it, it's a list-level check: a staff manager passes, and the caller must
- * scope its query with teamScopeFor().
+ * People actions (P8.1 roles). With `targetUserId`, resolves whether the
+ * target is the caller themselves — the one target-level rule is "everyone
+ * may see their own profile" (can()'s isSelf branch). There's no team
+ * scoping any more: every allowed role sees the whole workspace.
  */
 export async function assertCanPeople(
   user: SessionUser,
@@ -76,39 +75,17 @@ export async function assertCanPeople(
   opts?: { targetUserId?: string },
 ) {
   const people = await getPeopleContext(workspaceId, user.id);
-  let target: { isSelf: boolean; isDirectReport: boolean } | undefined;
+  let target: { isSelf: boolean } | undefined;
   if (opts?.targetUserId) {
     const targetMembership = await findMembership(workspaceId, opts.targetUserId);
     if (!targetMembership) throw new TRPCError({ code: "NOT_FOUND" });
-    target = {
-      isSelf: opts.targetUserId === user.id,
-      isDirectReport: targetMembership.managerUserId === user.id,
-    };
+    target = { isSelf: opts.targetUserId === user.id };
   }
 
   if (!can(user, action, { type: "people", peopleRole: people?.peopleRole ?? null, target })) {
     throw new TRPCError({ code: "FORBIDDEN" });
   }
   return people!;
-}
-
-/**
- * For a list-level team action the caller already passed: null means "the
- * whole workspace", otherwise only these members (a staff manager's direct
- * reports) may be shown.
- */
-export async function teamScopeFor(workspaceId: string, userId: string, peopleRole: string) {
-  if (peopleRole !== "staff_manager") return null;
-  const reports = await db
-    .select({ userId: schema.memberships.userId })
-    .from(schema.memberships)
-    .where(
-      and(
-        eq(schema.memberships.workspaceId, workspaceId),
-        eq(schema.memberships.managerUserId, userId),
-      ),
-    );
-  return reports.map((r) => r.userId);
 }
 
 /**

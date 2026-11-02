@@ -13,9 +13,8 @@ import {
 
 export type PerfTaskRow = PerfTask & { listId: string };
 
-/** Active members, optionally limited to `scope` (a staff manager's reports). */
-export async function scopedMembers(workspaceId: string, scope: string[] | null) {
-  if (scope && scope.length === 0) return [];
+/** Every active member of the workspace. */
+export async function activeMembers(workspaceId: string) {
   return db
     .select({
       userId: schema.users.id,
@@ -29,13 +28,7 @@ export async function scopedMembers(workspaceId: string, scope: string[] | null)
       schema.employeeProfiles,
       eq(schema.employeeProfiles.membershipId, schema.memberships.id),
     )
-    .where(
-      and(
-        eq(schema.memberships.workspaceId, workspaceId),
-        activeMembershipCondition,
-        scope ? inArray(schema.memberships.userId, scope) : undefined,
-      ),
-    )
+    .where(and(eq(schema.memberships.workspaceId, workspaceId), activeMembershipCondition))
     .orderBy(asc(schema.users.name));
 }
 
@@ -104,7 +97,7 @@ export async function computeEmployeeOfMonth(
   opts: { replace?: boolean; now?: Date } = {},
 ) {
   const { from, to } = monthRange(month);
-  const members = await scopedMembers(workspaceId, null);
+  const members = await activeMembers(workspaceId);
   const tasks = await loadAssignedTasks(
     workspaceId,
     members.map((m) => m.userId),

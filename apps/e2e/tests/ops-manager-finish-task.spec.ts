@@ -30,7 +30,7 @@ test("making a member an Operations Manager notifies them when a task is finishe
   // Nia makes Bob an Operations Manager (M7.1: a people role, set from his
   // People profile) — that's who hears about finished tasks.
   await page.getByRole("link", { name: "Open" }).click();
-  await setPeopleRole(page, bobEmail, "operation_manager");
+  await setPeopleRole(page, bobEmail, "operations_manager");
 
   await createSpaceAndList(page, "Ops", "Sprint");
   await page.getByRole("button", { name: "Board", exact: true }).click();

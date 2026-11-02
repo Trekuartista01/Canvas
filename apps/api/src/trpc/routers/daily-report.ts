@@ -12,7 +12,7 @@ import { and, asc, count, desc, eq, inArray } from "drizzle-orm";
 import type { SessionUser } from "../../auth/session";
 import { logActivity } from "../../lib/activity";
 import { activeMembershipCondition } from "../../lib/membership";
-import { assertCanPeople, requireActiveMember, teamScopeFor } from "../../lib/permissions";
+import { assertCanPeople, requireActiveMember } from "../../lib/permissions";
 import { extractPlainText } from "../../lib/plain-text";
 import { publish } from "../../lib/realtime";
 import { protectedProcedure, router } from "../trpc";
@@ -151,11 +151,9 @@ export const dailyReportRouter = router({
   }),
 
   // Managers: who submitted on a date and who didn't. Staff are expected to
-  // report; anyone else in scope shows up only if they did submit. A staff
-  // manager sees only their direct reports.
+  // report; anyone else shows up only if they did submit.
   team: protectedProcedure.input(dailyReportTeamSchema).query(async ({ ctx, input }) => {
-    const people = await assertCanPeople(ctx.user, input.workspaceId, "report:viewTeam");
-    const scope = await teamScopeFor(input.workspaceId, ctx.user.id, people.peopleRole);
+    await assertCanPeople(ctx.user, input.workspaceId, "report:viewTeam");
 
     const members = await db
       .select({
@@ -171,15 +169,7 @@ export const dailyReportRouter = router({
         schema.employeeProfiles,
         eq(schema.employeeProfiles.membershipId, schema.memberships.id),
       )
-      .where(
-        and(
-          eq(schema.memberships.workspaceId, input.workspaceId),
-          activeMembershipCondition,
-          scope
-            ? inArray(schema.memberships.userId, scope.length ? scope : [ctx.user.id])
-            : undefined,
-        ),
-      )
+      .where(and(eq(schema.memberships.workspaceId, input.workspaceId), activeMembershipCondition))
       .orderBy(asc(schema.users.name));
 
     const reports = await db
@@ -209,7 +199,7 @@ export const dailyReportRouter = router({
           report: report ? { ...report, readCount: reads.get(report.id) ?? 0 } : null,
         };
       })
-      .filter((m) => m.peopleRole === "staff" || m.report !== null);
+      .filter((m) => m.peopleRole === "employee" || m.report !== null);
   }),
 
   get: protectedProcedure.input(dailyReportIdSchema).query(async ({ ctx, input }) => {

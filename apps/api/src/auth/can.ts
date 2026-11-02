@@ -1,4 +1,5 @@
 import {
+  peopleRoleHas,
   ROLE_RANK,
   type MembershipRole,
   type PeopleAction,
@@ -160,60 +161,17 @@ export interface WorkspaceResource {
   spaceOverride?: boolean | null;
 }
 
-// M7.1 People (HR) permissions — decided by the member's effective people
-// role (owner ⇒ super_admin), not membership rank, and not grantable through
-// custom roles. `team` marks actions a staff_manager may take only for their
-// own direct reports (memberships.manager_user_id = them): the resource-level
-// half of the check, same "role here, ownership in the caller" split private
-// resources use elsewhere.
-const PEOPLE_MATRIX: Record<PeopleAction, { roles: readonly PeopleRole[]; team?: true }> = {
-  "people:viewDirectory": { roles: ["super_admin", "hr", "operation_manager", "staff_manager"] },
-  // Everyone may also view their own profile — see the isSelf branch below.
-  "people:viewProfile": {
-    roles: ["super_admin", "hr", "operation_manager", "staff_manager"],
-    team: true,
-  },
-  "people:manageStaff": { roles: ["super_admin", "hr"] },
-  // Granting or removing super_admin (or deactivating one) — HR can't mint
-  // a peer above themselves.
-  "people:assignSuperAdmin": { roles: ["super_admin"] },
-  "leave:approve": {
-    roles: ["super_admin", "hr", "operation_manager", "staff_manager"],
-    team: true,
-  },
-  "leave:recordForOthers": { roles: ["super_admin", "hr"] },
-  "payroll:view": { roles: ["super_admin", "hr"] },
-  "payroll:manage": { roles: ["super_admin", "hr"] },
-  "contract:manage": { roles: ["super_admin", "hr"] },
-  "report:viewTeam": {
-    roles: ["super_admin", "hr", "operation_manager", "staff_manager"],
-    team: true,
-  },
-  "performance:view": {
-    roles: ["super_admin", "hr", "operation_manager", "staff_manager"],
-    team: true,
-  },
-  "holiday:manage": { roles: ["super_admin", "hr"] },
-  "companyDocument:manage": { roles: ["super_admin", "hr"] },
-  // M7.2: also "approve"/"reject"/"transfer" on tasks. Besides these roles,
-  // the task's creator qualifies (target.isCreator) — see lib/task-transition.ts.
-  "tasks:manageTeam": {
-    roles: ["super_admin", "hr", "operation_manager", "staff_manager"],
-    team: true,
-  },
-};
-
+// People permissions — decided by the member's effective people role (owner
+// ⇒ admin), not membership rank, and not grantable through custom roles. The
+// role → permission map lives in one place, PEOPLE_ROLE_PERMISSIONS in
+// packages/shared/src/people.ts. There is no admin/owner shortcut: HR data
+// actions are hr_finance's alone (spec §1).
 export interface PeopleResource {
   type: "people";
   /** The acting user's effective people role, or null if not an active member. */
   peopleRole: PeopleRole | null;
-  /**
-   * The member being acted on, when the action targets one person. Omitted
-   * for list-level checks (e.g. "may view team reports at all") — a
-   * staff_manager passes those, and the caller must then scope its query to
-   * their direct reports (see teamScopeFor in lib/permissions.ts).
-   */
-  target?: { isSelf: boolean; isDirectReport: boolean; isCreator?: boolean };
+  /** The member being acted on, when the action targets one person. */
+  target?: { isSelf: boolean; isCreator?: boolean };
 }
 
 export function can(
@@ -235,13 +193,11 @@ export function can(
 
 function canPeople(action: PeopleAction, resource: PeopleResource): boolean {
   if (!resource.peopleRole) return false;
+  // Everyone may see their own profile in full.
   if (action === "people:viewProfile" && resource.target?.isSelf) return true;
+  // M7.2: a task's creator may also approve/reject/transfer it — see lib/task-transition.ts.
   if (action === "tasks:manageTeam" && resource.target?.isCreator) return true;
-
-  const rule = PEOPLE_MATRIX[action];
-  if (!rule.roles.includes(resource.peopleRole)) return false;
-  if (resource.peopleRole !== "staff_manager" || !resource.target) return true;
-  return rule.team === true && resource.target.isDirectReport;
+  return peopleRoleHas(resource.peopleRole, action);
 }
 
 function canWorkspace(action: WorkspaceAction, resource: WorkspaceResource): boolean {

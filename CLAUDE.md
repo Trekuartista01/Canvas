@@ -14,7 +14,8 @@ You are building a work-management platform with an image-native AI brain. The s
 
 ## Commands
 - `pnpm dev` — full stack (web + api + worker); needs Redis running in WSL and `.env` pointing at Supabase `canvas-dev` + R2 `canvas-dev` — no Docker (see `docs/LOCAL_SETUP.md`)
-- `pnpm db:generate` / `pnpm db:migrate` — Drizzle migrations (never edit applied migrations)
+- `pnpm db:generate` / `pnpm db:migrate` — Drizzle migrations (never edit applied migrations); every migration from 0064 on needs `packages/db/drizzle/down/<tag>.down.sql`, and `pnpm db:rollback` undoes the newest
+- `pnpm seed:roles` — one-off: first HR/Ops/CEO accounts from `SEED_*_EMAILS` (refuses once HR exists)
 - `pnpm test` — vitest; `pnpm test:e2e` — Playwright
 - `pnpm check` — typecheck + lint + format (must pass before every commit)
 - `pnpm build` then `pnpm start` / `pnpm start:worker` — run the built output; prod runs these under PM2 via `ecosystem.config.cjs` (see `DEPLOYMENT.md`)

@@ -78,9 +78,9 @@ function PersonProfilePage() {
         <Detail label="Position" value={p.jobTitle} />
         <Detail label="Department" value={p.department} />
         <Detail label="Reports to" value={p.managerName} />
-        <Detail label="Employment start" value={formatDate(p.employmentStartDate)} />
         {p.personal && (
           <>
+            <Detail label="Employment start" value={formatDate(p.employmentStartDate)} />
             <Detail label="Phone" value={p.personal.phone} />
             <Detail label="Address" value={p.personal.address} />
             <Detail label="Date of birth" value={formatDate(p.personal.dateOfBirth)} />
@@ -96,9 +96,11 @@ function PersonProfilePage() {
         )}
       </dl>
 
+      {(p.canManage || p.canAssignRoles) && (
+        <RoleAndManagerEditor workspaceId={workspaceId} profile={p} />
+      )}
       {p.canManage && (
         <>
-          <RoleAndManagerEditor workspaceId={workspaceId} profile={p} />
           <ProfileEditor workspaceId={workspaceId} profile={p} />
           <StatusEditor workspaceId={workspaceId} profile={p} />
         </>
@@ -127,15 +129,18 @@ function useInvalidatePerson() {
   };
 }
 
+// Role: admin only (roles:assign), and never HR for themselves. Reports to:
+// HR (people:manageStaff). The server enforces both.
 function RoleAndManagerEditor({ workspaceId, profile }: { workspaceId: string; profile: Profile }) {
   const invalidate = useInvalidatePerson();
+  const { user } = useSession();
   const members = trpc.workspace.members.useQuery({ workspaceId });
   const setRole = trpc.people.setRole.useMutation({ onSuccess: invalidate });
   const setManager = trpc.people.setManager.useMutation({ onSuccess: invalidate });
   const error = setRole.error ?? setManager.error;
 
   const roles = PEOPLE_ROLES.filter(
-    (r) => r !== "super_admin" || profile.canAssignSuperAdmin || profile.peopleRole === r,
+    (r) => r !== "hr_finance" || profile.userId !== user?.id || profile.peopleRole === r,
   );
 
   return (
@@ -145,62 +150,66 @@ function RoleAndManagerEditor({ workspaceId, profile }: { workspaceId: string; p
     >
       <h2 className="text-sm font-semibold">Role & reporting</h2>
       <div className="grid gap-3 sm:grid-cols-2">
-        <div className="space-y-1">
-          <Label htmlFor="person-role" className="text-xs">
-            Role
-          </Label>
-          <select
-            id="person-role"
-            value={profile.peopleRole}
-            disabled={profile.isOwner || setRole.isPending}
-            onChange={(e) =>
-              setRole.mutate({
-                workspaceId,
-                userId: profile.userId,
-                peopleRole: e.target.value as PeopleRole,
-              })
-            }
-            className="border-border bg-background h-9 w-full rounded-md border px-2 text-sm"
-          >
-            {roles.map((r) => (
-              <option key={r} value={r}>
-                {PEOPLE_ROLE_LABELS[r]}
-              </option>
-            ))}
-          </select>
-          {profile.isOwner && (
-            <p className="text-muted-foreground text-xs">
-              The workspace owner is always a super admin.
-            </p>
-          )}
-        </div>
-        <div className="space-y-1">
-          <Label htmlFor="person-manager" className="text-xs">
-            Reports to
-          </Label>
-          <select
-            id="person-manager"
-            value={profile.managerUserId ?? ""}
-            disabled={setManager.isPending}
-            onChange={(e) =>
-              setManager.mutate({
-                workspaceId,
-                userId: profile.userId,
-                managerUserId: e.target.value || null,
-              })
-            }
-            className="border-border bg-background h-9 w-full rounded-md border px-2 text-sm"
-          >
-            <option value="">Nobody</option>
-            {(members.data ?? [])
-              .filter((m) => m.userId !== profile.userId)
-              .map((m) => (
-                <option key={m.userId} value={m.userId}>
-                  {m.name}
+        {profile.canAssignRoles && (
+          <div className="space-y-1">
+            <Label htmlFor="person-role" className="text-xs">
+              Role
+            </Label>
+            <select
+              id="person-role"
+              value={profile.peopleRole}
+              disabled={profile.isOwner || setRole.isPending}
+              onChange={(e) =>
+                setRole.mutate({
+                  workspaceId,
+                  userId: profile.userId,
+                  peopleRole: e.target.value as PeopleRole,
+                })
+              }
+              className="border-border bg-background h-9 w-full rounded-md border px-2 text-sm"
+            >
+              {roles.map((r) => (
+                <option key={r} value={r}>
+                  {PEOPLE_ROLE_LABELS[r]}
                 </option>
               ))}
-          </select>
-        </div>
+            </select>
+            {profile.isOwner && (
+              <p className="text-muted-foreground text-xs">
+                The workspace owner is always an admin.
+              </p>
+            )}
+          </div>
+        )}
+        {profile.canManage && (
+          <div className="space-y-1">
+            <Label htmlFor="person-manager" className="text-xs">
+              Reports to
+            </Label>
+            <select
+              id="person-manager"
+              value={profile.managerUserId ?? ""}
+              disabled={setManager.isPending}
+              onChange={(e) =>
+                setManager.mutate({
+                  workspaceId,
+                  userId: profile.userId,
+                  managerUserId: e.target.value || null,
+                })
+              }
+              className="border-border bg-background h-9 w-full rounded-md border px-2 text-sm"
+            >
+              <option value="">Nobody</option>
+              {(members.data ?? [])
+                .filter((m) => m.userId !== profile.userId)
+                .map((m) => (
+                  <option key={m.userId} value={m.userId}>
+                    {m.name}
+                  </option>
+                ))}
+            </select>
+          </div>
+        )}
       </div>
       {error && (
         <p className="text-sm text-red-600 dark:text-red-400" role="alert">
