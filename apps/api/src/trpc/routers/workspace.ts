@@ -14,7 +14,7 @@ import { and, eq, isNull } from "drizzle-orm";
 import { activeMembershipCondition, findMembership } from "../../lib/membership";
 import { assertCan } from "../../lib/permissions";
 import { isRoleVisibleInWorkspace } from "../../lib/space-overrides";
-import { seedFixedHolidays } from "../../lib/working-days";
+import { seedOfficialHolidays } from "../../lib/working-days";
 import { protectedProcedure, publicProcedure, router } from "../trpc";
 
 const INVITE_TTL_MS = 1000 * 60 * 60 * 24 * 7; // 7 days
@@ -113,8 +113,10 @@ export const workspaceRouter = router({
       verb: "workspace.created",
     });
 
-    // M7.4: every workspace starts with Kosovo's fixed-date public holidays.
-    await seedFixedHolidays(workspace.id, Number(todayReportDate(new Date()).slice(0, 4)));
+    // P8.2: every workspace starts with this year's and next year's official holidays.
+    const year = Number(todayReportDate(new Date()).slice(0, 4));
+    await seedOfficialHolidays(workspace.id, year);
+    await seedOfficialHolidays(workspace.id, year + 1);
 
     return workspace;
   }),

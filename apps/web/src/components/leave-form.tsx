@@ -3,6 +3,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useLeaveDocumentUpload } from "@/hooks/use-leave-document-upload";
+import { formatReportDate } from "@/lib/daily-report-format";
 import { trpc } from "@/lib/trpc";
 import { LEAVE_TYPE_LABELS, LEAVE_TYPES, type LeaveType } from "@canvas/shared";
 import { useState, type FormEvent } from "react";
@@ -167,6 +168,18 @@ export function LeaveForm({
               <span className="text-muted-foreground">
                 {" "}
                 · {preview.data.available} available in {preview.data.year}
+              </span>
+            )}
+            {preview.data.excludedHolidays.length > 0 && (
+              <span className="text-muted-foreground" data-testid={`${prefix}-preview-holidays`}>
+                {" "}
+                · excludes {preview.data.excludedHolidays.map((h) => h.name).join(", ")}
+              </span>
+            )}
+            {preview.data.returnDate && preview.data.workingDays > 0 && (
+              <span className="text-muted-foreground" data-testid={`${prefix}-preview-return`}>
+                {" "}
+                · back at work {formatReportDate(preview.data.returnDate)}
               </span>
             )}
           </span>

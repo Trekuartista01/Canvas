@@ -1,4 +1,5 @@
 import type { AppRouter } from "@canvas/api";
+import { HolidayCalendar } from "@/components/holiday-calendar";
 import { LeaveForm } from "@/components/leave-form";
 import { formatLeaveRange, LeaveStatusBadge } from "@/components/leave-status-badge";
 import { Button } from "@/components/ui/button";
@@ -11,16 +12,30 @@ import { createRoute } from "@tanstack/react-router";
 import type { inferRouterOutputs } from "@trpc/server";
 import { ClipboardCheck } from "lucide-react";
 import { useRef, useState } from "react";
+import { z } from "zod";
 import { workspaceShellRoute } from "./workspace.$workspaceId";
+
+// P8.2: ?tab=holidays opens the Official holidays tab (Home banner, Holidays page).
+const searchSchema = z.object({
+  tab: z.enum(["requests", "record", "balances", "holidays"]).optional(),
+});
 
 export const leaveApprovalsRoute = createRoute({
   getParentRoute: () => workspaceShellRoute,
   path: "/leave-approvals",
+  validateSearch: searchSchema,
   component: LeaveApprovalsPage,
 });
 
 type Outputs = inferRouterOutputs<AppRouter>["leave"];
-type Tab = "requests" | "record" | "balances";
+type Tab = "requests" | "record" | "balances" | "holidays";
+
+const TAB_LABELS: Record<Tab, string> = {
+  requests: "Requests",
+  record: "Record leave",
+  balances: "Balances",
+  holidays: "Festat zyrtare / Official holidays",
+};
 
 // M7.5 approver view (leave:approve). HR (leave:recordForOthers) also gets
 // "Record leave" and the balances table.
@@ -29,7 +44,16 @@ function LeaveApprovalsPage() {
   const year = Number(todayReportDate(new Date()).slice(0, 4));
   const access = trpc.leave.mine.useQuery({ workspaceId, year });
   const canRecord = access.data?.canRecord ?? false;
-  const [tab, setTab] = useState<Tab>("requests");
+  // HR keeps the official holiday calendar (holiday:manage).
+  const holidays = trpc.holiday.list.useQuery({ workspaceId, year });
+  const canManageHolidays = holidays.data?.canManage ?? false;
+  const search = leaveApprovalsRoute.useSearch();
+  const [tab, setTab] = useState<Tab>(search.tab ?? "requests");
+  const tabs: Tab[] = [
+    "requests",
+    ...(canRecord ? (["record", "balances"] as const) : []),
+    ...(canManageHolidays ? (["holidays"] as const) : []),
+  ];
 
   return (
     <div
@@ -42,25 +66,26 @@ function LeaveApprovalsPage() {
         </span>
         <h1 className="mr-auto text-lg font-semibold">Leave approvals</h1>
         <div className="flex gap-1" role="tablist">
-          {(["requests", ...(canRecord ? (["record", "balances"] as const) : [])] as Tab[]).map(
-            (t) => (
-              <Button
-                key={t}
-                size="sm"
-                role="tab"
-                aria-selected={tab === t}
-                variant={tab === t ? "default" : "ghost"}
-                onClick={() => setTab(t)}
-              >
-                {t === "requests" ? "Requests" : t === "record" ? "Record leave" : "Balances"}
-              </Button>
-            ),
-          )}
+          {tabs.map((t) => (
+            <Button
+              key={t}
+              size="sm"
+              role="tab"
+              aria-selected={tab === t}
+              variant={tab === t ? "default" : "ghost"}
+              onClick={() => setTab(t)}
+            >
+              {TAB_LABELS[t]}
+            </Button>
+          ))}
         </div>
       </div>
       {tab === "requests" && <Requests workspaceId={workspaceId} />}
       {tab === "record" && canRecord && <RecordLeave workspaceId={workspaceId} />}
       {tab === "balances" && canRecord && <Balances workspaceId={workspaceId} year={year} />}
+      {tab === "holidays" && canManageHolidays && (
+        <HolidayCalendar workspaceId={workspaceId} manage />
+      )}
     </div>
   );
 }

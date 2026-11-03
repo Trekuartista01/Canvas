@@ -1,11 +1,13 @@
 import { db, schema } from "@canvas/db";
 import {
   confirmLeaveDocumentSchema,
+  countWorkingDays,
   decideLeaveSchema,
   leaveBalanceSchema,
   leaveCalendarSchema,
   leaveRequestIdSchema,
   leaveTeamSchema,
+  nextWorkingDay,
   presignLeaveDocumentSchema,
   previewLeaveSchema,
   recordLeaveSchema,
@@ -37,21 +39,23 @@ import {
   presignPrivateUpload,
   requirePrivateAttachment,
 } from "../../lib/private-upload";
-import { countWorkingDays } from "../../lib/working-days";
+import { loadHolidayCalendar } from "../../lib/working-days";
 import { protectedProcedure, router } from "../trpc";
 
 type LeaveInput = { type: LeaveType; startDate: string; endDate: string };
 
 /** Working days + the reason it can't be requested (null = fine), for `userId`. */
 async function checkLeave(workspaceId: string, userId: string, input: LeaveInput) {
-  const workingDays =
-    input.endDate < input.startDate
-      ? 0
-      : await countWorkingDays(workspaceId, input.startDate, input.endDate);
+  // P8.2: the one working-day calculator (packages/shared/src/working-days.ts).
+  const calendar = await loadHolidayCalendar(workspaceId);
+  const count = countWorkingDays(input.startDate, input.endDate, calendar);
+  const workingDays = count.total;
+  const returnDate =
+    input.endDate < input.startDate ? null : nextWorkingDay(input.endDate, calendar);
   const existing = await loadLeaveRequests(workspaceId, userId);
   const balance = await getVacationBalance(workspaceId, userId, yearOf(input.startDate), existing);
   const problem = validateLeaveRequest({ ...input, workingDays, balance, existing });
-  return { workingDays, balance, problem };
+  return { workingDays, count, returnDate, balance, problem };
 }
 
 async function requireLeaveRequest(id: string) {
@@ -161,8 +165,21 @@ export const leaveRouter = router({
     const userId = input.userId ?? ctx.user.id;
     if (userId === ctx.user.id) await requireActiveMember(ctx.user, input.workspaceId);
     else await assertCanActOnLeaveOf(ctx.user, input.workspaceId, userId, "leave:recordForOthers");
-    const { workingDays, balance, problem } = await checkLeave(input.workspaceId, userId, input);
-    return { workingDays, available: balance.available, year: balance.year, problem };
+    const { workingDays, count, returnDate, balance, problem } = await checkLeave(
+      input.workspaceId,
+      userId,
+      input,
+    );
+    return {
+      workingDays,
+      byYear: count.byYear,
+      excludedHolidays: count.excludedHolidays,
+      excludedWeekendDays: count.excludedWeekendDays,
+      returnDate,
+      available: balance.available,
+      year: balance.year,
+      problem,
+    };
   }),
 
   request: protectedProcedure.input(requestLeaveSchema).mutation(async ({ ctx, input }) => {

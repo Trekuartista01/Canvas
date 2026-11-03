@@ -4,11 +4,11 @@ import { env } from "../env";
 import { getEmailClient } from "../email";
 import { logActivity } from "./activity";
 import { sendDailyReportReminders } from "./daily-report-reminders";
-import { sendHolidayNotices } from "./holiday-notices";
+import { sendHolidayNotices, sendHolidaysMissingNotices } from "./holiday-notices";
 import { applyLeaveCarryOver } from "./leave-carry-over";
 import { sendContractExpiryNotices } from "./contract-expiry";
 import { runEmployeeOfMonth } from "./performance-data";
-import { seedMissingHolidayCalendars } from "./working-days";
+import { seedMissingHolidayYears } from "./working-days";
 import { buildDigestEmail } from "./digest";
 import { nextOrderKey } from "./order";
 import { computeNextRunAt } from "./recurrence";
@@ -196,9 +196,10 @@ export async function runSchedulerTick() {
   await spawnDueRecurringTasks();
   await fireDueReminders();
   await sendDueDigests();
-  // M7.4: backfill the holiday calendar for workspaces created before it existed.
-  await seedMissingHolidayCalendars(new Date().getUTCFullYear());
+  // P8.2: every workspace has this year's and next year's official holidays.
+  await seedMissingHolidayYears();
   await sendHolidayNotices();
+  await sendHolidaysMissingNotices();
   await sendDailyReportReminders();
   // M7.5: unused vacation carries into the new year (once per person per year).
   await applyLeaveCarryOver();

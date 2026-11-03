@@ -148,11 +148,16 @@ test("HR routes: 403 for admin, owner, CEO, Operations Manager and employees; 20
     {
       kind: "mutation",
       path: "holiday.create",
-      input: { workspaceId: ws, name: "Guard day", date: "2027-06-01" },
+      input: { workspaceId: ws, nameSq: "Ditë roje", nameEn: "Guard day", date: "2027-06-01" },
     },
-    { kind: "mutation", path: "holiday.update", input: { holidayId: holiday!.id, name: "X" } },
+    { kind: "mutation", path: "holiday.update", input: { holidayId: holiday!.id, nameEn: "X" } },
     { kind: "mutation", path: "holiday.delete", input: { holidayId: holiday!.id } },
     { kind: "mutation", path: "holiday.setNoticeDays", input: { workspaceId: ws, days: 3 } },
+    {
+      kind: "mutation",
+      path: "holiday.setWeekendSubstitution",
+      input: { workspaceId: ws, enabled: true },
+    },
     { kind: "query", path: "leave.team", input: { workspaceId: ws } },
     { kind: "query", path: "leave.balances", input: { workspaceId: ws, year: 2030 } },
     {

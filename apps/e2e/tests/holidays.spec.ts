@@ -1,16 +1,14 @@
 import { expect, test, type Page } from "@playwright/test";
 import {
   createWorkspaceAndOpen,
-  logIn,
   openAsHr,
+  pageAs,
+  seedMember,
   signUp,
-  uniqueEmail,
   workspaceIdFrom,
 } from "./helpers";
 
-const PASSWORD = "initial-pass-123";
-
-// Pins the page to 2027, whatever today's date is.
+// Pins a holiday calendar to `target`, whatever today's date is.
 async function goToYear(page: Page, target: number) {
   const year = page.getByTestId("holidays-year");
   await expect(year).toHaveText(/\d{4}/);
@@ -24,72 +22,90 @@ async function goToYear(page: Page, target: number) {
   }
 }
 
-test("M7.4 holidays: seeded Kosovo calendar, HR adds a movable holiday, weekend days move, staff can read it", async ({
+test("P8.2 official holidays: seeded 2027 calendar, HR keeps it in Leave approvals, the calculator uses it", async ({
   page: ownerPage,
   browser,
 }) => {
-  test.setTimeout(90_000);
+  test.setTimeout(120_000);
 
   await signUp(ownerPage, "Olsi Owner");
   await createWorkspaceAndOpen(ownerPage, "Holiday Workspace");
-  // P8.1: HR keeps the calendar (the owner is admin, never HR).
-  const { hrPage: page } = await openAsHr(browser, workspaceIdFrom(ownerPage));
-  await page.getByRole("link", { name: "Holidays" }).click();
-  await expect(page.getByTestId("holidays-page")).toBeVisible();
-  await goToYear(page, 2027);
+  const workspaceId = workspaceIdFrom(ownerPage);
+  const { hrPage: hr } = await openAsHr(browser, workspaceId);
 
-  // The fixed-date holidays were seeded with the workspace.
-  const list = page.getByTestId("holidays-list");
-  await expect(list).toContainText("Independence Day");
-  await expect(list).toContainText("Orthodox Christmas");
-  // 1 May 2027 is a Saturday → Monday 3 May off.
-  const labourDay = page.getByTestId("holiday-Labour Day");
-  await expect(labourDay).toContainText(/Day off Mon,? 3 May|Day off Mon, May 3/);
-
-  // Nothing movable for 2027 yet.
-  await expect(page.getByTestId("holidays-missing-movable")).toContainText(
-    "No movable holidays entered for 2027",
+  // Everyone's Holidays page is read-only; HR gets a link to the editor.
+  await hr.getByRole("link", { name: "Holidays" }).click();
+  await expect(hr.getByTestId("holidays-page")).toBeVisible();
+  await expect(hr.getByTestId("holiday-add")).toHaveCount(0);
+  await hr.getByTestId("holidays-edit-link").click();
+  await expect(hr.getByRole("tab", { name: "Festat zyrtare / Official holidays" })).toHaveAttribute(
+    "aria-selected",
+    "true",
   );
+  await goToYear(hr, 2027);
 
-  // HR adds Orthodox Easter Monday — the date comes prefilled (3 May 2027).
-  await page.getByRole("button", { name: "+ Orthodox Easter Monday" }).click();
-  const form = page.getByTestId("holiday-form");
-  await expect(form.getByLabel("Date", { exact: true })).toHaveValue("2027-05-03");
-  const created = page.waitForResponse((res) => res.url().includes("holiday.create"));
+  // Seeded with the workspace: fixed dates, Easter Mondays, Eids to confirm,
+  // and Mon 4 Jan as the substitute for Sat 2 Jan (substitution is on).
+  const list = hr.getByTestId("holidays-list");
+  await expect(list).toContainText("Dita e Pavarësisë");
+  await expect(hr.getByTestId("holiday-2027-05-03")).toContainText("Orthodox Easter Monday");
+  await expect(hr.getByTestId("holiday-2027-01-04")).toContainText("Substitute");
+  await expect(hr.getByTestId("holiday-2027-03-10")).toContainText("Confirm date");
+
+  // Switching substitution off removes the future substitutes; on brings them back.
+  const substitution = hr.getByTestId("holiday-substitution");
+  await expect(substitution).toBeChecked();
+  const toggle = async () => {
+    const saved = hr.waitForResponse((res) => res.url().includes("holiday.setWeekendSubstitution"));
+    await substitution.click();
+    expect((await saved).ok()).toBe(true);
+  };
+  await toggle();
+  await expect(substitution).not.toBeChecked();
+  await expect(hr.getByTestId("holiday-2027-01-04")).toHaveCount(0);
+  await toggle();
+  await expect(substitution).toBeChecked();
+  await expect(hr.getByTestId("holiday-2027-01-04")).toContainText("Substitute");
+
+  // HR confirms the government's Eid date (one day earlier than estimated).
+  const eid = hr.getByTestId("holiday-2027-03-10");
+  await eid.hover();
+  await eid.getByRole("button", { name: "Edit" }).click();
+  const form = hr.getByTestId("holiday-form");
+  await form.getByLabel("Emri (shqip)").fill("Fitër Bajrami");
+  await form.getByLabel("Name (English)").fill("Eid al-Fitr");
+  await form.getByLabel("Date").fill("2027-03-09");
+  const updated = hr.waitForResponse((res) => res.url().includes("holiday.update"));
   await form.getByTestId("holiday-save").click();
-  expect((await created).ok()).toBe(true);
+  expect((await updated).ok()).toBe(true);
+  await expect(hr.getByTestId("holiday-2027-03-09")).toContainText("Eid al-Fitr");
+  await expect(hr.getByTestId("holiday-2027-03-09")).not.toContainText("Confirm date");
 
-  await expect(page.getByTestId("holiday-Orthodox Easter Monday")).toContainText("2027 only");
-  await expect(page.getByTestId("holidays-missing-movable")).toHaveCount(0);
-  // Monday is now taken, so Labour Day's day off moves on to Tuesday.
-  await expect(labourDay).toContainText(/Day off Tue,? 4 May|Day off Tue, May 4/);
-
-  // A staff member sees the same calendar, read-only.
-  await page.getByRole("link", { name: "Directory" }).click();
-  const staffEmail = uniqueEmail("staff");
-  await page.getByTestId("people-add-staff").click();
-  const staffForm = page.getByTestId("add-staff-form");
-  await staffForm.getByLabel("Full name").fill("Sam Staff");
-  await staffForm.getByLabel("Email").fill(staffEmail);
-  await staffForm.getByLabel("Initial password").fill(PASSWORD);
-  const staffCreated = page.waitForResponse((res) => res.url().includes("people.createStaff"));
-  await page.getByTestId("add-staff-submit").click();
-  expect((await staffCreated).ok()).toBe(true);
-
-  const staffContext = await browser.newContext();
-  const staff = await staffContext.newPage();
-  await logIn(staff, staffEmail, PASSWORD);
-  await staff.getByRole("link", { name: "Open" }).click();
+  // An employee reads the same calendar, without edit controls or the link,
+  // and the leave form counts with it: 30 Dec 2026 – 5 Jan 2027 is 3 days.
+  const employee = await seedMember(workspaceId, "Sam Staff", "employee");
+  const staff = await pageAs(browser, employee, workspaceId);
   await staff.getByRole("link", { name: "Holidays" }).click();
   await goToYear(staff, 2027);
-  await expect(staff.getByTestId("holiday-Orthodox Easter Monday")).toBeVisible();
-  await expect(staff.getByTestId("holiday-add")).toHaveCount(0);
+  await expect(staff.getByTestId("holiday-2027-03-09")).toBeVisible();
+  await expect(staff.getByTestId("holidays-edit-link")).toHaveCount(0);
+  await expect(staff.getByRole("button", { name: "Edit" })).toHaveCount(0);
 
-  // So does the owner (admin): reading, not managing.
+  await staff.getByRole("link", { name: "Leave", exact: true }).click();
+  const leaveForm = staff.getByTestId("leave-form");
+  await leaveForm.getByLabel("Type").selectOption("vacation");
+  await leaveForm.getByLabel("First day").fill("2026-12-30");
+  await leaveForm.getByLabel("Last day").fill("2027-01-05");
+  await expect(staff.getByTestId("leave-preview")).toContainText("3 working days");
+  await expect(staff.getByTestId("leave-preview-holidays")).toContainText("New Year's Day");
+  await expect(staff.getByTestId("leave-preview-return")).toContainText(/Wed,? (6 Jan|Jan 6)/);
+
+  // The owner (admin) reads, never manages.
   await ownerPage.getByRole("link", { name: "Holidays" }).click();
   await goToYear(ownerPage, 2027);
-  await expect(ownerPage.getByTestId("holiday-Orthodox Easter Monday")).toBeVisible();
-  await expect(ownerPage.getByTestId("holiday-add")).toHaveCount(0);
+  await expect(ownerPage.getByTestId("holiday-2027-03-09")).toBeVisible();
+  await expect(ownerPage.getByTestId("holidays-edit-link")).toHaveCount(0);
 
-  await staffContext.close();
+  await staff.context().close();
+  await hr.context().close();
 });

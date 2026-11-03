@@ -2830,3 +2830,32 @@ During the real deploy: Cloudflare billing doesn't accept Kosovo cards, so R2 ca
 
 - `pnpm check` green; `pnpm test`: API 388, shared 108, db 11, web 15.
 - Full Playwright run at CI parity: **77/77 passed**.
+
+## 2026-11-03 P8.2: Kosovo working-day calculator + official holidays
+
+### Done
+
+- **One calculator** (`packages/shared/src/working-days.ts`): `countWorkingDays(start, end, calendar) → { total, byYear, excludedHolidays, excludedWeekendDays }`, `nextWorkingDay`, `previousWorkingDay`, `holidayCalendar(rows)`. Date-only strings, UTC arithmetic. The API wrapper (`apps/api/src/lib/working-days.ts`) only loads the workspace's rows; leave, daily-report reminders and holiday notices all go through it. The old `expandHolidays` / `makeHolidayChecker` weekend rule is gone — the rows are the truth.
+- **Migration `0065`** (down file included): `public_holidays` gets `name_sq`, `name_en` (renamed from `name`; `name_sq` backfilled from a map), `year`, `is_observed_substitute`. M7.4's recurring rows become concrete rows of their anchor year; an HR observed-date override becomes a substitute row. `observed_date` / `is_recurring_fixed` stay unused so the migration can be rolled back. New `public_holiday_years` (seed claim + December notice claim, RLS on). `workspaces.holiday_weekend_substitution` default on.
+- **Seed:** `seedOfficialHolidays(workspace, year)` — fixed dates, both Easter Mondays, Eid estimates named "(confirm date)" / "(konfirmo datën)" (`KOSOVO_EID_ESTIMATES`, 2026–2030), and Monday substitutes when the setting is on. Once per (workspace, year); a date that already has a row is skipped. Runs on workspace creation and every scheduler tick for this year and next.
+- **Substitution setting:** on adds missing substitutes for seeded years from this one on; off soft-deletes substitutes dated today or later (past ones stay, leave was counted with them). HR can delete any substitute row.
+- **API:** `holiday.list` (per year, with `onWeekend` / `needsConfirmation`), `create` / `update` take `nameSq` + `nameEn`, new `setWeekendSubstitution` and `reminder`. `leave.preview` also returns `byYear`, `excludedHolidays`, `excludedWeekendDays` and `returnDate`.
+- **Notifications:** `holiday.upcoming` now per concrete weekday row. New `holiday.missing` to HR once in December when next year is empty or has an unconfirmed Eid; Home and My Tasks show HR a banner linking to the editor.
+- **UI:** shared `HolidayCalendar` component. Leave approvals has a "Festat zyrtare / Official holidays" tab (HR, `?tab=holidays`) with add/edit/delete, the substitution switch and notice days. The Holidays page is read-only for everyone, with an "Edit in Leave approvals" link for HR. The leave form shows excluded holidays and the return date.
+
+### Decisions
+
+- **Two substitutes never share a day:** the spec says "the following Monday"; when that Monday is already off (1 May 2027 Sat → Mon 3 May is Orthodox Easter Monday) the substitute moves to the next free weekday (Tue 4 May). Substitutes are only for the fixed dates, as the spec says (not Eids).
+- **Eid seeding** skips a year where HR already entered an Eid (name matches eid/bajram), so existing workspaces don't get a duplicate estimate.
+- **Leave rules are untouched** (still the single-year balance check); byYear splitting, the over-balance warning and HR's decide flow are P8.4.
+- The "holidays missing" reminder is in-app only (the spec's email list doesn't include it).
+
+### Verified
+
+- `pnpm check` green; `pnpm test`: API 388, shared 110 (all §2 cases: 4 days / return 03.03.2026, 30.12–05.01 = 4 OFF / 3 ON with byYear, zero-day ranges, nextWorkingDay and all four previousWorkingDay cases), db 11, web 15.
+- `0065` applied locally (10,778 rows migrated, RLS on the new tables); `pnpm db:rollback` restored the old columns and row count; re-migrated cleanly.
+- Playwright at CI parity: **77/77 passed**. `holidays.spec.ts` rewritten: seeded 2027 calendar, substitution off/on, HR confirms an Eid, employee reads only, the leave form counts 30.12.2026–05.01.2027 as 3 days and returns Wed 6 Jan. `hr-guards.spec.ts` covers `holiday.setWeekendSubstitution`. (One earlier full run had `brain-tools.spec.ts` fail once; it passed alone and in the rerun.)
+
+### TODO
+
+- Seed estimates past 2030 when the time comes (`KOSOVO_EID_ESTIMATES`); the December banner covers a missing year.

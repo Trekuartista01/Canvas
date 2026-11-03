@@ -71,14 +71,18 @@ daily_report_reads(report_id fk, user_id fk, read_at, pk pair)           -- read
 daily_report_reminders(id, workspace_id fk, user_id fk, report_date,     -- 16:45 reminder ledger:
                   sent_at, uniq(workspace_id, user_id, report_date))    -- at most one per person per day
 
-public_holidays  (id, workspace_id fk, date, name,                      -- M7.4 Kosovo calendar
-                  observed_date null,                                   -- HR override; null = weekend rule
-                  is_recurring_fixed bool,                              -- true: month/day repeats yearly
+public_holidays  (id, workspace_id fk, date, year,                      -- P8.2 official holidays: each
+                  name_sq, name_en,                                     --   live row = one non-working day
+                  is_observed_substitute bool,                          -- Monday off for a weekend holiday
+                  observed_date null, is_recurring_fixed bool,          -- M7.4 leftovers, unused (rollback only)
                   created_by fk users null, deleted_at)
+public_holiday_years(id, workspace_id fk, year, seeded_at null,          -- P8.2 seed claim per year +
+                  missing_notified_at null, uniq(workspace_id, year))   --   December "holidays missing" notice
 public_holiday_notices(id, workspace_id fk, holiday_id fk, observed_date, -- "holiday in N days" ledger
                   sent_at, uniq(workspace_id, holiday_id, observed_date))
--- workspaces also carry holiday_notice_days (default 2, 0 = off) and
--- holidays_seeded_at (fixed holidays seeded once).
+-- workspaces also carry holiday_notice_days (default 2, 0 = off),
+-- holiday_weekend_substitution (default true, HR) and holidays_seeded_at
+-- (M7.4, unused since P8.2).
 
 leave_requests   (id, workspace_id fk, user_id fk,                      -- M7.5
                   type enum('sick','vacation','personal','maternity','paternity','emergency'),

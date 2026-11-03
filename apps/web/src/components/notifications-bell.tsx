@@ -63,6 +63,13 @@ function holidayLine(payload: unknown): string {
   return `${name} — day off ${day}`;
 }
 
+// P8.2 "holiday.missing" (to HR in December): the year to fill in.
+function missingYear(payload: unknown): string {
+  if (!payload || typeof payload !== "object") return "next year";
+  const year = (payload as { year?: unknown }).year;
+  return typeof year === "number" ? String(year) : "next year";
+}
+
 // M7.6 "contract.expiring": "Sam Staff — in 7 days".
 function contractLine(payload: unknown): string {
   if (!payload || typeof payload !== "object") return "";
@@ -195,6 +202,12 @@ export function NotificationsBell() {
                         to: "/w/$workspaceId/leave",
                         params: { workspaceId: n.workspaceId },
                       });
+                    } else if (n.verb === "holiday.missing") {
+                      navigate({
+                        to: "/w/$workspaceId/leave-approvals",
+                        params: { workspaceId: n.workspaceId },
+                        search: { tab: "holidays" },
+                      });
                     } else if (n.verb === "holiday.upcoming") {
                       navigate({
                         to: "/w/$workspaceId/holidays",
@@ -206,7 +219,12 @@ export function NotificationsBell() {
                     n.readAt ? "" : "bg-muted/50"
                   } hover:bg-muted`}
                 >
-                  {n.verb === "holiday.upcoming" ? (
+                  {n.verb === "holiday.missing" ? (
+                    <span>
+                      <span className="font-medium">Official holidays:</span> add or confirm{" "}
+                      {missingYear(n.payloadJson)}&rsquo;s calendar
+                    </span>
+                  ) : n.verb === "holiday.upcoming" ? (
                     <span>
                       <span className="font-medium">Public holiday:</span>{" "}
                       {holidayLine(n.payloadJson)}

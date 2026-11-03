@@ -1,18 +1,21 @@
 import { db, schema } from "@canvas/db";
 import {
   createHolidaySchema,
-  expandHolidays,
-  hasMovableHolidays,
   holidayIdSchema,
+  holidayReminderSchema,
+  isWeekend,
   listHolidaysSchema,
+  needsDateConfirmation,
   setHolidayNoticeDaysSchema,
+  setHolidayWeekendSubstitutionSchema,
   updateHolidaySchema,
 } from "@canvas/shared";
 import { TRPCError } from "@trpc/server";
 import { and, eq, isNull } from "drizzle-orm";
 import { logActivity } from "../../lib/activity";
+import { holidaysMissingNextYear } from "../../lib/holiday-notices";
 import { assertCanPeople, canPeopleAction, requireActiveMember } from "../../lib/permissions";
-import { loadHolidayRows } from "../../lib/working-days";
+import { applyWeekendSubstitution, loadHolidayRows } from "../../lib/working-days";
 import { protectedProcedure, router } from "../trpc";
 
 async function requireHoliday(holidayId: string) {
@@ -23,61 +26,57 @@ async function requireHoliday(holidayId: string) {
   return holiday;
 }
 
-// A recurring fixed-date holiday's observed day differs each year, so it's
-// always by the rule — the override is for one-off (movable) entries only.
-function assertObservedOverride(
-  isRecurringFixed: boolean,
-  observedDate: string | null | undefined,
-) {
-  if (isRecurringFixed && observedDate) {
-    throw new TRPCError({
-      code: "BAD_REQUEST",
-      message: "Recurring holidays always follow the weekend rule",
-    });
-  }
-}
+const yearOf = (date: string) => Number(date.slice(0, 4));
 
+// P8.2 official holidays. Everyone reads the calendar; only HR
+// (holiday:manage) changes it — from Leave approvals → Official holidays.
 export const holidayRouter = router({
-  // Everyone sees the calendar; HR (holiday:manage) also gets the edit controls.
   list: protectedProcedure.input(listHolidaysSchema).query(async ({ ctx, input }) => {
     await requireActiveMember(ctx.user, input.workspaceId);
     const [rows, workspace, canManage] = await Promise.all([
-      loadHolidayRows(input.workspaceId),
+      loadHolidayRows(input.workspaceId, input.year),
       db.query.workspaces.findFirst({ where: eq(schema.workspaces.id, input.workspaceId) }),
       canPeopleAction(ctx.user, input.workspaceId, "holiday:manage"),
     ]);
-    const rowById = new Map(rows.map((r) => [r.id, r]));
     return {
       year: input.year,
-      holidays: expandHolidays(rows, input.year).map((o) => ({
-        ...o,
-        // What HR edits: the stored date (a recurring row's anchor year is
-        // irrelevant) and the explicit override, if any.
-        observedOverride: rowById.get(o.id)?.observedDate ?? null,
+      holidays: rows.map((r) => ({
+        ...r,
+        onWeekend: isWeekend(r.date),
+        needsConfirmation: needsDateConfirmation(r),
       })),
-      hasMovableHolidays: hasMovableHolidays(rows, input.year),
       noticeDays: workspace?.holidayNoticeDays ?? 2,
+      weekendSubstitution: workspace?.holidayWeekendSubstitution ?? true,
       canManage,
     };
   }),
 
+  // HR's Home banner in December: "Add next year's official holidays".
+  reminder: protectedProcedure.input(holidayReminderSchema).query(async ({ ctx, input }) => {
+    await requireActiveMember(ctx.user, input.workspaceId);
+    if (!(await canPeopleAction(ctx.user, input.workspaceId, "holiday:manage"))) {
+      return { missing: false, year: null };
+    }
+    return holidaysMissingNextYear(input.workspaceId);
+  }),
+
   create: protectedProcedure.input(createHolidaySchema).mutation(async ({ ctx, input }) => {
     await assertCanPeople(ctx.user, input.workspaceId, "holiday:manage");
-    assertObservedOverride(input.isRecurringFixed, input.observedDate);
     const [holiday] = await db
       .insert(schema.publicHolidays)
       .values({
         workspaceId: input.workspaceId,
-        name: input.name,
         date: input.date,
-        isRecurringFixed: input.isRecurringFixed,
-        observedDate: input.observedDate ?? null,
+        year: yearOf(input.date),
+        nameSq: input.nameSq,
+        nameEn: input.nameEn,
+        isObservedSubstitute: input.isObservedSubstitute,
         createdBy: ctx.user.id,
       })
       .returning();
     if (!holiday) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
     await logActivity(input.workspaceId, ctx.user.id, "holiday", holiday.id, "holiday.created", {
-      name: holiday.name,
+      name: holiday.nameEn,
       date: holiday.date,
     });
     return holiday;
@@ -86,25 +85,22 @@ export const holidayRouter = router({
   update: protectedProcedure.input(updateHolidaySchema).mutation(async ({ ctx, input }) => {
     const existing = await requireHoliday(input.holidayId);
     await assertCanPeople(ctx.user, existing.workspaceId, "holiday:manage");
-    const isRecurringFixed = input.isRecurringFixed ?? existing.isRecurringFixed;
-    const observedDate =
-      input.observedDate !== undefined ? input.observedDate : existing.observedDate;
-    assertObservedOverride(isRecurringFixed, observedDate);
-
     const [holiday] = await db
       .update(schema.publicHolidays)
       .set({
-        ...(input.name !== undefined ? { name: input.name } : {}),
-        ...(input.date !== undefined ? { date: input.date } : {}),
-        isRecurringFixed,
-        observedDate,
+        ...(input.date !== undefined ? { date: input.date, year: yearOf(input.date) } : {}),
+        ...(input.nameSq !== undefined ? { nameSq: input.nameSq } : {}),
+        ...(input.nameEn !== undefined ? { nameEn: input.nameEn } : {}),
+        ...(input.isObservedSubstitute !== undefined
+          ? { isObservedSubstitute: input.isObservedSubstitute }
+          : {}),
         updatedAt: new Date(),
       })
       .where(eq(schema.publicHolidays.id, existing.id))
       .returning();
     if (!holiday) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
     await logActivity(existing.workspaceId, ctx.user.id, "holiday", holiday.id, "holiday.updated", {
-      name: holiday.name,
+      name: holiday.nameEn,
       date: holiday.date,
     });
     return holiday;
@@ -123,10 +119,7 @@ export const holidayRouter = router({
       "holiday",
       existing.id,
       "holiday.deleted",
-      {
-        name: existing.name,
-        date: existing.date,
-      },
+      { name: existing.nameEn, date: existing.date },
     );
     return { id: existing.id };
   }),
@@ -148,5 +141,21 @@ export const holidayRouter = router({
         { days: input.days },
       );
       return { days: input.days };
+    }),
+
+  setWeekendSubstitution: protectedProcedure
+    .input(setHolidayWeekendSubstitutionSchema)
+    .mutation(async ({ ctx, input }) => {
+      await assertCanPeople(ctx.user, input.workspaceId, "holiday:manage");
+      const changed = await applyWeekendSubstitution(input.workspaceId, input.enabled);
+      await logActivity(
+        input.workspaceId,
+        ctx.user.id,
+        "workspace",
+        input.workspaceId,
+        "workspace.holiday_weekend_substitution_changed",
+        { enabled: input.enabled, changedDays: changed },
+      );
+      return { enabled: input.enabled, changedDays: changed };
     }),
 });

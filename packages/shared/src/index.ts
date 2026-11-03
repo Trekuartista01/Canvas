@@ -23,6 +23,7 @@ export * from "./brain-context";
 export * from "./people";
 export * from "./due";
 export * from "./holidays";
+export * from "./working-days";
 export * from "./daily-reports";
 export * from "./leave";
 export * from "./documents";

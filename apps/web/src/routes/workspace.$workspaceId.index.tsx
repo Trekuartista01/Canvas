@@ -1,5 +1,6 @@
 import type { AppRouter } from "@canvas/api";
 import { EmployeeOfMonthBanner } from "@/components/employee-of-month-banner";
+import { HolidaysMissingBanner } from "@/components/holidays-missing-banner";
 import { MembersPanel } from "@/components/members-panel";
 import { TaskHighlightRow } from "@/components/task-highlight-row";
 import { TemplatesPanel } from "@/components/templates-panel";
@@ -84,6 +85,7 @@ function WorkspaceHome() {
 
   return (
     <div className="space-y-8 p-6">
+      <HolidaysMissingBanner workspaceId={workspaceId} />
       <EmployeeOfMonthBanner workspaceId={workspaceId} />
       <p className="text-muted-foreground text-sm">
         Select a list from the sidebar, or create a space to get started.

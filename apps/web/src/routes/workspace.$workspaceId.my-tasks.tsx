@@ -1,5 +1,6 @@
 import type { AppRouter } from "@canvas/api";
 import { EmployeeOfMonthBanner } from "@/components/employee-of-month-banner";
+import { HolidaysMissingBanner } from "@/components/holidays-missing-banner";
 import { isOverdue, type StatusKind } from "@canvas/shared";
 import { formatDue } from "@/lib/format";
 import { useSession } from "@/hooks/use-session";
@@ -81,6 +82,7 @@ function MyTasksPage() {
         )}
       </div>
 
+      <HolidaysMissingBanner workspaceId={workspaceId} />
       <EmployeeOfMonthBanner workspaceId={workspaceId} />
 
       {tasks.isLoading ? (

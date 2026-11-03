@@ -24,6 +24,8 @@ export const NOTIFICATION_VERB_LABELS: Record<string, string> = {
   "daily_report.reminder": "Reminder: submit today's daily report",
   // M7.4 — rendered with the holiday name and date from the payload.
   "holiday.upcoming": "Public holiday coming up",
+  // P8.2 — to HR in December, rendered with the year from the payload.
+  "holiday.missing": "Add next year’s official holidays",
   // M7.5 leave.
   "leave.requested": "asked for leave",
   "leave.approved": "approved your leave",

@@ -1,28 +1,38 @@
-// M7.4 Kosovo public holidays + working days. Pure — every date is a
+// Kosovo official holidays (M7.4, reworked in P8.2). Pure — every date is a
 // "YYYY-MM-DD" calendar date (Kosovo calendar), handled in UTC arithmetic so
 // the machine's own zone never shifts a day.
+//
+// Since P8.2 the stored rows are the truth: each row is one concrete day off
+// (`official_holidays` in the spec, our `public_holidays`). This file only
+// knows what to *seed* for a year; counting days is ./working-days.ts.
 
-export const KOSOVO_FIXED_HOLIDAYS: { monthDay: string; name: string }[] = [
-  { monthDay: "01-01", name: "New Year's Day" },
-  { monthDay: "01-02", name: "New Year's Day (second day)" },
-  { monthDay: "01-07", name: "Orthodox Christmas" },
-  { monthDay: "02-17", name: "Independence Day" },
-  { monthDay: "04-09", name: "Constitution Day" },
-  { monthDay: "05-01", name: "Labour Day" },
-  { monthDay: "05-09", name: "Europe Day" },
-  { monthDay: "12-25", name: "Catholic Christmas" },
+export const KOSOVO_FIXED_HOLIDAYS: { monthDay: string; nameSq: string; nameEn: string }[] = [
+  { monthDay: "01-01", nameSq: "Viti i Ri", nameEn: "New Year's Day" },
+  { monthDay: "01-02", nameSq: "Dita e dytë e Vitit të Ri", nameEn: "New Year's Day (second day)" },
+  { monthDay: "01-07", nameSq: "Krishtlindjet Ortodokse", nameEn: "Orthodox Christmas" },
+  { monthDay: "02-17", nameSq: "Dita e Pavarësisë", nameEn: "Independence Day" },
+  { monthDay: "04-09", nameSq: "Dita e Kushtetutës", nameEn: "Constitution Day" },
+  { monthDay: "05-01", nameSq: "Dita Ndërkombëtare e Punës", nameEn: "Labour Day" },
+  { monthDay: "05-09", nameSq: "Dita e Evropës", nameEn: "Europe Day" },
+  { monthDay: "12-25", nameSq: "Krishtlindjet Katolike", nameEn: "Catholic Christmas" },
 ];
 
-/** Movable holidays HR enters each year. Easter Mondays come with a suggested date. */
-export const KOSOVO_MOVABLE_HOLIDAYS: {
-  name: string;
-  suggestDate?: (year: number) => string;
-}[] = [
-  { name: "Catholic Easter Monday", suggestDate: (y) => addDays(catholicEaster(y), 1) },
-  { name: "Orthodox Easter Monday", suggestDate: (y) => addDays(orthodoxEaster(y), 1) },
-  { name: "Eid al-Fitr (Bajrami i Madh)" },
-  { name: "Eid al-Adha (Kurban Bajrami)" },
-];
+/** Shown in a seeded Eid's name until HR confirms the government's date. */
+export const CONFIRM_DATE_EN = "(confirm date)";
+export const CONFIRM_DATE_SQ = "(konfirmo datën)";
+
+/**
+ * Expected Eid dates (astronomical estimates; the government announces the
+ * real ones). Seeded with "(confirm date)" in the name. Years without an
+ * entry get no Eid rows and HR adds them.
+ */
+export const KOSOVO_EID_ESTIMATES: Record<number, { fitr: string; adha: string }> = {
+  2026: { fitr: "2026-03-20", adha: "2026-05-27" },
+  2027: { fitr: "2027-03-10", adha: "2027-05-16" },
+  2028: { fitr: "2028-02-27", adha: "2028-05-05" },
+  2029: { fitr: "2029-02-14", adha: "2029-04-24" },
+  2030: { fitr: "2030-02-04", adha: "2030-04-13" },
+};
 
 export const DEFAULT_HOLIDAY_NOTICE_DAYS = 2;
 
@@ -80,82 +90,107 @@ export function orthodoxEaster(year: number): string {
   return addDays(ymd(year, month, day), 13);
 }
 
-export interface HolidayRow {
-  id: string;
-  name: string;
-  /** For a recurring fixed-date holiday only the month/day counts. */
+export interface OfficialHoliday {
   date: string;
-  /** HR override; null = by the observed rule. */
-  observedDate: string | null;
-  isRecurringFixed: boolean;
-}
-
-export interface HolidayOccurrence {
-  id: string;
-  name: string;
-  date: string;
-  /** The working day taken off — the date itself unless it fell on a weekend. */
-  observedDate: string;
-  isRecurringFixed: boolean;
+  nameSq: string;
+  nameEn: string;
+  isObservedSubstitute: boolean;
 }
 
 /**
- * The holidays of one year with their observed dates. Rule: a holiday on a
- * Saturday or Sunday is observed on the next working day that isn't already
- * a holiday (or another holiday's observed day) — so New Year on Sat + Sun
- * gives Mon and Tue off.
+ * What the seed inserts for one year: the fixed dates, both Easter Mondays,
+ * the Eids (estimated, "(confirm date)") and — when `substitution` is on —
+ * a substitute day off for every fixed holiday on a weekend. The substitute
+ * is the following Monday, or the next weekday after it that isn't already a
+ * day off (New Year on Sat + Sun → Mon and Tue; 1 May 2027 on a Saturday
+ * whose Monday is Orthodox Easter Monday → Tue 4 May).
  */
-export function expandHolidays(rows: HolidayRow[], year: number): HolidayOccurrence[] {
-  const occurrences = rows
-    .map((row) => ({
-      row,
-      date: row.isRecurringFixed ? `${year}-${row.date.slice(5)}` : row.date,
-    }))
-    .filter(({ row, date }) => (row.isRecurringFixed ? true : date.startsWith(`${year}-`)))
-    .sort((x, y) => x.date.localeCompare(y.date) || x.row.name.localeCompare(y.row.name));
+export function officialHolidays(
+  year: number,
+  { substitution }: { substitution: boolean },
+): OfficialHoliday[] {
+  const fixed = KOSOVO_FIXED_HOLIDAYS.map((h) => ({
+    date: `${year}-${h.monthDay}`,
+    nameSq: h.nameSq,
+    nameEn: h.nameEn,
+    isObservedSubstitute: false,
+  }));
+  const movable: OfficialHoliday[] = [
+    {
+      date: addDays(catholicEaster(year), 1),
+      nameSq: "E hëna e Pashkëve Katolike",
+      nameEn: "Catholic Easter Monday",
+      isObservedSubstitute: false,
+    },
+    {
+      date: addDays(orthodoxEaster(year), 1),
+      nameSq: "E hëna e Pashkëve Ortodokse",
+      nameEn: "Orthodox Easter Monday",
+      isObservedSubstitute: false,
+    },
+  ];
+  const eid = KOSOVO_EID_ESTIMATES[year];
+  if (eid) {
+    movable.push(
+      {
+        date: eid.fitr,
+        nameSq: `Fitër Bajrami ${CONFIRM_DATE_SQ}`,
+        nameEn: `Eid al-Fitr ${CONFIRM_DATE_EN}`,
+        isObservedSubstitute: false,
+      },
+      {
+        date: eid.adha,
+        nameSq: `Kurban Bajrami ${CONFIRM_DATE_SQ}`,
+        nameEn: `Eid al-Adha ${CONFIRM_DATE_EN}`,
+        isObservedSubstitute: false,
+      },
+    );
+  }
 
-  // Every actual holiday date, plus overrides, is unavailable as a substitute day.
-  const taken = new Set(occurrences.map((o) => o.date));
-  for (const { row } of occurrences) if (row.observedDate) taken.add(row.observedDate);
-
-  return occurrences.map(({ row, date }) => {
-    let observed = date;
-    if (!row.isRecurringFixed && row.observedDate) {
-      observed = row.observedDate;
-    } else if (isWeekend(date)) {
-      observed = addDays(date, 1);
-      while (isWeekend(observed) || taken.has(observed)) observed = addDays(observed, 1);
-      taken.add(observed);
+  const all = [...fixed, ...movable];
+  if (substitution) {
+    const taken = new Set(all.map((h) => h.date));
+    for (const h of fixed) {
+      if (!isWeekend(h.date)) continue;
+      let day = addDays(h.date, 1);
+      while (isWeekend(day) || taken.has(day)) day = addDays(day, 1);
+      taken.add(day);
+      all.push(substituteFor(h, day));
     }
-    return {
-      id: row.id,
-      name: row.name,
-      date,
-      observedDate: observed,
-      isRecurringFixed: row.isRecurringFixed,
-    };
-  });
+  }
+  return all.sort((x, y) => x.date.localeCompare(y.date) || x.nameEn.localeCompare(y.nameEn));
 }
 
-/**
- * `isHoliday(date)` for a workspace's calendar: true on any day off that
- * falls on a weekday (the holiday itself, or its observed substitute).
- * Years are expanded lazily and cached.
- */
-export function makeHolidayChecker(rows: HolidayRow[]): (date: string) => boolean {
-  const byYear = new Map<number, Set<string>>();
-  return (date) => {
-    const year = Number(date.slice(0, 4));
-    let daysOff = byYear.get(year);
-    if (!daysOff) {
-      daysOff = new Set(expandHolidays(rows, year).map((o) => o.observedDate));
-      byYear.set(year, daysOff);
-    }
-    return daysOff.has(date);
+export function substituteFor(
+  holiday: { nameSq: string; nameEn: string },
+  date: string,
+): OfficialHoliday {
+  return {
+    date,
+    nameSq: `${holiday.nameSq} (ditë zëvendësuese)`,
+    nameEn: `${holiday.nameEn} (substitute day)`,
+    isObservedSubstitute: true,
   };
 }
 
-/** Mon–Fri and not a public holiday (or a holiday's observed day). */
+/** A seeded Eid HR still has to check against the government's announcement. */
+export function needsDateConfirmation(holiday: { nameSq: string; nameEn: string }): boolean {
+  return holiday.nameEn.includes(CONFIRM_DATE_EN) || holiday.nameSq.includes(CONFIRM_DATE_SQ);
+}
+
+/**
+ * HR's December reminder ("Add next year's official holidays"): due in
+ * December when next year has no rows at all or still has an unconfirmed Eid.
+ */
+export function holidaysMissingFor(
+  today: string,
+  nextYearRows: { nameSq: string; nameEn: string }[],
+): boolean {
+  if (today.slice(5, 7) !== "12") return false;
+  return nextYearRows.length === 0 || nextYearRows.some(needsDateConfirmation);
+}
+
+/** Mon–Fri and not a public holiday. */
 export function isWorkingDay(
   date: string,
   isHoliday: (date: string) => boolean = () => false,
@@ -163,29 +198,11 @@ export function isWorkingDay(
   return !isWeekend(date) && !isHoliday(date);
 }
 
-/** Working days from `from` to `to`, both inclusive; 0 if `to` is before `from`. */
-export function countWorkingDays(
-  from: string,
-  to: string,
-  isHoliday: (date: string) => boolean = () => false,
-): number {
-  let count = 0;
-  for (let d = from; d <= to; d = addDays(d, 1)) {
-    if (isWorkingDay(d, isHoliday)) count++;
-  }
-  return count;
-}
-
 /**
  * Should the "holiday coming up" notice go out today? From `noticeDays`
  * calendar days before the day off until the day before it — a worker that
  * missed the exact day still catches up; the notice ledger keeps it to once.
  */
-export function isHolidayNoticeDue(today: string, observedDate: string, noticeDays: number) {
-  return today >= addDays(observedDate, -noticeDays) && today < observedDate;
-}
-
-/** Has HR entered any movable (non-recurring) holiday for `year` yet? */
-export function hasMovableHolidays(rows: HolidayRow[], year: number): boolean {
-  return rows.some((r) => !r.isRecurringFixed && r.date.startsWith(`${year}-`));
+export function isHolidayNoticeDue(today: string, dayOff: string, noticeDays: number) {
+  return today >= addDays(dayOff, -noticeDays) && today < dayOff;
 }

@@ -1,4 +1,5 @@
 import {
+  boolean,
   index,
   integer,
   jsonb,
@@ -46,6 +47,9 @@ export const workspaces = pgTable("workspaces", {
   // M7.4: set once the Kosovo fixed-date holidays have been seeded, so a
   // calendar HR has emptied on purpose is never re-seeded.
   holidaysSeededAt: timestamp("holidays_seeded_at", { withTimezone: true }),
+  // P8.2: when a fixed holiday falls on a weekend, the seed adds a Monday
+  // substitute day off (HR can switch it off and delete any substitute).
+  holidayWeekendSubstitution: boolean("holiday_weekend_substitution").notNull().default(true),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
