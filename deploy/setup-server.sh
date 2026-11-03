@@ -43,6 +43,20 @@ as_root corepack enable
 command -v pm2 >/dev/null || as_root npm install -g pm2@7 >/dev/null 2>&1
 pm2 --version
 
+say "LibreOffice + Garamond (P8.5 Vendim: DOCX → PDF on one page)"
+as_root apt-get install -y -qq libreoffice-writer-nogui fonts-ebgaramond fontconfig >/dev/null
+# The template asks for "Garamond"; EB Garamond is the free version of the
+# same typeface, so map the name to it or LibreOffice picks another serif.
+as_root tee /etc/fonts/conf.d/60-canvas-garamond.conf >/dev/null <<'FONTS'
+<?xml version="1.0"?>
+<!DOCTYPE fontconfig SYSTEM "fonts.dtd">
+<fontconfig>
+  <alias binding="same"><family>Garamond</family><prefer><family>EB Garamond</family></prefer></alias>
+</fontconfig>
+FONTS
+as_root fc-cache -f >/dev/null
+soffice --version
+
 say "Redis (127.0.0.1 only, password, no eviction, append-only)"
 as_root apt-get install -y -qq redis-server >/dev/null
 REDIS_CONF=/etc/redis/redis.conf

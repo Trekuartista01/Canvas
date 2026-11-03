@@ -15,6 +15,7 @@ import {
   setDefaultVacationDaysSchema,
   setLeaveBalanceSchema,
   leaveMessages,
+  vendimDownloadSchema,
   type LeaveType,
 } from "@canvas/shared";
 import { TRPCError } from "@trpc/server";
@@ -41,6 +42,9 @@ import {
 import { writeAudit } from "../../lib/audit";
 import { activeMembershipCondition, getMembershipRole } from "../../lib/membership";
 import { notifyUsers } from "../../lib/notify";
+import { getPresignedUrl } from "../../lib/storage";
+import { needsVendim } from "../../lib/vendim-job";
+import { enqueueVendim } from "../../queues/vendim-queue";
 import { assertCanPeople, canPeopleAction, requireActiveMember } from "../../lib/permissions";
 import { publish } from "../../lib/realtime";
 import {
@@ -142,14 +146,24 @@ async function assertActiveTarget(workspaceId: string, userId: string) {
   }
 }
 
+// Storage keys never leave the server (P8.5): the browser only learns
+// whether a Vendim file exists and asks vendimDownload for a signed link.
 async function decorate<
-  T extends { userId: string; decidedBy: string | null; recordedBy: string | null },
+  T extends {
+    userId: string;
+    decidedBy: string | null;
+    recordedBy: string | null;
+    vendimPdfKey: string | null;
+    vendimDocxKey: string | null;
+  },
 >(rows: T[]) {
   const names = await namesById(
     rows.flatMap((r) => [r.userId, r.decidedBy, r.recordedBy]).filter((id): id is string => !!id),
   );
-  return rows.map((r) => ({
+  return rows.map(({ vendimPdfKey, vendimDocxKey, ...r }) => ({
     ...r,
+    hasVendimPdf: vendimPdfKey !== null,
+    hasVendimDocx: vendimDocxKey !== null,
     userName: names.get(r.userId) ?? "",
     decidedByName: r.decidedBy ? (names.get(r.decidedBy) ?? null) : null,
     recordedByName: r.recordedBy ? (names.get(r.recordedBy) ?? null) : null,
@@ -324,10 +338,65 @@ Open the request: ${approvalsLink(input.workspaceId, request.id)}`,
         `${text}\n\n${env.WEB_URL}/w/${request.workspaceId}/leave`,
       );
     }
-    // P8.5 generates the Vendim for an approved annual-leave request here.
+    if (needsVendim(updated)) await enqueueVendim(updated.id);
     await publishLeave(request.workspaceId, request.id, "updated");
     return updated;
   }),
+
+  // P8.5 Vendim: HR only (spec §3 — the employee doesn't get the file).
+  // A 5-minute signed link, downloaded under a readable name; audited.
+  vendimDownload: protectedProcedure
+    .input(vendimDownloadSchema)
+    .mutation(async ({ ctx, input }) => {
+      const request = await requireLeaveRequest(input.leaveRequestId);
+      await assertCanPeople(ctx.user, request.workspaceId, "leave:approve", {
+        targetUserId: request.userId,
+      });
+      const key = input.format === "pdf" ? request.vendimPdfKey : request.vendimDocxKey;
+      if (!key) throw new TRPCError({ code: "NOT_FOUND", message: "No Vendim file yet" });
+      const person = await db.query.users.findFirst({ where: eq(schema.users.id, request.userId) });
+      const fileName = `Vendim pushim vjetor - ${person?.name ?? "punonjes"} - ${request.startDate}.${input.format}`;
+      await writeAudit({
+        workspaceId: request.workspaceId,
+        actorId: ctx.user.id,
+        action: "leave.vendim_downloaded",
+        entity: "leave_request",
+        entityId: request.id,
+        ip: ctx.ip,
+        payload: { userId: request.userId, format: input.format },
+      });
+      return { url: await getPresignedUrl(key, 300, fileName) };
+    }),
+
+  vendimRegenerate: protectedProcedure
+    .input(leaveRequestIdSchema)
+    .mutation(async ({ ctx, input }) => {
+      const request = await requireLeaveRequest(input.leaveRequestId);
+      await assertCanPeople(ctx.user, request.workspaceId, "leave:approve", {
+        targetUserId: request.userId,
+      });
+      if (!needsVendim(request)) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "Only approved annual leave has a Vendim",
+        });
+      }
+      await db
+        .update(schema.leaveRequests)
+        .set({ vendimError: null, updatedAt: new Date() })
+        .where(eq(schema.leaveRequests.id, request.id));
+      await enqueueVendim(request.id);
+      await logActivity(
+        request.workspaceId,
+        ctx.user.id,
+        "leave_request",
+        request.id,
+        "leave.vendim_regenerated",
+        { userId: request.userId },
+      );
+      await publishLeave(request.workspaceId, request.id, "updated");
+      return { queued: true };
+    }),
 
   // The employee withdraws a pending request; HR can also cancel approved leave.
   cancel: protectedProcedure.input(leaveRequestIdSchema).mutation(async ({ ctx, input }) => {
@@ -407,6 +476,7 @@ Open the request: ${approvalsLink(input.workspaceId, request.id)}`,
       activityPayload(request),
     );
     await notifyUsers(activity.id, [input.userId]);
+    if (needsVendim(request)) await enqueueVendim(request.id);
     await publishLeave(input.workspaceId, request.id, "created");
     return request;
   }),

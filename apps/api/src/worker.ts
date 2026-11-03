@@ -27,6 +27,8 @@ import { EMBEDDING_QUEUE_NAME, type EmbeddingJobData } from "./queues/embedding-
 import { IMAGE_QUEUE_NAME, type ImageJobData } from "./queues/image-queue";
 import { scheduleRecurringTick, SCHEDULER_QUEUE_NAME } from "./queues/scheduler-queue";
 import { SLACK_QUEUE_NAME, type SlackJobData } from "./queues/slack-queue";
+import { VENDIM_QUEUE_NAME, type VendimJobData } from "./queues/vendim-queue";
+import { runVendim } from "./lib/vendim-job";
 
 initSentry("worker");
 
@@ -596,6 +598,20 @@ copywriterWorker.on("failed", (job, err) => {
   console.error(`[worker] copywriter job ${job?.id} failed:`, err);
 });
 
+// P8.5: the Vendim (Word + PDF) for approved annual leave.
+const vendimWorker = new Worker<VendimJobData>(
+  VENDIM_QUEUE_NAME,
+  async (job) => {
+    await runVendim(job.data.leaveRequestId);
+  },
+  { connection: redisConnection, concurrency: 1 },
+);
+
+vendimWorker.on("failed", (job, err) => {
+  captureException(err);
+  console.error(`[worker] vendim job ${job?.id} failed:`, err);
+});
+
 console.log(
-  `[worker] listening on queues "${IMAGE_QUEUE_NAME}", "${BRAIN_QUEUE_NAME}", "${SCHEDULER_QUEUE_NAME}", "${SLACK_QUEUE_NAME}", "${EMBEDDING_QUEUE_NAME}", "${COPYWRITER_QUEUE_NAME}"`,
+  `[worker] listening on queues "${IMAGE_QUEUE_NAME}", "${BRAIN_QUEUE_NAME}", "${SCHEDULER_QUEUE_NAME}", "${SLACK_QUEUE_NAME}", "${EMBEDDING_QUEUE_NAME}", "${COPYWRITER_QUEUE_NAME}", "${VENDIM_QUEUE_NAME}"`,
 );

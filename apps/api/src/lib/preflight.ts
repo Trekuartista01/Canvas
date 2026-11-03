@@ -220,3 +220,23 @@ export function corsFinding(origin: string, status: number, headers: Headers): F
   }
   return ok("Storage CORS", `browser uploads from ${origin} allowed`);
 }
+
+/**
+ * P8.5: the Vendim PDF needs LibreOffice, and Garamond (or EB Garamond under
+ * that name) to stay on one page. Without them HR still gets the Word file.
+ */
+export function vendimToolsFinding(sofficeVersion: string | null, garamondFonts: string): Finding {
+  if (!sofficeVersion) {
+    return warn(
+      "Vendim PDF",
+      "LibreOffice (soffice) not found — Vendims are Word-only until it's installed (deploy/setup-server.sh)",
+    );
+  }
+  if (!/garamond/i.test(garamondFonts)) {
+    return warn(
+      "Vendim PDF",
+      `${sofficeVersion.trim()}, but no Garamond font — the PDF may not fit one page`,
+    );
+  }
+  return ok("Vendim PDF", `${sofficeVersion.trim()} with Garamond`);
+}

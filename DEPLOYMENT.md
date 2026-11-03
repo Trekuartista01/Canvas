@@ -132,7 +132,7 @@ cd ~/canvas-app
 bash deploy/setup-server.sh
 ```
 
-It sets the timezone to Europe/Belgrade and installs Node 22 LTS, pnpm (the version pinned in `package.json`), PM2, Redis (localhost only, generated password), Caddy and the PostgreSQL 17 client (for backups). It also opens ports 80/443 in the VM's firewall. It's safe to re-run. At the end it prints a `REDIS_URL=…` line (also saved in `~/.canvas-redis-url`): you need it for `.env`.
+It sets the timezone to Europe/Belgrade and installs Node 22 LTS, pnpm (the version pinned in `package.json`), PM2, Redis (localhost only, generated password), Caddy, the PostgreSQL 17 client (for backups) and LibreOffice Writer with EB Garamond, mapped to the template's "Garamond" (to make the Vendim PDF). It also opens ports 80/443 in the VM's firewall. It's safe to re-run. At the end it prints a `REDIS_URL=…` line (also saved in `~/.canvas-redis-url`): you need it for `.env`.
 
 > Node 22 rather than the older "Node 20" you may see mentioned elsewhere: the repo requires ≥ 22.13, and Node 20 is end-of-life.
 
@@ -347,6 +347,8 @@ Never edit an already-applied migration (CLAUDE.md).
 | Uploads fail once storage is full                        | The free plan's 1 GB is used up: upgrade the Supabase plan                                                                                                                                                                                                     |
 | `/health` shows `database: error`                        | Supabase project paused (free tier, 7 days idle): unpause in the dashboard. Or the Transaction pooler URL (6543) is in use                                                                                                                                     |
 | Emails never arrive                                      | `SMTP_*` not set (preflight warns), or the provider rejects `EMAIL_FROM`                                                                                                                                                                                       |
+| Vendim shows "PDF conversion needs LibreOffice"          | LibreOffice isn't installed or not on PATH: re-run `deploy/setup-server.sh`, or set `SOFFICE_PATH`. HR still gets the Word file; press Regenerate once fixed                                                                                                   |
+| Vendim PDF is 2 pages                                    | The Garamond font is missing, so another serif was used: re-run `deploy/setup-server.sh` (`fc-list                                                                                                                                                             | grep -i garamond` should list it), then Regenerate |
 | Backup log: `server version mismatch`                    | `pg_dump` older than Supabase's Postgres: re-run `deploy/setup-server.sh`, or set `PG_DUMP=/usr/lib/postgresql/17/bin/pg_dump` in `.env`                                                                                                                       |
 
 ## Scaling note

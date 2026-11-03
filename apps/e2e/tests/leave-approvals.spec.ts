@@ -147,3 +147,94 @@ test("P8.4 leave: cross-year request → HR toast → per-year balances → reje
 
   for (const p of [hr, staff, hugoPage]) await p.context().close();
 });
+
+test("P8.5 Vendim: approval makes it, a missing People field is shown to HR, Word downloads, employees can't", async ({
+  page: owner,
+  browser,
+}) => {
+  test.setTimeout(120_000);
+
+  await signUp(owner, "Olsi Owner");
+  await createWorkspaceAndOpen(owner, "Vendim Workspace");
+  const ws = workspaceIdFrom(owner);
+  const hana = await seedMember(ws, "Hana HR", "hr_finance");
+  const sam = await seedMember(ws, "Sam Staff", "employee");
+  const hr = await pageAs(browser, hana, ws);
+  const staff = await pageAs(browser, sam, ws);
+
+  // 25.02.2026 – 02.03.2026, the spec's example: 4 working days.
+  await requestLeave(staff, "2026-02-25", "2026-03-02");
+  await expect(staff.getByTestId("leave-preview")).toContainText("4 working days");
+  await submit(staff);
+  await hr.goto(`/w/${ws}/leave-approvals`);
+  const approved = hr.waitForResponse((res) => res.url().includes("leave.decide"));
+  await hr.getByTestId("leave-approval-Sam Staff").getByTestId("leave-approve").click();
+  expect((await approved).ok()).toBe(true);
+
+  // Sam's People record has no contract or position yet: no Vendim, HR is told why.
+  await hr.getByRole("tab", { name: "Approved" }).click();
+  const card = hr.getByTestId("leave-approval-Sam Staff");
+  await expect(card.getByTestId("vendim-error")).toContainText("contract start date", {
+    timeout: 20_000,
+  });
+  await expect(card.getByTestId("vendim-download-docx")).toBeDisabled();
+
+  // HR fills the record, then regenerates.
+  await hr.goto(`/w/${ws}/people/${sam.userId}`);
+  const position = hr.getByTestId("person-profile-editor").getByLabel("Position / job title");
+  await position.fill("Graphic Designer");
+  const profileSaved = hr.waitForResponse((res) => res.url().includes("people.updateProfile"));
+  await hr.getByRole("button", { name: "Save profile" }).click();
+  expect((await profileSaved).ok()).toBe(true);
+  await hr.getByRole("tab", { name: "Confidential" }).click();
+  const terms = hr.getByTestId("person-terms-form");
+  await terms.getByLabel("Contract type").selectOption("fixed_term");
+  await terms.getByLabel("Contract start").fill("2025-03-01");
+  await terms.getByLabel("Contract end").fill("2026-12-31");
+  const termsSaved = hr.waitForResponse((res) => res.url().includes("people.updateConfidential"));
+  await terms.getByTestId("person-terms-save").click();
+  expect((await termsSaved).ok()).toBe(true);
+
+  await hr.goto(`/w/${ws}/leave-approvals?tab=approved`);
+  const again = hr.getByTestId("leave-approval-Sam Staff");
+  await again.getByTestId("vendim-regenerate").click();
+  await expect(again.getByTestId("vendim-download-docx")).toBeEnabled({ timeout: 30_000 });
+
+  // The Word file is the filled template.
+  const [row] = await db
+    .select({ id: schema.leaveRequests.id })
+    .from(schema.leaveRequests)
+    .where(
+      and(eq(schema.leaveRequests.workspaceId, ws), eq(schema.leaveRequests.userId, sam.userId)),
+    );
+  const link = await hr.request.post("/trpc/leave.vendimDownload", {
+    data: { leaveRequestId: row!.id, format: "docx" },
+  });
+  expect(link.ok()).toBe(true);
+  const { url } = ((await link.json()) as { result: { data: { url: string } } }).result.data;
+  const file = await hr.request.get(url);
+  expect(file.ok()).toBe(true);
+  expect((await file.body()).subarray(0, 2).toString()).toBe("PK");
+  const audit = await db
+    .select({ action: schema.auditLog.action })
+    .from(schema.auditLog)
+    .where(
+      and(
+        eq(schema.auditLog.workspaceId, ws),
+        eq(schema.auditLog.action, "leave.vendim_downloaded"),
+      ),
+    );
+  expect(audit).toHaveLength(1);
+
+  // The employee never gets the Vendim (spec §3), and no storage key reaches the browser.
+  const refused = await staff.request.post("/trpc/leave.vendimDownload", {
+    data: { leaveRequestId: row!.id, format: "docx" },
+  });
+  expect(refused.status()).toBe(403);
+  const mine = await staff.request.get(
+    `/trpc/leave.mine?input=${encodeURIComponent(JSON.stringify({ workspaceId: ws, year: 2026 }))}`,
+  );
+  expect(await mine.text()).not.toContain("hr/vendim/");
+
+  for (const p of [hr, staff]) await p.context().close();
+});

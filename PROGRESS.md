@@ -2947,3 +2947,54 @@ During the real deploy: Cloudflare billing doesn't accept Kosovo cards, so R2 ca
 ### Note
 
 - `email-digest.spec.ts` timed out twice in full runs (P8.3 and here) and passed alone and on reruns. Cause: the scheduler tick loops over every workspace, and the local test DB has 1,745 from accumulated e2e runs. The P8.2/P8.4 holiday steps take ~1.2 s of it (measured). A cleanup of old e2e workspaces, or a longer poll in that spec, would fix it; not done here.
+
+## 2026-11-03 P8.5: Vendim (Word + PDF) for approved annual leave
+
+### Done
+
+- **Template:** `templates/vendim-pushim-vjetor-template.docx`, the user's original renamed to the spec's filename. Filled as-is with docxtemplater; never retyped. The ten tags are confirmed present: `data_vendimit`, `emri_mbiemri`, `lloji_kontrates`, `data_kontrates`, `pozita`, `viti`, `data_fillimit`, `data_mbarimit`, `ditet_pune`, `data_kthimit`.
+- **`lib/vendim.ts` (pure parts):**
+  - `buildVendimData` maps the tags:
+    - dates are dd.mm.yyyy;
+    - the contract type becomes "për kohë të caktuar" / "për kohë të pacaktuar";
+    - `viti` is "2026/2027" for a cross-year request;
+    - `ditet_pune` is the **stored** value.
+  - A missing name, contract type, contract start or position throws `VendimDataError`, naming each missing People field.
+  - `renderVendimDocx` refuses any unfilled tag.
+  - `convertToPdf` runs `soffice --headless --convert-to pdf` in a temp dir with its own profile and a 60 s timeout. `pdfPageCount` (pdf-lib) checks the page count.
+- **Job (`lib/vendim-job.ts`, BullMQ `vendim-jobs`, concurrency 1):**
+  - Runs on approve and on HR "Record leave", for annual leave only.
+  - Contract start comes from the People record, or else the newest uploaded contract. The return date is `nextWorkingDay(end)`.
+  - A data error saves no file and writes `vendim_error`, which shows on the request.
+  - Without LibreOffice the Word file is still saved and the PDF error is shown. A PDF of more than 1 page is flagged (missing Garamond).
+  - Files go to `hr/vendim/{workspace}/{uuidv7}.docx|.pdf`; regenerating deletes the old ones.
+- **Migration `0068`** (down file included): `vendim_generated_at`, `vendim_error`. The keys came in 0067.
+- **API:**
+  - `leave.vendimDownload` (HR, `leave:approve`; employees get 403 per spec §3): a 5-minute signed link named "Vendim pushim vjetor - <name> - <start>.pdf/.docx", each download written to audit_log.
+  - `leave.vendimRegenerate` (HR) clears the error and queues a new job.
+  - Storage keys never reach the browser: list responses carry `hasVendimPdf` / `hasVendimDocx` instead.
+- **UI:** approved annual-leave cards show **Download PDF / Download Word / Regenerate**, "Being made…", and the error text.
+- **Server:**
+  - `deploy/setup-server.sh` installs `libreoffice-writer-nogui fonts-ebgaramond fontconfig` and adds a fontconfig alias Garamond → EB Garamond.
+  - `pnpm preflight` reports "Vendim PDF" (LibreOffice + a Garamond font).
+  - `.env.example`: optional `SOFFICE_PATH`, `VENDIM_TEMPLATE_PATH`.
+  - DEPLOYMENT.md 4.2 and troubleshooting are updated.
+
+### Not yet verified
+
+- **The PDF itself.** Neither this laptop (Windows) nor the dev WSL distro has LibreOffice, so `convertToPdf` and the one-page check are untested here (the unit test skips without `soffice`). Verify on the prod WSL distro once it exists: approve a test leave, download the PDF, compare it with the template in Word.
+- EB Garamond isn't metric-identical to Microsoft's Garamond. If the PDF spills onto 2 pages, the job flags it, and the options are to install Microsoft's Garamond on the server (check the licence) or have HR tighten the template.
+
+### Verified
+
+- `pnpm check` green; `pnpm test`: API 390 + 1 skipped (the `vendim.test.ts` cases):
+  - the real template renders the spec's 25.02–02.03.2026 example with "(4 ditë pune)", "03.03.2026", "Prishtinë, 20.02.2026", both name slots, fixed text intact and no tag left;
+  - the cross-year "2026/2027" and open-ended wording;
+  - a missing contract start fails loudly.
+- Also `vendimToolsFinding`; shared 116; db 11; web 15.
+- `0068` applied, rolled back and re-applied.
+- Playwright: new P8.5 test in `leave-approvals.spec.ts`:
+  - The 4-day example is approved, and the card shows the missing-field error.
+  - HR fills position and contract and presses Regenerate; Word becomes downloadable. The downloaded file is a real DOCX, and the download is audited.
+  - The employee gets 403 on `vendimDownload`, and no `hr/vendim/` key appears in their `leave.mine`.
+- Full suite: 79/80 on the first run (`email-digest` again), then **80/80**. That run captured the server log: no failed scheduler ticks, and a full tick takes ~1.3 s at rest. So `email-digest`'s occasional 20 s timeout under parallel load is still unexplained. Next time it fails, read the captured `pw:webserver` log (`DEBUG=pw:webserver`).

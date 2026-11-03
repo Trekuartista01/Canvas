@@ -89,3 +89,9 @@ export const confirmLeaveDocumentSchema = z.object({
   fileName: z.string().trim().min(1).max(300),
   mime: z.string().trim().min(1).max(200),
 });
+
+// P8.5 Vendim files on an approved annual-leave request (HR only).
+export const vendimDownloadSchema = z.object({
+  leaveRequestId: z.string().uuid(),
+  format: z.enum(["pdf", "docx"]),
+});

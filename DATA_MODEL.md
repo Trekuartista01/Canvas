@@ -94,7 +94,8 @@ leave_requests   (id, workspace_id fk, user_id fk,                      -- M7.5
                   by_year jsonb,                                        -- P8.4 {"2026": 2, "2027": 1}, kept
                   excluded_holidays jsonb,                              -- P8.4 [{date, name}], kept
                   rejection_reason null, self_approved bool,            -- P8.4 (self = lone HR, audited)
-                  vendim_pdf_key null, vendim_docx_key null)            -- P8.5 private files
+                  vendim_pdf_key null, vendim_docx_key null,            -- P8.5 private files (hr/vendim/…)
+                  vendim_generated_at null, vendim_error null)          -- P8.5 job state shown to HR
 leave_balances   (id, workspace_id fk, user_id fk, year,
                   entitlement_days null,                                -- null = workspace default
                   carried_over_days null,                               -- null = rollover not run yet

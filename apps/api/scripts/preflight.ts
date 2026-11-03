@@ -33,6 +33,7 @@ import {
   migrationFinding,
   nodeVersionFinding,
   pgDumpFinding,
+  vendimToolsFinding,
   SUPABASE_FREE_FILE_LIMIT,
   type Finding,
 } from "../src/lib/preflight";
@@ -134,6 +135,16 @@ const dump = spawnSync(env.PG_DUMP || "pg_dump", ["--version"], { encoding: "utf
 if (serverVersion || dump.status === 0) {
   add(pgDumpFinding(serverVersion || "PostgreSQL 0", dump.status === 0 ? dump.stdout : null));
 }
+
+// P8.5 Vendim: LibreOffice and the Garamond font.
+const soffice = spawnSync(env.SOFFICE_PATH || "soffice", ["--version"], { encoding: "utf8" });
+const fonts = spawnSync("fc-list", [":family"], { encoding: "utf8" });
+add(
+  vendimToolsFinding(
+    soffice.status === 0 ? soffice.stdout : null,
+    fonts.status === 0 ? fonts.stdout : "",
+  ),
+);
 
 // 4. Redis.
 const redis = new IORedis(env.REDIS_URL || "redis://127.0.0.1:6379", {

@@ -269,6 +269,8 @@ function RequestCard({ request: r, highlighted }: { request: TeamRow; highlighte
         <p className="text-muted-foreground text-xs">Decided by {r.decidedByName}</p>
       )}
 
+      {r.status === "approved" && r.type === "vacation" && <VendimActions request={r} />}
+
       {r.status === "pending" && !r.canDecide && (
         <p className="text-muted-foreground text-xs">Another HR user has to decide this one.</p>
       )}
@@ -327,6 +329,73 @@ function RequestCard({ request: r, highlighted }: { request: TeamRow; highlighte
       {decide.error && (
         <p className="text-sm text-red-600 dark:text-red-400" role="alert">
           {decide.error.message}
+        </p>
+      )}
+    </div>
+  );
+}
+
+// P8.5: the Vendim (Word + PDF) made by the worker after approval. HR only;
+// downloads are short-lived signed links, each one audited.
+function VendimActions({ request: r }: { request: TeamRow }) {
+  const utils = trpc.useUtils();
+  const download = trpc.leave.vendimDownload.useMutation({
+    onSuccess: ({ url }) => window.location.assign(url),
+  });
+  const regenerate = trpc.leave.vendimRegenerate.useMutation({
+    onSuccess: () => utils.leave.invalidate(),
+  });
+  const making = !r.hasVendimDocx && !r.vendimError;
+
+  return (
+    <div className="space-y-1" data-testid="vendim-actions">
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="text-xs font-medium">Vendim</span>
+        <Button
+          size="sm"
+          variant="outline"
+          disabled={!r.hasVendimPdf || download.isPending}
+          onClick={() => download.mutate({ leaveRequestId: r.id, format: "pdf" })}
+          data-testid="vendim-download-pdf"
+        >
+          Download PDF
+        </Button>
+        <Button
+          size="sm"
+          variant="outline"
+          disabled={!r.hasVendimDocx || download.isPending}
+          onClick={() => download.mutate({ leaveRequestId: r.id, format: "docx" })}
+          data-testid="vendim-download-docx"
+        >
+          Download Word
+        </Button>
+        <Button
+          size="sm"
+          variant="ghost"
+          disabled={regenerate.isPending}
+          onClick={() => regenerate.mutate({ leaveRequestId: r.id })}
+          data-testid="vendim-regenerate"
+        >
+          Regenerate
+        </Button>
+        {making && (
+          <span className="text-muted-foreground text-xs" data-testid="vendim-making">
+            Being made…
+          </span>
+        )}
+      </div>
+      {r.vendimError && (
+        <p
+          className="text-xs text-red-600 dark:text-red-400"
+          role="alert"
+          data-testid="vendim-error"
+        >
+          {r.vendimError}
+        </p>
+      )}
+      {(download.error ?? regenerate.error) && (
+        <p className="text-xs text-red-600 dark:text-red-400" role="alert">
+          {(download.error ?? regenerate.error)!.message}
         </p>
       )}
     </div>

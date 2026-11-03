@@ -7,6 +7,7 @@ import {
   nodeVersionFinding,
   pgDumpFinding,
   pgMajor,
+  vendimToolsFinding,
 } from "./preflight";
 
 const good = {
@@ -157,5 +158,17 @@ describe("corsFinding", () => {
         }),
       ).level,
     ).toBe("fail");
+  });
+});
+
+describe("vendimToolsFinding (P8.5)", () => {
+  it("warns without LibreOffice or Garamond, passes with both", () => {
+    expect(vendimToolsFinding(null, "EB Garamond").level).toBe("warn");
+    expect(vendimToolsFinding("LibreOffice 24.2.7.2", "DejaVu Serif\n").level).toBe("warn");
+    expect(vendimToolsFinding("LibreOffice 24.2.7.2\n", "EB Garamond,EB Garamond 12\n")).toEqual({
+      level: "ok",
+      check: "Vendim PDF",
+      detail: "LibreOffice 24.2.7.2 with Garamond",
+    });
   });
 });

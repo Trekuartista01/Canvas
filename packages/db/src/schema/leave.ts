@@ -69,6 +69,10 @@ export const leaveRequests = pgTable(
     // P8.5 Vendim files in private storage.
     vendimPdfKey: text("vendim_pdf_key"),
     vendimDocxKey: text("vendim_docx_key"),
+    // P8.5 job state: when the files were last made, and why the last try
+    // failed (shown to HR on the request; null = fine).
+    vendimGeneratedAt: timestamp("vendim_generated_at", { withTimezone: true }),
+    vendimError: text("vendim_error"),
     // Set when HR records leave on someone's behalf (approved immediately).
     recordedBy: uuid("recorded_by").references(() => users.id, { onDelete: "set null" }),
     // e.g. a doctor's note. An attachments row with no task/comment — only
