@@ -4,13 +4,14 @@ import {
   type EmployeeProfileDraft,
 } from "@/components/employee-profile-draft";
 import { EmployeeProfileFields } from "@/components/employee-profile-fields";
+import { ConfidentialPanel } from "@/components/person-confidential";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { useSession } from "@/hooks/use-session";
 import { Avatar } from "@/lib/avatar";
 import { trpc } from "@/lib/trpc";
 import { PEOPLE_ROLE_LABELS, PEOPLE_ROLES, type PeopleRole } from "@canvas/shared";
-import { createRoute, Link } from "@tanstack/react-router";
+import { createRoute, Link, useNavigate } from "@tanstack/react-router";
 import type { inferRouterOutputs } from "@trpc/server";
 import { ArrowLeft } from "lucide-react";
 import { useState, type FormEvent } from "react";
@@ -35,7 +36,12 @@ function formatDate(value: string | null) {
 
 function PersonProfilePage() {
   const { workspaceId, userId } = personProfileRoute.useParams();
-  const profile = trpc.people.profile.useQuery({ workspaceId, userId });
+  const profile = trpc.people.profile.useQuery(
+    { workspaceId, userId },
+    // A refusal or an archived/deleted person won't change on retry.
+    { retry: (count, err) => (err.data?.httpStatus ?? 500) >= 500 && count < 3 },
+  );
+  const [tab, setTab] = useState<"profile" | "confidential">("profile");
 
   if (profile.isLoading) return <p className="text-muted-foreground p-6 text-sm">Loading…</p>;
   if (profile.error || !profile.data) {
@@ -69,11 +75,40 @@ function PersonProfilePage() {
         </span>
         {p.status === "inactive" && (
           <span className="rounded-full bg-red-500/10 px-2 py-0.5 text-xs text-red-600 dark:text-red-400">
-            Deactivated
+            Archived
           </span>
         )}
       </div>
 
+      {p.canManage && (
+        <div className="flex gap-1" role="tablist">
+          {(["profile", "confidential"] as const).map((t) => (
+            <Button
+              key={t}
+              size="sm"
+              role="tab"
+              aria-selected={tab === t}
+              variant={tab === t ? "default" : "ghost"}
+              onClick={() => setTab(t)}
+            >
+              {t === "profile" ? "Profile" : "Confidential"}
+            </Button>
+          ))}
+        </div>
+      )}
+
+      {tab === "confidential" && p.canManage ? (
+        <ConfidentialPanel workspaceId={workspaceId} profile={p} />
+      ) : (
+        <ProfileTab workspaceId={workspaceId} profile={p} />
+      )}
+    </div>
+  );
+}
+
+function ProfileTab({ workspaceId, profile: p }: { workspaceId: string; profile: Profile }) {
+  return (
+    <>
       <dl className="grid gap-x-6 gap-y-3 text-sm sm:grid-cols-2" data-testid="person-details">
         <Detail label="Position" value={p.jobTitle} />
         <Detail label="Department" value={p.department} />
@@ -102,10 +137,10 @@ function PersonProfilePage() {
       {p.canManage && (
         <>
           <ProfileEditor workspaceId={workspaceId} profile={p} />
-          <StatusEditor workspaceId={workspaceId} profile={p} />
+          <ArchiveEditor workspaceId={workspaceId} profile={p} />
         </>
       )}
-    </div>
+    </>
   );
 }
 
@@ -266,41 +301,95 @@ function ProfileEditor({ workspaceId, profile }: { workspaceId: string; profile:
   );
 }
 
-function StatusEditor({ workspaceId, profile }: { workspaceId: string; profile: Profile }) {
+// P8.3 "Remove" = archive: gone from lists and logins, records kept. Only an
+// archived person can be deleted permanently (HR; the server checks both).
+function ArchiveEditor({ workspaceId, profile }: { workspaceId: string; profile: Profile }) {
   const { user } = useSession();
+  const navigate = useNavigate();
   const invalidate = useInvalidatePerson();
-  const setStatus = trpc.people.setStatus.useMutation({ onSuccess: invalidate });
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const archive = trpc.people.archive.useMutation({ onSuccess: invalidate });
+  const unarchive = trpc.people.unarchive.useMutation({ onSuccess: invalidate });
+  const remove = trpc.people.deletePermanently.useMutation({
+    onSuccess: async () => {
+      await invalidate();
+      await navigate({ to: "/w/$workspaceId/people", params: { workspaceId } });
+    },
+  });
   if (profile.isOwner || profile.userId === user?.id) return null;
 
-  const inactive = profile.status === "inactive";
+  const archived = profile.status === "inactive";
+  const error = archive.error ?? unarchive.error ?? remove.error;
+  const busy = archive.isPending || unarchive.isPending || remove.isPending;
+  const target = { workspaceId, userId: profile.userId };
+
   return (
-    <section className="border-border space-y-2 rounded-md border p-4">
-      <h2 className="text-sm font-semibold">{inactive ? "Reactivate" : "Deactivate"}</h2>
+    <section className="border-border space-y-2 rounded-md border p-4" data-testid="person-archive">
+      <h2 className="text-sm font-semibold">{archived ? "Archived" : "Remove"}</h2>
       <p className="text-muted-foreground text-xs">
-        {inactive
-          ? "Gives them access to this workspace again, exactly as before."
-          : "They can no longer open this workspace and disappear from member pickers. Their tasks, comments and history stay."}
+        {archived
+          ? "They can't open this workspace and don't appear in lists. Their contracts, payroll and leave history are kept."
+          : "Archives them: they can no longer open this workspace and disappear from lists. Contracts, payroll and leave history stay for the records."}
       </p>
-      {setStatus.error && (
+      {error && (
         <p className="text-sm text-red-600 dark:text-red-400" role="alert">
-          {setStatus.error.message}
+          {error.message}
         </p>
       )}
-      <Button
-        size="sm"
-        variant={inactive ? "default" : "outline"}
-        disabled={setStatus.isPending}
-        onClick={() =>
-          setStatus.mutate({
-            workspaceId,
-            userId: profile.userId,
-            status: inactive ? "active" : "inactive",
-          })
-        }
-        data-testid="person-status-toggle"
-      >
-        {inactive ? "Reactivate" : "Deactivate"}
-      </Button>
+      <div className="flex flex-wrap items-center gap-2">
+        {archived ? (
+          <Button
+            size="sm"
+            disabled={busy}
+            onClick={() => unarchive.mutate(target)}
+            data-testid="person-unarchive"
+          >
+            Restore
+          </Button>
+        ) : (
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={busy}
+            onClick={() => archive.mutate(target)}
+            data-testid="person-archive-button"
+          >
+            Remove (archive)
+          </Button>
+        )}
+        {archived &&
+          (confirmDelete ? (
+            <>
+              <span className="text-xs text-red-600 dark:text-red-400">
+                Deletes their payroll, contracts, leave and files for good.
+              </span>
+              <Button
+                size="sm"
+                variant="outline"
+                className="border-red-500/50 text-red-600 dark:text-red-400"
+                disabled={busy}
+                onClick={() => remove.mutate(target)}
+                data-testid="person-delete-confirm"
+              >
+                Yes, delete permanently
+              </Button>
+              <Button size="sm" variant="ghost" onClick={() => setConfirmDelete(false)}>
+                Cancel
+              </Button>
+            </>
+          ) : (
+            <Button
+              size="sm"
+              variant="ghost"
+              className="text-red-600 dark:text-red-400"
+              disabled={busy}
+              onClick={() => setConfirmDelete(true)}
+              data-testid="person-delete"
+            >
+              Delete permanently…
+            </Button>
+          ))}
+      </div>
     </section>
   );
 }

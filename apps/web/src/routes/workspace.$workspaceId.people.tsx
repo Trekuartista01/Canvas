@@ -30,7 +30,7 @@ function PeopleDirectoryPage() {
   const [adding, setAdding] = useState(false);
 
   const allowed = access.can("people:viewDirectory");
-  // Deactivated people: HR only (the server refuses everyone else).
+  // Archived people: HR only (the server refuses everyone else).
   const canManage = access.can("people:manageStaff");
   const directory = trpc.people.directory.useQuery(
     { workspaceId, includeInactive: includeInactive && canManage },
@@ -57,8 +57,8 @@ function PeopleDirectoryPage() {
   });
 
   if (access.isLoading) return <p className="text-muted-foreground p-6 text-sm">Loading…</p>;
-  // Staff have no directory (they still reach their own profile from My
-  // Tasks' header). The API enforces this regardless.
+  // P8.3: every member has the directory (public fields only); this guard
+  // only covers a deactivated session. The API enforces it regardless.
   if (!allowed) return <Navigate to="/w/$workspaceId/my-tasks" params={{ workspaceId }} replace />;
 
   return (
@@ -100,7 +100,7 @@ function PeopleDirectoryPage() {
             data-testid="people-status-filter"
           >
             <option value="active">Active only</option>
-            <option value="all">Active and deactivated</option>
+            <option value="all">Active and archived</option>
           </select>
         )}
         <span className="text-muted-foreground text-xs">{rows.length} people</span>
@@ -144,7 +144,7 @@ function PeopleDirectoryPage() {
                   </span>
                   {person.status === "inactive" && (
                     <span className="shrink-0 rounded-full bg-red-500/10 px-2 py-0.5 text-[11px] text-red-600 dark:text-red-400">
-                      Deactivated
+                      Archived
                     </span>
                   )}
                 </Link>

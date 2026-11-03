@@ -112,8 +112,19 @@ company_documents(id, workspace_id fk, category_id fk null, title,
 company_document_versions(id, document_id fk, attachment_id fk, version,
                   uploaded_by fk users, uniq(document_id, version))     -- every version, current included
 
+employee_profiles(id, membership_id fk unique,                          -- M7.1 HR profile per membership
+                  phone, address, date_of_birth, job_title, department,
+                  employment_start_date, emergency_contact_name/phone,
+                  personal_number_enc,                                  -- P8.3, encrypted like payroll's
+                  pay_currency default 'EUR',
+                  contract_type enum(fixed_term, open_ended) null,
+                  contract_start, contract_end,                         -- P8.3 confidential: HR only
+                  status enum(active, inactive), deactivated_at,
+                  archived_at)                                          -- P8.3 archive = inactive + archived_at
+
 payroll_records  (id, workspace_id fk, user_id fk,                      -- M7.7, HR only
-                  net_salary_eur numeric(12,2),
+                  net_salary_eur numeric(12,2),                         -- in the profile's pay_currency
+                  gross_salary numeric(12,2),                           -- P8.3
                   id_card_number_enc, iban_enc,                         -- AES-256-GCM, PAYROLL_ENCRYPTION_KEY
                   bank_name, account_holder, updated_by fk users,
                   updated_at, uniq(workspace_id, user_id))              -- reads/edits/exports → activity + audit_log

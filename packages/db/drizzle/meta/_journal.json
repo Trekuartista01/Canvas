@@ -463,6 +463,13 @@
       "when": 1793696592314,
       "tag": "0065_official_holidays",
       "breakpoints": true
+    },
+    {
+      "idx": 66,
+      "version": "7",
+      "when": 1793698298795,
+      "tag": "0066_people_confidential",
+      "breakpoints": true
     }
   ]
 }

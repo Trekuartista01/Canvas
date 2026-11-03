@@ -1,5 +1,6 @@
 import { db, schema } from "@canvas/db";
 import {
+  archivePersonSchema,
   createStaffSchema,
   effectivePeopleRole,
   PEOPLE_ACTIONS,
@@ -7,9 +8,9 @@ import {
   PRIVILEGED_PEOPLE_ROLES,
   peopleDirectorySchema,
   peopleMemberSchema,
-  setEmployeeStatusSchema,
   setManagerSchema,
   setPeopleRoleSchema,
+  updateConfidentialSchema,
   updateEmployeeProfileSchema,
   WORKSPACE_ACTIONS,
   workspaceScopedSchema,
@@ -34,6 +35,11 @@ import {
   listHrUserIds,
 } from "../../lib/membership";
 import { notifyUsers } from "../../lib/notify";
+import {
+  deletePersonRecords,
+  encryptPersonalNumber,
+  loadConfidential,
+} from "../../lib/people-records";
 import { assertCanPeople, requireActiveMember } from "../../lib/permissions";
 import { getCustomRoleDeltas } from "../../lib/space-overrides";
 import { protectedProcedure, router } from "../trpc";
@@ -182,6 +188,9 @@ export const peopleRouter = router({
     if (isSelf) await requireActiveMember(ctx.user, input.workspaceId);
     else await assertCanPeople(ctx.user, input.workspaceId, "people:viewDirectory");
     const membership = await requireTargetMembership(input.workspaceId, input.userId);
+    const canManage = await canPeople(ctx.user, input.workspaceId, "people:manageStaff");
+    // P8.3: archived people exist only for HR.
+    if (!membership.active && !canManage) throw new TRPCError({ code: "NOT_FOUND" });
     const confidential = await canPeople(
       ctx.user,
       input.workspaceId,
@@ -199,7 +208,6 @@ export const peopleRouter = router({
     ]);
     if (!user) throw new TRPCError({ code: "NOT_FOUND" });
 
-    const canManage = await canPeople(ctx.user, input.workspaceId, "people:manageStaff");
     if (confidential && !isSelf) {
       await writeAudit({
         workspaceId: input.workspaceId,
@@ -223,6 +231,7 @@ export const peopleRouter = router({
       managerName: manager?.name ?? null,
       status: membership.active ? ("active" as const) : ("inactive" as const),
       deactivatedAt: profile?.deactivatedAt ?? null,
+      archivedAt: canManage ? (profile?.archivedAt ?? null) : null,
       jobTitle: profile?.jobTitle ?? null,
       department: profile?.department ?? null,
       employmentStartDate: confidential ? (profile?.employmentStartDate ?? null) : null,
@@ -413,44 +422,157 @@ export const peopleRouter = router({
     return { userId: input.userId, managerUserId: input.managerUserId };
   }),
 
-  // Deactivating keeps the membership and every bit of history; it only
-  // blocks the member from the workspace (lib/membership.ts) and hides them
-  // from pickers. Reactivating restores access as it was.
-  setStatus: protectedProcedure.input(setEmployeeStatusSchema).mutation(async ({ ctx, input }) => {
-    await assertCanPeople(ctx.user, input.workspaceId, "people:manageStaff", {
-      targetUserId: input.userId,
-    });
+  // P8.3 Confidential tab (spec §5): HR only — not even the person
+  // themselves (they get My Pay Details). Every look is audited.
+  confidential: protectedProcedure.input(peopleMemberSchema).query(async ({ ctx, input }) => {
+    await assertCanPeople(ctx.user, input.workspaceId, "people:manageStaff");
+    await assertCanPeople(ctx.user, input.workspaceId, "payroll:view");
     const membership = await requireTargetMembership(input.workspaceId, input.userId);
-    if (membership.role === "owner") {
-      throw new TRPCError({
-        code: "BAD_REQUEST",
-        message: "The workspace owner can't be deactivated",
-      });
-    }
-    if (input.userId === ctx.user.id) {
-      throw new TRPCError({ code: "BAD_REQUEST", message: "You can't deactivate yourself" });
-    }
-
-    const inactive = input.status === "inactive";
-    await upsertProfile(membership.id, {
-      status: input.status,
-      deactivatedAt: inactive ? new Date() : null,
-    });
-    await logActivity(
-      input.workspaceId,
-      ctx.user.id,
-      "person",
-      input.userId,
-      inactive ? "person.deactivated" : "person.reactivated",
-    );
+    const data = await loadConfidential(input.workspaceId, input.userId, membership.id);
     await writeAudit({
       workspaceId: input.workspaceId,
       actorId: ctx.user.id,
-      action: inactive ? "person.deactivated" : "person.reactivated",
+      action: "person.confidential_viewed",
       entity: "person",
       entityId: input.userId,
       ip: ctx.ip,
     });
-    return { userId: input.userId, status: input.status };
+    return data;
   }),
+
+  updateConfidential: protectedProcedure
+    .input(updateConfidentialSchema)
+    .mutation(async ({ ctx, input }) => {
+      await assertCanPeople(ctx.user, input.workspaceId, "people:manageStaff");
+      await assertCanPeople(ctx.user, input.workspaceId, "payroll:manage");
+      if (input.userId === ctx.user.id) {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: "Someone else has to change your own confidential details",
+        });
+      }
+      const membership = await requireTargetMembership(input.workspaceId, input.userId);
+      const { workspaceId, userId } = input;
+
+      const profile = {
+        ...(input.personalNumber !== undefined
+          ? { personalNumberEnc: encryptPersonalNumber(workspaceId, userId, input.personalNumber) }
+          : {}),
+        ...(input.payCurrency !== undefined ? { payCurrency: input.payCurrency } : {}),
+        ...(input.contractType !== undefined ? { contractType: input.contractType } : {}),
+        ...(input.contractStart !== undefined ? { contractStart: input.contractStart } : {}),
+        ...(input.contractEnd !== undefined ? { contractEnd: input.contractEnd } : {}),
+      };
+      const pay = {
+        ...(input.grossSalary !== undefined ? { grossSalary: input.grossSalary } : {}),
+        ...(input.netSalary !== undefined ? { netSalaryEur: input.netSalary } : {}),
+      };
+      if (Object.keys(profile).length > 0) await upsertProfile(membership.id, profile);
+      if (Object.keys(pay).length > 0) {
+        const values = { ...pay, updatedBy: ctx.user.id, updatedAt: new Date() };
+        await db
+          .insert(schema.payrollRecords)
+          .values({ workspaceId, userId, ...values })
+          .onConflictDoUpdate({
+            target: [schema.payrollRecords.workspaceId, schema.payrollRecords.userId],
+            set: values,
+          });
+      }
+
+      // Which fields changed — never what they changed to.
+      const fields = (
+        [
+          "personalNumber",
+          "payCurrency",
+          "contractType",
+          "contractStart",
+          "contractEnd",
+          "grossSalary",
+          "netSalary",
+        ] as const
+      ).filter((f) => input[f] !== undefined);
+      await logActivity(workspaceId, ctx.user.id, "person", userId, "person.confidential_updated", {
+        fields,
+      });
+      await writeAudit({
+        workspaceId,
+        actorId: ctx.user.id,
+        action: "person.confidential_updated",
+        entity: "person",
+        entityId: userId,
+        ip: ctx.ip,
+        payload: { fields },
+      });
+      return { userId };
+    }),
+
+  // P8.3 "Remove" = archive (spec §5): the person drops out of every list
+  // and can't open the workspace (lib/membership.ts treats status
+  // 'inactive' as a non-member); contracts, payroll and leave stay.
+  archive: protectedProcedure.input(archivePersonSchema).mutation(async ({ ctx, input }) => {
+    const membership = await requireArchivable(ctx.user, input.workspaceId, input.userId);
+    const now = new Date();
+    await upsertProfile(membership.id, { status: "inactive", deactivatedAt: now, archivedAt: now });
+    await recordPersonChange(ctx, input.workspaceId, input.userId, "person.archived");
+    return { userId: input.userId };
+  }),
+
+  unarchive: protectedProcedure.input(archivePersonSchema).mutation(async ({ ctx, input }) => {
+    const membership = await requireArchivable(ctx.user, input.workspaceId, input.userId);
+    await upsertProfile(membership.id, { status: "active", deactivatedAt: null, archivedAt: null });
+    await recordPersonChange(ctx, input.workspaceId, input.userId, "person.unarchived");
+    return { userId: input.userId };
+  }),
+
+  // Only for someone already archived, and only HR (spec §5). Irreversible.
+  deletePermanently: protectedProcedure
+    .input(archivePersonSchema)
+    .mutation(async ({ ctx, input }) => {
+      const membership = await requireArchivable(ctx.user, input.workspaceId, input.userId);
+      if (membership.active) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "Archive this person before deleting them permanently",
+        });
+      }
+      const user = await db.query.users.findFirst({ where: eq(schema.users.id, input.userId) });
+      const deleted = await deletePersonRecords(input.workspaceId, input.userId, membership.id);
+      await recordPersonChange(ctx, input.workspaceId, input.userId, "person.deleted", {
+        name: user?.name ?? "",
+        ...deleted,
+      });
+      return { userId: input.userId, ...deleted };
+    }),
 });
+
+// HR (people:manageStaff), never on the owner or yourself.
+async function requireArchivable(user: SessionUser, workspaceId: string, userId: string) {
+  await assertCanPeople(user, workspaceId, "people:manageStaff", { targetUserId: userId });
+  const membership = await requireTargetMembership(workspaceId, userId);
+  if (membership.role === "owner") {
+    throw new TRPCError({ code: "BAD_REQUEST", message: "The workspace owner can't be archived" });
+  }
+  if (userId === user.id) {
+    throw new TRPCError({ code: "BAD_REQUEST", message: "You can't archive yourself" });
+  }
+  return membership;
+}
+
+async function recordPersonChange(
+  ctx: { user: SessionUser; ip: string | null },
+  workspaceId: string,
+  userId: string,
+  verb: string,
+  payload?: Record<string, unknown>,
+) {
+  await logActivity(workspaceId, ctx.user.id, "person", userId, verb, payload);
+  await writeAudit({
+    workspaceId,
+    actorId: ctx.user.id,
+    action: verb,
+    entity: "person",
+    entityId: userId,
+    ip: ctx.ip,
+    ...(payload ? { payload } : {}),
+  });
+}

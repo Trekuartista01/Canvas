@@ -8,6 +8,7 @@ import {
   peopleRoleHas,
   wouldCreateReportingCycle,
 } from "./people";
+import { updateConfidentialSchema } from "./schemas/people";
 
 describe("wouldCreateReportingCycle", () => {
   // carol → bob → alice (alice has no manager)
@@ -75,7 +76,31 @@ describe("PEOPLE_ROLE_PERMISSIONS", () => {
     expect(PEOPLE_ROLES.filter((r) => peopleRoleHas(r, "roles:assign"))).toEqual(["admin"]);
   });
 
-  it("gives employees nothing beyond their own data", () => {
-    expect(PEOPLE_ROLE_PERMISSIONS.employee).toEqual([]);
+  it("gives employees only the directory beyond their own data (P8.3)", () => {
+    expect(PEOPLE_ROLE_PERMISSIONS.employee).toEqual(["people:viewDirectory"]);
+  });
+});
+
+describe("updateConfidentialSchema (P8.3)", () => {
+  const base = {
+    workspaceId: "0190a000-0000-7000-8000-000000000001",
+    userId: "0190a000-0000-7000-8000-000000000002",
+  };
+  it("clears a date sent as an empty string and keeps untouched fields undefined", () => {
+    const parsed = updateConfidentialSchema.parse({ ...base, contractEnd: "", grossSalary: 950 });
+    expect(parsed.contractEnd).toBeNull();
+    expect(parsed.grossSalary).toBe(950);
+    expect(parsed.personalNumber).toBeUndefined();
+  });
+  it("refuses a contract that ends before it starts, and unknown currencies", () => {
+    expect(
+      updateConfidentialSchema.safeParse({
+        ...base,
+        contractStart: "2026-06-01",
+        contractEnd: "2026-05-31",
+      }).success,
+    ).toBe(false);
+    expect(updateConfidentialSchema.safeParse({ ...base, payCurrency: "XYZ" }).success).toBe(false);
+    expect(updateConfidentialSchema.safeParse({ ...base, grossSalary: -1 }).success).toBe(false);
   });
 });

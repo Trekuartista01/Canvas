@@ -11,6 +11,7 @@ const row = (i: number, over: Partial<PayrollRow> = {}): PayrollRow => ({
   jobTitle: "Sales associate",
   recordId: `r${i}`,
   netSalaryEur: 650.5,
+  grossSalary: 850,
   bankName: "Banka Kombëtare",
   accountHolder: `Person ${i}`,
   idCardNumber: "1234567890",

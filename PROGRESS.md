@@ -2859,3 +2859,40 @@ During the real deploy: Cloudflare billing doesn't accept Kosovo cards, so R2 ca
 ### TODO
 
 - Seed estimates past 2030 when the time comes (`KOSOVO_EID_ESTIMATES`); the December banner covers a missing year.
+
+## 2026-11-03 P8.3: People confidential fields, archiving, leave allowances
+
+### Done
+
+- **Migration `0066`** (down file included): `employee_profiles` gets `personal_number_enc`, `pay_currency` (default EUR), `contract_type` enum (fixed_term / open_ended), `contract_start`, `contract_end`, `archived_at` (backfilled from `deactivated_at` for the 17 deactivated profiles locally). `payroll_records` gets `gross_salary`. `leave_balances` stays as the spec's `leave_allowances` (no rename).
+- **Directory for everyone** (spec §5): `employee` now has `people:viewDirectory` in the one permission map, so every member sees name, photo, position, department and email. Archived people are listed for HR only, and their profile is NOT_FOUND for everyone else.
+- **Confidential tab (HR only):**
+  - `people.confidential` returns personal number, pay currency, contract terms, gross/net salary, bank details and the leave allowance per year. It needs `people:manageStaff` + `payroll:view`, so admin and the person themselves are refused too (they get My Pay Details in P8.7). Every view is audited.
+  - `people.updateConfidential` (HR, never on yourself) writes the profile and payroll parts. The personal number is encrypted with the payroll key. Activity + audit_log record which fields changed, never the values.
+  - Bank details are shown there and still edited on the Payroll page. The allowance table edits per year through the existing `leave.setBalance`.
+- **Remove = archive:** `people.archive` / `people.unarchive` replace `setStatus` (status `inactive` + `archived_at`; login to the workspace is blocked through the existing inactive handling). `people.deletePermanently` works for archived people only. It deletes, in one transaction, their payroll, contracts, leave requests, allowances, the private files behind them and the membership (the profile cascades). The storage objects are then removed. The account stays, since it may belong to other workspaces. All three are audited.
+- **UI:**
+  - The profile page has Profile / Confidential tabs for HR.
+  - "Remove (archive)", "Restore", and "Delete permanently…" with an inline confirmation (no browser dialog).
+  - The directory filter is now "Active and archived".
+  - The profile query no longer retries 4xx answers, so an archived profile shows "no access" right away.
+
+### Decisions
+
+- **Personal number** is a new field next to payroll's existing ID-card number (the approved plan has both).
+- **`net_salary_eur`** keeps its name but is in the person's pay currency. The Payroll page and its exports still label it EUR; that page is P8.7's.
+- **Permanent delete** keeps tasks, comments and activity the person wrote, like any departed member's.
+
+### Verified
+
+- `pnpm check` green; `pnpm test`: API 388, shared 112 (+ confidential schema cases, employee = directory only), db 11, web 15.
+- `0066` applied locally; `pnpm db:rollback` and re-migrate clean.
+- Playwright at CI parity: **78/78 passed**. New `people.spec.ts` P8.3 path:
+  - HR fills in the Confidential tab; the personal number is stored encrypted.
+  - A 2027 allowance of 25 persists.
+  - An employee has the directory but no tab, and gets 403 from the API.
+  - HR can't edit their own details.
+  - Archive hides the person (HR sees them with the filter).
+  - Permanent delete removes the membership and payroll.
+  - `hr-guards.spec.ts` covers `confidential`, `updateConfidential`, `archive`, `unarchive` and `deletePermanently` (403 for admin, owner, CEO, ops and employees; nothing written).
+  - (One earlier full run had `email-digest.spec.ts` fail once; it passed alone and in the full rerun.)

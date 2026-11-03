@@ -5,7 +5,8 @@ import { env } from "../env";
 import { decryptField, encryptField, maskLast4 } from "./field-crypto";
 import { activeMembershipCondition } from "./membership";
 
-export type PayrollSecretField = "idCardNumber" | "iban";
+// P8.3: the personal number (employee_profiles) uses the same key and scheme.
+export type PayrollSecretField = "idCardNumber" | "iban" | "personalNumber";
 
 /** Binds a ciphertext to its row and field (see field-crypto.ts). */
 function context(workspaceId: string, userId: string, field: PayrollSecretField) {
@@ -48,6 +49,7 @@ export interface PayrollRow {
   jobTitle: string | null;
   recordId: string | null;
   netSalaryEur: number | null;
+  grossSalary: number | null;
   bankName: string | null;
   accountHolder: string | null;
   /** Full value when revealed, "•••• 1234" otherwise. */
@@ -111,6 +113,7 @@ export async function loadPayrollRows(
       ...r,
       recordId: record?.id ?? null,
       netSalaryEur: record?.netSalaryEur ?? null,
+      grossSalary: record?.grossSalary ?? null,
       bankName: record?.bankName ?? null,
       accountHolder: record?.accountHolder ?? null,
       idCardNumber: opts.reveal ? idCard : maskLast4(idCard),

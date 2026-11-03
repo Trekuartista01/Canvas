@@ -20,6 +20,9 @@ export const payrollRecords = pgTable(
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
     netSalaryEur: numeric("net_salary_eur", { precision: 12, scale: 2, mode: "number" }),
+    // P8.3: gross salary, in the person's pay currency (employee_profiles).
+    // net_salary_eur keeps its M7.7 name; it's in that currency too.
+    grossSalary: numeric("gross_salary", { precision: 12, scale: 2, mode: "number" }),
     idCardNumberEnc: text("id_card_number_enc"),
     bankName: text("bank_name"),
     ibanEnc: text("iban_enc"),

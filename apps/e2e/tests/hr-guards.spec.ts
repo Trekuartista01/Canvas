@@ -208,12 +208,17 @@ test("HR routes: 403 for admin, owner, CEO, Operations Manager and employees; 20
       input: { workspaceId: ws, userId, managerUserId: null },
     },
     { kind: "query", path: "people.directory", input: { workspaceId: ws, includeInactive: true } },
-    // Last: deactivating Sam would change later answers.
+    // P8.3 Confidential tab, archive, unarchive, permanent delete.
+    { kind: "query", path: "people.confidential", input: { workspaceId: ws, userId } },
     {
       kind: "mutation",
-      path: "people.setStatus",
-      input: { workspaceId: ws, userId, status: "inactive" },
+      path: "people.updateConfidential",
+      input: { workspaceId: ws, userId, grossSalary: 1, personalNumber: "1234567890" },
     },
+    { kind: "mutation", path: "people.unarchive", input: { workspaceId: ws, userId } },
+    { kind: "mutation", path: "people.deletePermanently", input: { workspaceId: ws, userId } },
+    // Last: archiving Sam would change later answers.
+    { kind: "mutation", path: "people.archive", input: { workspaceId: ws, userId } },
   ];
 
   const label = (c: Call) => c.path;
@@ -232,8 +237,8 @@ test("HR routes: 403 for admin, owner, CEO, Operations Manager and employees; 20
     }
   }
 
-  // Directory roles see a profile, but never its confidential part.
-  for (const [role, request] of callers.filter(([r]) => r !== "employee")) {
+  // Everyone sees a profile (P8.3: employees too), never its confidential part.
+  for (const [role, request] of callers) {
     const res = await call(request, {
       kind: "query",
       path: "people.profile",
@@ -255,6 +260,11 @@ test("HR routes: 403 for admin, owner, CEO, Operations Manager and employees; 20
     where: eq(schema.leaveRequests.id, pending!.id),
   });
   expect(stillPending!.status).toBe("pending");
+  // …and the refused confidential edit wrote nothing.
+  const samPay = await db.query.payrollRecords.findFirst({
+    where: and(eq(schema.payrollRecords.workspaceId, ws), eq(schema.payrollRecords.userId, userId)),
+  });
+  expect(samPay?.grossSalary ?? null).toBeNull();
 
   // HR itself gets through (one read per area is enough here; the feature
   // specs cover HR's flows).

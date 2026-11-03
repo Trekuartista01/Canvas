@@ -110,7 +110,8 @@ export const PEOPLE_ROLE_PERMISSIONS: Record<PeopleRole, readonly PeopleAction[]
   ceo: OPS_ACTIONS,
   operations_manager: OPS_ACTIONS,
   hr_finance: [...HR_DATA_ACTIONS, ...TEAM_ACTIONS, "companyDocument:manage"],
-  employee: [],
+  // P8.3 (spec §5): everyone sees the directory (public fields only).
+  employee: ["people:viewDirectory"],
 };
 
 export function peopleRoleHas(role: PeopleRole, action: PeopleAction): boolean {
@@ -142,3 +143,13 @@ export function wouldCreateReportingCycle(
   }
   return false;
 }
+
+// P8.3 confidential employment terms (spec §5) — HR only.
+export const CONTRACT_TYPES = ["fixed_term", "open_ended"] as const;
+export type ContractType = (typeof CONTRACT_TYPES)[number];
+export const CONTRACT_TYPE_LABELS: Record<ContractType, string> = {
+  fixed_term: "Fixed-term (me afat)",
+  open_ended: "Open-ended (pa afat)",
+};
+export const PAY_CURRENCIES = ["EUR", "USD", "CHF", "GBP", "ALL"] as const;
+export type PayCurrency = (typeof PAY_CURRENCIES)[number];

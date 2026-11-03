@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { PEOPLE_ROLES } from "../people";
+import { CONTRACT_TYPES, PAY_CURRENCIES, PEOPLE_ROLES } from "../people";
 import { emailSchema, passwordSchema } from "./auth";
 
 const workspaceId = z.string().uuid();
@@ -62,11 +62,32 @@ export const setPeopleRoleSchema = z.object({ workspaceId, userId, peopleRole: p
 
 export const setManagerSchema = z.object({ workspaceId, userId, managerUserId: userId.nullable() });
 
-export const setEmployeeStatusSchema = z.object({
-  workspaceId,
-  userId,
-  status: z.enum(["active", "inactive"]),
-});
-
 export type CreateStaffInput = z.infer<typeof createStaffSchema>;
 export type EmployeeProfileFields = z.infer<typeof employeeProfileFieldsSchema>;
+
+// P8.3: archive = remove from lists and block login; history stays (spec §5).
+export const archivePersonSchema = z.object({ workspaceId, userId });
+
+const money = z.number().min(0).max(9_999_999_999.99).multipleOf(0.01).nullable().optional();
+
+// The HR-only Confidential tab. undefined = leave as is, null = clear.
+// Salary and bank fields are written to payroll_records, the rest to
+// employee_profiles.
+export const updateConfidentialSchema = z
+  .object({
+    workspaceId,
+    userId,
+    personalNumber: z.string().trim().min(1).max(40).nullable().optional(),
+    payCurrency: z.enum(PAY_CURRENCIES).optional(),
+    contractType: z.enum(CONTRACT_TYPES).nullable().optional(),
+    contractStart: optionalDate,
+    contractEnd: optionalDate,
+    grossSalary: money,
+    netSalary: money,
+  })
+  .refine((v) => !v.contractStart || !v.contractEnd || v.contractEnd >= v.contractStart, {
+    message: "The contract can't end before it starts",
+    path: ["contractEnd"],
+  });
+
+export type UpdateConfidentialInput = z.infer<typeof updateConfidentialSchema>;

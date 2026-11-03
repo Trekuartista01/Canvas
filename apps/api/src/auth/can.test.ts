@@ -256,7 +256,7 @@ describe("can() — People (P8.1 roles)", () => {
   const TEAM: PeopleRole[] = ["admin", "ceo", "hr_finance", "operations_manager"];
   const OPS: PeopleRole[] = ["admin", "ceo", "operations_manager"];
   const MATRIX: Record<PeopleAction, PeopleRole[]> = {
-    "people:viewDirectory": TEAM,
+    "people:viewDirectory": [...TEAM, "employee"],
     "people:viewProfile": HR,
     "people:manageStaff": HR,
     "roles:assign": ["admin"],
