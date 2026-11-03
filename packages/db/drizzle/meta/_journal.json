@@ -470,6 +470,13 @@
       "when": 1793698298795,
       "tag": "0066_people_confidential",
       "breakpoints": true
+    },
+    {
+      "idx": 67,
+      "version": "7",
+      "when": 1793699961349,
+      "tag": "0067_leave_by_year",
+      "breakpoints": true
     }
   ]
 }

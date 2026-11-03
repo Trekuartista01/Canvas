@@ -1,3 +1,4 @@
+import { leaveNotificationText } from "@/lib/leave-notification";
 import { NOTIFICATION_VERB_LABELS, PEOPLE_ROLE_LABELS, type PeopleRole } from "@canvas/shared";
 import { formatRelativeTime } from "@/lib/format";
 import { trpc } from "@/lib/trpc";
@@ -169,6 +170,7 @@ export function NotificationsBell() {
                 : null;
               const submitterName =
                 n.verb === "task.completed_via_form" ? formSubmitterName(n.payloadJson) : null;
+              const leaveText = leaveNotificationText(n.verb, n.payloadJson, n.actorName);
               return (
                 <button
                   key={n.id}
@@ -196,6 +198,7 @@ export function NotificationsBell() {
                       navigate({
                         to: "/w/$workspaceId/leave-approvals",
                         params: { workspaceId: n.workspaceId },
+                        search: { request: n.entityId },
                       });
                     } else if (n.verb.startsWith("leave.")) {
                       navigate({
@@ -219,7 +222,9 @@ export function NotificationsBell() {
                     n.readAt ? "" : "bg-muted/50"
                   } hover:bg-muted`}
                 >
-                  {n.verb === "holiday.missing" ? (
+                  {leaveText ? (
+                    <span>{leaveText}</span>
+                  ) : n.verb === "holiday.missing" ? (
                     <span>
                       <span className="font-medium">Official holidays:</span> add or confirm{" "}
                       {missingYear(n.payloadJson)}&rsquo;s calendar

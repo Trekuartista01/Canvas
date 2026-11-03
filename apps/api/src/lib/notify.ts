@@ -1,5 +1,7 @@
 import { db, schema } from "@canvas/db";
+import { eq } from "drizzle-orm";
 import { listActiveMemberIds, listActiveMemberIdsWithRole } from "./membership";
+import { publish } from "./realtime";
 
 // Shared by every notification-creating call site (comment @mentions,
 // task assignment, urgent-priority broadcasts) — a bare insert against an
@@ -9,6 +11,24 @@ export async function notifyUsers(activityId: string, userIds: string[]) {
   const unique = [...new Set(userIds)];
   if (unique.length === 0) return;
   await db.insert(schema.notifications).values(unique.map((userId) => ({ userId, activityId })));
+  // P8.4: bells and toasts refresh at once instead of on the next poll.
+  // Invalidation only — what the notification says stays behind the API.
+  const activity = await db.query.activity.findFirst({
+    where: eq(schema.activity.id, activityId),
+    columns: { workspaceId: true },
+  });
+  if (activity) {
+    try {
+      await publish(activity.workspaceId, {
+        entity: "notification",
+        id: activityId,
+        workspaceId: activity.workspaceId,
+        kind: "created",
+      });
+    } catch (err) {
+      console.error("[notify] realtime publish failed:", err);
+    }
+  }
 }
 
 // Every member of a workspace, optionally excluding the actor (who doesn't

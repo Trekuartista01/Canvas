@@ -85,6 +85,14 @@ export const realtimeEventSchema = z.discriminatedUnion("entity", [
     workspaceId: z.string().uuid(),
     kind,
   }),
+  // P8.4: someone in this workspace got a notification — clients refetch
+  // their own notification list (the server only ever returns theirs).
+  z.object({
+    entity: z.literal("notification"),
+    id: z.string().uuid(),
+    workspaceId: z.string().uuid(),
+    kind,
+  }),
   // M7.7: a payroll record changed. Invalidation only — never any payroll
   // values over the socket.
   z.object({

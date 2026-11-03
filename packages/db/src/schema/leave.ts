@@ -1,7 +1,9 @@
 import {
+  boolean,
   date,
   index,
   integer,
+  jsonb,
   numeric,
   pgEnum,
   pgTable,
@@ -51,6 +53,22 @@ export const leaveRequests = pgTable(
     decidedBy: uuid("decided_by").references(() => users.id, { onDelete: "set null" }),
     decidedAt: timestamp("decided_at", { withTimezone: true }),
     decisionNote: text("decision_note"),
+    // P8.4 (spec §3): stored with the request, like working_days, so a later
+    // holiday-calendar edit can't change a past decision. by_year splits a
+    // request across 31 Dec ({"2026": 2, "2027": 1}) — each year's balance
+    // takes its part.
+    byYear: jsonb("by_year").$type<Record<string, number>>().notNull().default({}),
+    excludedHolidays: jsonb("excluded_holidays")
+      .$type<{ date: string; name: string }[]>()
+      .notNull()
+      .default([]),
+    // Required when HR rejects; shown to the employee.
+    rejectionReason: text("rejection_reason"),
+    // HR approved their own request because no other HR user existed.
+    selfApproved: boolean("self_approved").notNull().default(false),
+    // P8.5 Vendim files in private storage.
+    vendimPdfKey: text("vendim_pdf_key"),
+    vendimDocxKey: text("vendim_docx_key"),
     // Set when HR records leave on someone's behalf (approved immediately).
     recordedBy: uuid("recorded_by").references(() => users.id, { onDelete: "set null" }),
     // e.g. a doctor's note. An attachments row with no task/comment — only

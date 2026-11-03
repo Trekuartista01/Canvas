@@ -2896,3 +2896,54 @@ During the real deploy: Cloudflare billing doesn't accept Kosovo cards, so R2 ca
   - Permanent delete removes the membership and payroll.
   - `hr-guards.spec.ts` covers `confidential`, `updateConfidential`, `archive`, `unarchive` and `deletePermanently` (403 for admin, owner, CEO, ops and employees; nothing written).
   - (One earlier full run had `email-digest.spec.ts` fail once; it passed alone and in the full rerun.)
+
+## 2026-11-03 P8.4: Leave request → HR notifications → Leave approvals
+
+### Done
+
+- **Migration `0067`** (down file included): `leave_requests` gets `by_year` jsonb, `excluded_holidays` jsonb, `rejection_reason`, `self_approved`, `vendim_pdf_key`, `vendim_docx_key`. Backfill: `by_year` = the start year's working days; `rejection_reason` from the old rejection note.
+- **Rules** (`lib/leave-balance.ts`, spec §3):
+  - Balance = allowed + carried − approved − pending, per year.
+  - A request crossing 31 Dec is allowed and each year takes its `byYear` part.
+  - Going over the balance is a **warning**, never a block; `approvalBlocker` is gone and HR decides.
+  - Still refused: end before start, zero working days, overlapping your own leave.
+- **Request:**
+  - Stores days, `byYear` and the excluded holidays, so a later calendar edit can't change past decisions.
+  - Every HR user gets the activity + notification, and an email via `emailUsers` (the P8.1 `sendEmail` wrapper) with the spec's sentence and a link to `leave-approvals?request=<id>`.
+  - `leave.preview` returns `byYear`, excluded holidays, remaining after per year, return date and `warning`.
+- **Decide** (HR only, `leave:approve`):
+  - HR's own request needs another HR user (403 otherwise). A lone HR user may decide it; it's flagged `self_approved` and written to audit_log as `leave.self_approved`.
+  - Every decision is audited.
+  - Reject needs a reason. The employee gets an in-app notice and an email with the spec's approved text (including the return date from `nextWorkingDay`) or the reason.
+  - The Vendim is P8.5 (marked in `decide`).
+- **Live notifications:** `notifyUsers` now publishes a payload-free `{entity: "notification"}` WS event, so the bell refreshes at once (the 30 s poll stays as the fallback).
+  - New `NotificationToasts` on Home and My Tasks pops up fresh unread notifications once; "once" is remembered per browser in localStorage, wrapped in try/catch.
+  - Leave notices read as the spec's sentences in both the toast and the bell. Clicking a leave request opens it on Leave approvals.
+- **UI:**
+  - The leave form preview reads "N working days · 1 Jan (…) is an official holiday and is not counted · Remaining after this: …", with an amber warning that doesn't disable submit.
+  - Leave approvals tabs: **Pending** (count badge) / Approved / Rejected / Official holidays / **Calendar** (the Who's off grid, extracted into `LeaveMonthCalendar`) / Record leave / Balances. `?request=` opens and highlights a request.
+  - Each card shows the excluded holidays, balance before → after per year (red below zero), other people's approved leave on those dates, the note, and the "Your request" / "Self-approved" flags.
+- The vacation label is now "Annual leave (Pushim vjetor)".
+
+### Decisions
+
+- Toasts appear on Home and My Tasks (where HR and employees land), not on every page.
+- "Shown once" is per browser, not stored on the server. A second device may show the same toast once more, but the bell is the record.
+- Emails go through the existing EmailClient (SMTP or mock), as decided in P8.1, not Resend.
+
+### Verified
+
+- `pnpm check` green; `pnpm test`: API 385 (leave rules rewritten: cross-year split, warning not block, hard rules), shared 116 (+ the spec's exact message texts), db 11, web 15.
+- `0067` applied, rolled back and re-applied locally.
+- Playwright at CI parity: **79/79 passed** (on the rerun; the first full run had `email-digest.spec.ts` time out — see the note below). New `leave-approvals.spec.ts`:
+  - Sam requests 30.12.2026–05.01.2027: "3 working days" and "Remaining after this: 2026: 18 days, 2027: 19 days".
+  - HR, already on Home, gets a live toast with the spec's sentence; clicking it opens the request (pending badge 1).
+  - The card shows the per-year balances and 01.01.2027 not counted.
+  - Reject needs a reason and Sam sees it in his bell.
+  - An over-balance request shows the warning and can still be submitted; HR approves it and Sam is told he's back on 01.04.2027.
+  - HR's own request: 403 for herself, another HR user approves. When she's the only HR user, she self-approves and it's flagged in the UI and audit_log.
+  - The Calendar tab renders.
+
+### Note
+
+- `email-digest.spec.ts` timed out twice in full runs (P8.3 and here) and passed alone and on reruns. Cause: the scheduler tick loops over every workspace, and the local test DB has 1,745 from accumulated e2e runs. The P8.2/P8.4 holiday steps take ~1.2 s of it (measured). A cleanup of old e2e workspaces, or a longer poll in that spec, would fix it; not done here.

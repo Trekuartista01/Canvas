@@ -1,6 +1,7 @@
 import type { AppRouter } from "@canvas/api";
 import { EmployeeOfMonthBanner } from "@/components/employee-of-month-banner";
 import { HolidaysMissingBanner } from "@/components/holidays-missing-banner";
+import { NotificationToasts } from "@/components/notification-toasts";
 import { isOverdue, type StatusKind } from "@canvas/shared";
 import { formatDue } from "@/lib/format";
 import { useSession } from "@/hooks/use-session";
@@ -82,6 +83,7 @@ function MyTasksPage() {
         )}
       </div>
 
+      <NotificationToasts workspaceId={workspaceId} />
       <HolidaysMissingBanner workspaceId={workspaceId} />
       <EmployeeOfMonthBanner workspaceId={workspaceId} />
 

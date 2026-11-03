@@ -11,8 +11,9 @@ import { useState, type FormEvent } from "react";
 /**
  * M7.5 request form. Without `forUserId` the caller asks for their own
  * leave (pending until approved); with it, HR records leave for that person
- * (approved at once). Working days and any rule problem come live from
- * leave.preview — the server computes both, the form only shows them.
+ * (approved at once). Working days, excluded holidays, what's left and any
+ * problem come live from leave.preview — the server computes them all.
+ * P8.4: going over the balance is a warning; HR decides.
  */
 export function LeaveForm({
   workspaceId,
@@ -164,16 +165,21 @@ export function LeaveForm({
         {datesSet && preview.data && (
           <span className="text-sm" data-testid={`${prefix}-preview`}>
             {preview.data.workingDays} working day{preview.data.workingDays === 1 ? "" : "s"}
-            {type === "vacation" && !problem && (
-              <span className="text-muted-foreground">
-                {" "}
-                · {preview.data.available} available in {preview.data.year}
-              </span>
-            )}
             {preview.data.excludedHolidays.length > 0 && (
               <span className="text-muted-foreground" data-testid={`${prefix}-preview-holidays`}>
                 {" "}
-                · excludes {preview.data.excludedHolidays.map((h) => h.name).join(", ")}
+                · {holidaysSentence(preview.data.excludedHolidays)}
+              </span>
+            )}
+            {!problem && preview.data.remainingAfter.length > 0 && (
+              <span className="text-muted-foreground" data-testid={`${prefix}-preview-remaining`}>
+                {" "}
+                · Remaining after this:{" "}
+                {preview.data.remainingAfter.length === 1
+                  ? daysLabel(preview.data.remainingAfter[0]!.days)
+                  : preview.data.remainingAfter
+                      .map((r) => `${r.year}: ${daysLabel(r.days)}`)
+                      .join(", ")}
               </span>
             )}
             {preview.data.returnDate && preview.data.workingDays > 0 && (
@@ -182,6 +188,15 @@ export function LeaveForm({
                 · back at work {formatReportDate(preview.data.returnDate)}
               </span>
             )}
+          </span>
+        )}
+        {!problem && preview.data?.warning && (
+          <span
+            className="text-sm text-amber-700 dark:text-amber-400"
+            role="status"
+            data-testid={`${prefix}-warning`}
+          >
+            {preview.data.warning}
           </span>
         )}
         {problem && (
@@ -197,4 +212,24 @@ export function LeaveForm({
       </div>
     </form>
   );
+}
+
+const daysLabel = (n: number) => `${n} day${Math.abs(n) === 1 ? "" : "s"}`;
+
+function shortDay(date: string) {
+  return new Date(`${date}T12:00:00Z`).toLocaleDateString("en-GB", {
+    day: "numeric",
+    month: "short",
+    timeZone: "UTC",
+  });
+}
+
+/** "1 Jan (New Year's Day) and 2 Jan (…) are official holidays and are not counted" (spec §3). */
+function holidaysSentence(holidays: { date: string; name: string }[]) {
+  const parts = holidays.map((h) => `${shortDay(h.date)} (${h.name})`);
+  const list =
+    parts.length === 1
+      ? parts[0]!
+      : `${parts.slice(0, -1).join(", ")} and ${parts[parts.length - 1]}`;
+  return `${list} ${parts.length === 1 ? "is an official holiday" : "are official holidays"} and ${parts.length === 1 ? "is" : "are"} not counted`;
 }

@@ -90,7 +90,11 @@ leave_requests   (id, workspace_id fk, user_id fk,                      -- M7.5
                   reason, status enum('pending','approved','rejected','cancelled'),
                   decided_by fk users null, decided_at, decision_note,
                   recorded_by fk users null,                            -- HR recorded it (approved at once)
-                  document_attachment_id fk attachments null)          -- private to employee + approvers
+                  document_attachment_id fk attachments null,          -- private to employee + approvers
+                  by_year jsonb,                                        -- P8.4 {"2026": 2, "2027": 1}, kept
+                  excluded_holidays jsonb,                              -- P8.4 [{date, name}], kept
+                  rejection_reason null, self_approved bool,            -- P8.4 (self = lone HR, audited)
+                  vendim_pdf_key null, vendim_docx_key null)            -- P8.5 private files
 leave_balances   (id, workspace_id fk, user_id fk, year,
                   entitlement_days null,                                -- null = workspace default
                   carried_over_days null,                               -- null = rollover not run yet

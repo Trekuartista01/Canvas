@@ -1,12 +1,14 @@
 import { describe, expect, it } from "vitest";
 import {
-  approvalBlocker,
+  balanceAfter,
   carryOverFrom,
   computeVacationBalance,
   consumesBalance,
+  daysInYear,
   findOverlap,
   rangesOverlap,
   validateLeaveRequest,
+  yearsOf,
   type LeaveLike,
 } from "./leave-balance";
 
@@ -85,7 +87,7 @@ describe("overlap", () => {
   });
 });
 
-describe("validateLeaveRequest", () => {
+describe("validateLeaveRequest (P8.4: only hard rules)", () => {
   const base = {
     type: "vacation" as const,
     startDate: "2026-04-13",
@@ -93,90 +95,87 @@ describe("validateLeaveRequest", () => {
     workingDays: 5,
   };
 
-  it("accepts a request within balance", () => {
-    expect(validateLeaveRequest({ ...base, balance: balanceOf([]), existing: [] })).toBeNull();
+  it("accepts a normal request", () => {
+    expect(validateLeaveRequest({ ...base, existing: [] })).toBeNull();
   });
 
-  it("rejects an end date before the start", () => {
+  it("refuses end before start, zero working days and overlapping own leave", () => {
+    expect(validateLeaveRequest({ ...base, endDate: "2026-04-12", existing: [] })).toMatch(
+      "end date is before",
+    );
+    expect(validateLeaveRequest({ ...base, workingDays: 0, existing: [] })).toMatch(
+      "no working days",
+    );
+    const existing = [leave({ status: "pending", startDate: "2026-04-16", endDate: "2026-04-20" })];
+    expect(validateLeaveRequest({ ...base, existing })).toMatch("Overlaps");
+  });
+
+  it("allows a request across the new year and one over the balance", () => {
     expect(
       validateLeaveRequest({
         ...base,
-        endDate: "2026-04-10",
-        balance: balanceOf([]),
-        existing: [],
-      }),
-    ).toMatch(/before the start/);
-  });
-
-  it("rejects leave crossing the new year", () => {
-    expect(
-      validateLeaveRequest({
-        ...base,
-        startDate: "2026-12-28",
+        startDate: "2026-12-30",
         endDate: "2027-01-05",
-        balance: balanceOf([]),
+        workingDays: 3,
         existing: [],
       }),
-    ).toMatch(/split/);
-  });
-
-  it("rejects dates with no working days", () => {
-    expect(
-      validateLeaveRequest({ ...base, workingDays: 0, balance: balanceOf([]), existing: [] }),
-    ).toMatch(/no working days/);
-  });
-
-  it("rejects overlapping requests, of any type", () => {
-    const existing = [leave({ type: "sick", startDate: "2026-04-16", endDate: "2026-04-20" })];
-    expect(validateLeaveRequest({ ...base, balance: balanceOf(existing), existing })).toMatch(
-      /Overlaps sick leave from 2026-04-16 to 2026-04-20/,
-    );
-  });
-
-  it("rejects vacation beyond the remaining balance, counting pending requests", () => {
-    const existing = [
-      leave({ workingDays: 10 }),
-      leave({ status: "pending", startDate: "2026-06-01", endDate: "2026-06-12", workingDays: 8 }),
-    ];
-    // 20 − 10 approved − 8 pending = 2 left.
-    expect(validateLeaveRequest({ ...base, balance: balanceOf(existing), existing })).toBe(
-      "Only 2 vacation days left for 2026",
-    );
-    expect(
-      validateLeaveRequest({
-        ...base,
-        endDate: "2026-04-14",
-        workingDays: 2,
-        balance: balanceOf(existing),
-        existing,
-      }),
     ).toBeNull();
-  });
-
-  it("doesn't limit types that don't consume balance", () => {
-    const existing = [leave({ workingDays: 20 })];
-    expect(
-      validateLeaveRequest({ ...base, type: "sick", balance: balanceOf(existing), existing }),
-    ).toBeNull();
+    expect(validateLeaveRequest({ ...base, workingDays: 40, existing: [] })).toBeNull();
   });
 });
 
-describe("approvalBlocker", () => {
-  it("lets a pending request through if it fits after approved leave", () => {
-    const request = leave({ id: "r", status: "pending", workingDays: 5 });
-    const b = balanceOf([leave({ workingDays: 15 }), request]);
-    expect(approvalBlocker(request, b)).toBeNull();
+describe("byYear split (P8.4)", () => {
+  const crossYear = leave({
+    startDate: "2026-12-30",
+    endDate: "2027-01-05",
+    workingDays: 3,
+    byYear: { "2026": 2, "2027": 1 },
   });
 
-  it("blocks approving more than remains", () => {
-    const request = leave({ id: "r", status: "pending", workingDays: 6 });
-    const b = balanceOf([leave({ workingDays: 15 }), request]);
-    expect(approvalBlocker(request, b)).toBe("Only 5 vacation days left for 2026");
+  it("each year's balance takes only its part", () => {
+    expect(balanceOf([crossYear]).used).toBe(2);
+    expect(
+      computeVacationBalance({
+        year: 2027,
+        entitlementDays: 20,
+        carriedOverDays: 0,
+        requests: [crossYear],
+      }).used,
+    ).toBe(1);
+    expect(daysInYear(crossYear, 2027)).toBe(1);
+    expect(yearsOf(crossYear)).toEqual([2026, 2027]);
   });
 
-  it("never blocks non-vacation leave", () => {
-    const request = leave({ type: "maternity", status: "pending", workingDays: 90 });
-    expect(approvalBlocker(request, balanceOf([request]))).toBeNull();
+  it("falls back to the start year without a split", () => {
+    const old = leave({ byYear: {} });
+    expect(daysInYear(old, 2026)).toBe(5);
+    expect(daysInYear(old, 2027)).toBe(0);
+  });
+});
+
+describe("balanceAfter (P8.4)", () => {
+  it("shows what's left per year and warns, without blocking, when a year goes over", () => {
+    const b2026 = balanceOf([leave({ workingDays: 19 })]);
+    const b2027 = computeVacationBalance({
+      year: 2027,
+      entitlementDays: 20,
+      carriedOverDays: 0,
+      requests: [],
+    });
+    const r = balanceAfter("vacation", { "2026": 2, "2027": 1 }, [b2026, b2027]);
+    expect(r.remainingAfter).toEqual([
+      { year: 2026, days: -1 },
+      { year: 2027, days: 19 },
+    ]);
+    expect(r.warning).toBe("Goes over the annual leave balance (1 day over in 2026). HR decides.");
+    expect(balanceAfter("vacation", { "2027": 1 }, [b2027]).warning).toBeNull();
+  });
+
+  it("has nothing to say about types without a balance", () => {
+    expect(balanceAfter("sick", { "2026": 40 }, [balanceOf([])])).toEqual({
+      remainingAfter: [],
+      warning: null,
+    });
   });
 });
 

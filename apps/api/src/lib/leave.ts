@@ -3,7 +3,7 @@ import { TRPCError } from "@trpc/server";
 import { and, eq, inArray } from "drizzle-orm";
 import { can, type PeopleAction } from "../auth/can";
 import type { SessionUser } from "../auth/session";
-import { computeVacationBalance, yearOf, type LeaveLike } from "./leave-balance";
+import { computeVacationBalance, type LeaveLike } from "./leave-balance";
 import { getPeopleContext, listHrUserIds } from "./membership";
 import { assertCanPeople } from "./permissions";
 import { PRIVATE_PREFIXES } from "./private-upload";
@@ -17,6 +17,7 @@ export async function loadLeaveRequests(workspaceId: string, userId: string): Pr
       startDate: schema.leaveRequests.startDate,
       endDate: schema.leaveRequests.endDate,
       workingDays: schema.leaveRequests.workingDays,
+      byYear: schema.leaveRequests.byYear,
     })
     .from(schema.leaveRequests)
     .where(
@@ -64,7 +65,8 @@ export async function getVacationBalance(
     year,
     entitlementDays: row?.entitlementDays ?? fallback,
     carriedOverDays: row?.carriedOverDays ?? 0,
-    requests: all.filter((r) => yearOf(r.startDate) === year),
+    // Each request counts its part in this year (P8.4 byYear).
+    requests: all,
   });
 }
 

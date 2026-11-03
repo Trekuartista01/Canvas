@@ -14,11 +14,14 @@ import {
   requestLeaveSchema,
   setDefaultVacationDaysSchema,
   setLeaveBalanceSchema,
+  leaveMessages,
   type LeaveType,
 } from "@canvas/shared";
 import { TRPCError } from "@trpc/server";
 import { and, asc, desc, eq, gte, inArray, lte } from "drizzle-orm";
 import type { SessionUser } from "../../auth/session";
+import { emailUsers } from "../../email/send-email";
+import { env } from "../../env";
 import { logActivity } from "../../lib/activity";
 import {
   assertCanActOnLeaveOf,
@@ -28,7 +31,14 @@ import {
   leaveScopeFor,
   loadLeaveRequests,
 } from "../../lib/leave";
-import { approvalBlocker, validateLeaveRequest, yearOf } from "../../lib/leave-balance";
+import {
+  balanceAfter,
+  validateLeaveRequest,
+  yearOf,
+  yearsOf,
+  type LeaveLike,
+} from "../../lib/leave-balance";
+import { writeAudit } from "../../lib/audit";
 import { activeMembershipCondition, getMembershipRole } from "../../lib/membership";
 import { notifyUsers } from "../../lib/notify";
 import { assertCanPeople, canPeopleAction, requireActiveMember } from "../../lib/permissions";
@@ -39,23 +49,38 @@ import {
   presignPrivateUpload,
   requirePrivateAttachment,
 } from "../../lib/private-upload";
-import { loadHolidayCalendar } from "../../lib/working-days";
+import { loadHolidayCalendar, nextWorkingDay as nextWorkingDayIn } from "../../lib/working-days";
 import { protectedProcedure, router } from "../trpc";
 
 type LeaveInput = { type: LeaveType; startDate: string; endDate: string };
 
-/** Working days + the reason it can't be requested (null = fine), for `userId`. */
+/**
+ * Everything about a request for `userId` before it exists: working days
+ * (P8.2 calculator), the per-year split, the return date, each touched
+ * year's balance, what's left after it, a balance warning (P8.4: never a
+ * block) and the hard problem that refuses it (null = fine).
+ */
 async function checkLeave(workspaceId: string, userId: string, input: LeaveInput) {
-  // P8.2: the one working-day calculator (packages/shared/src/working-days.ts).
   const calendar = await loadHolidayCalendar(workspaceId);
   const count = countWorkingDays(input.startDate, input.endDate, calendar);
   const workingDays = count.total;
+  const byYear = Object.fromEntries(
+    Object.entries(count.byYear).map(([year, days]) => [String(year), days]),
+  );
   const returnDate =
     input.endDate < input.startDate ? null : nextWorkingDay(input.endDate, calendar);
   const existing = await loadLeaveRequests(workspaceId, userId);
-  const balance = await getVacationBalance(workspaceId, userId, yearOf(input.startDate), existing);
-  const problem = validateLeaveRequest({ ...input, workingDays, balance, existing });
-  return { workingDays, count, returnDate, balance, problem };
+  const years = workingDays > 0 ? Object.keys(byYear).map(Number) : [yearOf(input.startDate)];
+  const balances = await Promise.all(
+    years.map((y) => getVacationBalance(workspaceId, userId, y, existing)),
+  );
+  const { remainingAfter, warning } = balanceAfter(input.type, byYear, balances);
+  const problem = validateLeaveRequest({ ...input, workingDays, existing });
+  return { workingDays, count, byYear, returnDate, balances, remainingAfter, warning, problem };
+}
+
+function approvalsLink(workspaceId: string, requestId: string) {
+  return `${env.WEB_URL}/w/${workspaceId}/leave-approvals?request=${requestId}`;
 }
 
 async function requireLeaveRequest(id: string) {
@@ -165,26 +190,26 @@ export const leaveRouter = router({
     const userId = input.userId ?? ctx.user.id;
     if (userId === ctx.user.id) await requireActiveMember(ctx.user, input.workspaceId);
     else await assertCanActOnLeaveOf(ctx.user, input.workspaceId, userId, "leave:recordForOthers");
-    const { workingDays, count, returnDate, balance, problem } = await checkLeave(
-      input.workspaceId,
-      userId,
-      input,
-    );
+    const c = await checkLeave(input.workspaceId, userId, input);
     return {
-      workingDays,
-      byYear: count.byYear,
-      excludedHolidays: count.excludedHolidays,
-      excludedWeekendDays: count.excludedWeekendDays,
-      returnDate,
-      available: balance.available,
-      year: balance.year,
-      problem,
+      workingDays: c.workingDays,
+      byYear: c.byYear,
+      excludedHolidays: c.count.excludedHolidays,
+      excludedWeekendDays: c.count.excludedWeekendDays,
+      returnDate: c.returnDate,
+      remainingAfter: c.remainingAfter,
+      warning: c.warning,
+      problem: c.problem,
     };
   }),
 
   request: protectedProcedure.input(requestLeaveSchema).mutation(async ({ ctx, input }) => {
     await requireActiveMember(ctx.user, input.workspaceId);
-    const { workingDays, problem } = await checkLeave(input.workspaceId, ctx.user.id, input);
+    const { workingDays, byYear, count, problem } = await checkLeave(
+      input.workspaceId,
+      ctx.user.id,
+      input,
+    );
     if (problem) throw new TRPCError({ code: "BAD_REQUEST", message: problem });
     await assertUsableDocument(input.workspaceId, ctx.user.id, input.documentAttachmentId);
 
@@ -197,6 +222,8 @@ export const leaveRouter = router({
         startDate: input.startDate,
         endDate: input.endDate,
         workingDays,
+        byYear,
+        excludedHolidays: count.excludedHolidays,
         reason: input.reason || null,
         documentAttachmentId: input.documentAttachmentId ?? null,
       })
@@ -211,26 +238,40 @@ export const leaveRouter = router({
       "leave.requested",
       activityPayload(request),
     );
-    await notifyUsers(activity.id, await leaveApproverIds(input.workspaceId, ctx.user.id));
+    // Every HR user (another HR user when the requester is HR), in-app and by email.
+    const hrIds = await leaveApproverIds(input.workspaceId, ctx.user.id);
+    await notifyUsers(activity.id, hrIds);
+    const text = leaveMessages.requested({ name: ctx.user.name, ...request });
+    void emailUsers(
+      hrIds,
+      `Leave request: ${ctx.user.name}`,
+      `${text}
+
+Open the request: ${approvalsLink(input.workspaceId, request.id)}`,
+    );
     await publishLeave(input.workspaceId, request.id, "created");
     return request;
   }),
 
+  // P8.4 (spec §3): HR only. HR's own request needs another HR user; a lone
+  // HR user may decide it, flagged self-approved in the audit log. The
+  // balance never blocks — HR sees it and decides.
   decide: protectedProcedure.input(decideLeaveSchema).mutation(async ({ ctx, input }) => {
     const request = await requireLeaveRequest(input.leaveRequestId);
-    await assertCanActOnLeaveOf(ctx.user, request.workspaceId, request.userId, "leave:approve");
+    const own = request.userId === ctx.user.id;
+    await assertCanPeople(ctx.user, request.workspaceId, "leave:approve", {
+      targetUserId: request.userId,
+    });
+    if (own && (await leaveApproverIds(request.workspaceId, ctx.user.id)).length > 0) {
+      throw new TRPCError({
+        code: "FORBIDDEN",
+        message: "Another HR user has to decide on your own leave",
+      });
+    }
     if (request.status !== "pending") {
       throw new TRPCError({ code: "BAD_REQUEST", message: "This request was already decided" });
     }
-    if (input.decision === "approved") {
-      const balance = await getVacationBalance(
-        request.workspaceId,
-        request.userId,
-        yearOf(request.startDate),
-      );
-      const blocker = approvalBlocker(request, balance);
-      if (blocker) throw new TRPCError({ code: "BAD_REQUEST", message: blocker });
-    }
+    const approved = input.decision === "approved";
 
     const [updated] = await db
       .update(schema.leaveRequests)
@@ -239,24 +280,51 @@ export const leaveRouter = router({
         decidedBy: ctx.user.id,
         decidedAt: new Date(),
         decisionNote: input.note || null,
+        rejectionReason: approved ? null : (input.note ?? null),
+        selfApproved: own,
         updatedAt: new Date(),
       })
       .where(
         and(eq(schema.leaveRequests.id, request.id), eq(schema.leaveRequests.status, "pending")),
       )
       .returning();
-    if (!updated)
+    if (!updated) {
       throw new TRPCError({ code: "CONFLICT", message: "This request was already decided" });
+    }
 
+    const returnDate = approved
+      ? await nextWorkingDayIn(request.workspaceId, request.endDate)
+      : null;
     const activity = await logActivity(
       request.workspaceId,
       ctx.user.id,
       "leave_request",
       request.id,
-      input.decision === "approved" ? "leave.approved" : "leave.rejected",
-      { ...activityPayload(request), note: input.note ?? null },
+      approved ? "leave.approved" : "leave.rejected",
+      { ...activityPayload(request), note: input.note ?? null, returnDate },
     );
-    await notifyUsers(activity.id, [request.userId]);
+    await writeAudit({
+      workspaceId: request.workspaceId,
+      actorId: ctx.user.id,
+      action: own ? `leave.self_${input.decision}` : `leave.${input.decision}`,
+      entity: "leave_request",
+      entityId: request.id,
+      ip: ctx.ip,
+      payload: { userId: request.userId, selfApproved: own },
+    });
+
+    if (!own) {
+      await notifyUsers(activity.id, [request.userId]);
+      const text = approved
+        ? leaveMessages.approved({ ...request, returnDate: returnDate! })
+        : leaveMessages.rejected({ ...request, reason: input.note ?? "" });
+      void emailUsers(
+        [request.userId],
+        approved ? "Your leave was approved" : "Your leave request was not approved",
+        `${text}\n\n${env.WEB_URL}/w/${request.workspaceId}/leave`,
+      );
+    }
+    // P8.5 generates the Vendim for an approved annual-leave request here.
     await publishLeave(request.workspaceId, request.id, "updated");
     return updated;
   }),
@@ -300,7 +368,11 @@ export const leaveRouter = router({
   record: protectedProcedure.input(recordLeaveSchema).mutation(async ({ ctx, input }) => {
     await assertCanActOnLeaveOf(ctx.user, input.workspaceId, input.userId, "leave:recordForOthers");
     await assertActiveTarget(input.workspaceId, input.userId);
-    const { workingDays, problem } = await checkLeave(input.workspaceId, input.userId, input);
+    const { workingDays, byYear, count, problem } = await checkLeave(
+      input.workspaceId,
+      input.userId,
+      input,
+    );
     if (problem) throw new TRPCError({ code: "BAD_REQUEST", message: problem });
     await assertUsableDocument(input.workspaceId, ctx.user.id, input.documentAttachmentId);
 
@@ -314,6 +386,8 @@ export const leaveRouter = router({
         startDate: input.startDate,
         endDate: input.endDate,
         workingDays,
+        byYear,
+        excludedHolidays: count.excludedHolidays,
         reason: input.reason || null,
         status: "approved",
         decidedBy: ctx.user.id,
@@ -337,7 +411,11 @@ export const leaveRouter = router({
     return request;
   }),
 
-  // Approvals page: requests from the people the caller may approve for.
+  // P8.4 Leave approvals (HR): Pending / Approved / Rejected, HR's own
+  // requests included. Each request carries what HR needs to decide:
+  // excluded holidays (stored on it), each touched year's balance before
+  // and after, other people's approved leave on the same dates, and
+  // whether this caller may decide it.
   team: protectedProcedure.input(leaveTeamSchema).query(async ({ ctx, input }) => {
     await assertCanPeople(ctx.user, input.workspaceId, "leave:approve");
     const scope = await leaveScopeFor(ctx.user, input.workspaceId);
@@ -347,22 +425,89 @@ export const leaveRouter = router({
       .where(
         and(
           eq(schema.leaveRequests.workspaceId, input.workspaceId),
-          input.status === "pending" ? eq(schema.leaveRequests.status, "pending") : undefined,
+          input.status === "all" ? undefined : eq(schema.leaveRequests.status, input.status),
           scope ? inArray(schema.leaveRequests.userId, scope) : undefined,
         ),
       )
-      .orderBy(asc(schema.leaveRequests.startDate));
-    const others = rows.filter((r) => r.userId !== ctx.user.id);
-    const decorated = await decorate(others);
-    // Vacation requests show what the person has left, so the approver sees the impact.
+      .orderBy(
+        input.status === "pending"
+          ? asc(schema.leaveRequests.startDate)
+          : desc(schema.leaveRequests.startDate),
+      );
+    const decorated = await decorate(rows);
+    const otherHr = (await leaveApproverIds(input.workspaceId, ctx.user.id)).length > 0;
+
+    // Other people's approved leave in the span of these requests, for overlaps.
+    const span = rows.reduce<{ from: string; to: string } | null>(
+      (acc, r) => ({
+        from: !acc || r.startDate < acc.from ? r.startDate : acc.from,
+        to: !acc || r.endDate > acc.to ? r.endDate : acc.to,
+      }),
+      null,
+    );
+    const approvedInSpan = span
+      ? await db
+          .select({
+            id: schema.leaveRequests.id,
+            userId: schema.leaveRequests.userId,
+            userName: schema.users.name,
+            startDate: schema.leaveRequests.startDate,
+            endDate: schema.leaveRequests.endDate,
+          })
+          .from(schema.leaveRequests)
+          .innerJoin(schema.users, eq(schema.users.id, schema.leaveRequests.userId))
+          .where(
+            and(
+              eq(schema.leaveRequests.workspaceId, input.workspaceId),
+              eq(schema.leaveRequests.status, "approved"),
+              lte(schema.leaveRequests.startDate, span.to),
+              gte(schema.leaveRequests.endDate, span.from),
+            ),
+          )
+      : [];
+
+    const requestsByUser = new Map<string, Promise<LeaveLike[]>>();
+    const requestsOf = (userId: string) => {
+      let p = requestsByUser.get(userId);
+      if (!p) requestsByUser.set(userId, (p = loadLeaveRequests(input.workspaceId, userId)));
+      return p;
+    };
+
     return Promise.all(
-      decorated.map(async (r) => ({
-        ...r,
-        balance:
+      decorated.map(async (r) => {
+        const balances =
           r.type === "vacation"
-            ? await getVacationBalance(r.workspaceId, r.userId, yearOf(r.startDate))
-            : null,
-      })),
+            ? await Promise.all(
+                yearsOf(r).map(async (year) => {
+                  const b = await getVacationBalance(
+                    r.workspaceId,
+                    r.userId,
+                    year,
+                    await requestsOf(r.userId),
+                  );
+                  const days = r.byYear[String(year)] ?? r.workingDays;
+                  // Approved leave is already in remaining; pending isn't.
+                  const before = r.status === "approved" ? b.remaining + days : b.remaining;
+                  const after =
+                    r.status === "rejected" || r.status === "cancelled" ? before : before - days;
+                  return { year, total: b.total, before, after: Math.round(after * 10) / 10 };
+                }),
+              )
+            : [];
+        const overlaps = approvedInSpan
+          .filter(
+            (o) => o.userId !== r.userId && o.startDate <= r.endDate && o.endDate >= r.startDate,
+          )
+          .map((o) => ({ userName: o.userName, startDate: o.startDate, endDate: o.endDate }));
+        const own = r.userId === ctx.user.id;
+        return {
+          ...r,
+          own,
+          canDecide: r.status === "pending" && (!own || !otherHr),
+          balances,
+          overlaps,
+        };
+      }),
     );
   }),
 

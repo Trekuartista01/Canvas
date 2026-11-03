@@ -1,6 +1,7 @@
 import type { AppRouter } from "@canvas/api";
 import { EmployeeOfMonthBanner } from "@/components/employee-of-month-banner";
 import { HolidaysMissingBanner } from "@/components/holidays-missing-banner";
+import { NotificationToasts } from "@/components/notification-toasts";
 import { MembersPanel } from "@/components/members-panel";
 import { TaskHighlightRow } from "@/components/task-highlight-row";
 import { TemplatesPanel } from "@/components/templates-panel";
@@ -85,6 +86,7 @@ function WorkspaceHome() {
 
   return (
     <div className="space-y-8 p-6">
+      <NotificationToasts workspaceId={workspaceId} />
       <HolidaysMissingBanner workspaceId={workspaceId} />
       <EmployeeOfMonthBanner workspaceId={workspaceId} />
       <p className="text-muted-foreground text-sm">

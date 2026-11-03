@@ -81,7 +81,7 @@ test("M7.5 leave: staff requests vacation → HR approves → balance decreases,
   // Overlapping the same week again is refused.
   await leaveForm.getByLabel("First day").fill("2027-03-04");
   await leaveForm.getByLabel("Last day").fill("2027-03-08");
-  await expect(leaveForm.getByRole("alert")).toContainText("Overlaps vacation");
+  await expect(leaveForm.getByRole("alert")).toContainText("Overlaps annual leave");
 
   // The owner (admin) has no approvals page; HR approves it.
   await ownerPage.reload();
@@ -89,8 +89,8 @@ test("M7.5 leave: staff requests vacation → HR approves → balance decreases,
   await expect(ownerPage.getByRole("link", { name: "Leave approvals" })).toHaveCount(0);
   await page.getByRole("link", { name: "Leave approvals" }).click();
   const row = page.getByTestId("leave-approval-Sam Staff");
-  await expect(row).toContainText("5 days");
-  await expect(row).toContainText("20 of 20 vacation days left in 2027");
+  await expect(row).toContainText("5 working days");
+  await expect(row.getByTestId("leave-approval-balance-2027")).toContainText("20 → 15 of 20 days");
   const decided = page.waitForResponse((res) => res.url().includes("leave.decide"));
   await row.getByTestId("leave-approve").click();
   expect((await decided).ok()).toBe(true);

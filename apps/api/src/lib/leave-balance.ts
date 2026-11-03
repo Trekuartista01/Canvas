@@ -1,14 +1,14 @@
 import { LEAVE_TYPE_LABELS, type LeaveStatus, type LeaveType } from "@canvas/shared";
 
 /**
- * M7.5 leave rules. Pure — the DB-backed half (loading requests, counting
- * working days with the workspace's holiday calendar) is in
- * trpc/routers/leave.ts and lib/working-days.ts.
+ * Leave rules (M7.5, reworked in P8.4 per docs/hr-ops-spec.md §3). Pure —
+ * the DB-backed half (loading requests, the holiday calendar) is in
+ * lib/leave.ts and lib/working-days.ts.
  *
- * - Only vacation consumes the balance; every other type is just recorded.
- * - A request belongs to the year it's in; one crossing 31 Dec must be split.
- * - Requested days count against the balance while pending, so two pending
- *   requests can't together overspend it.
+ * - Only annual leave (vacation) consumes the balance; other types are recorded.
+ * - Balance = allowed + carried over − approved − pending, per year. A request
+ *   that crosses 31 Dec takes each year's part from that year (`byYear`).
+ * - Going over the balance is a warning, not a block: HR decides.
  */
 export interface LeaveLike {
   id?: string;
@@ -17,6 +17,8 @@ export interface LeaveLike {
   startDate: string;
   endDate: string;
   workingDays: number;
+  /** Working days per year ("2026" → 2). Empty/missing = all in the start year. */
+  byYear?: Record<string, number> | null;
 }
 
 export interface VacationBalance {
@@ -30,7 +32,7 @@ export interface VacationBalance {
   pending: number;
   /** total − used. */
   remaining: number;
-  /** remaining − pending: what a new request may still ask for. */
+  /** remaining − pending: what a new request may take without going over. */
   available: number;
 }
 
@@ -47,6 +49,20 @@ function round(n: number) {
   return Math.round(n * 10) / 10;
 }
 
+/** How many of this request's working days fall in `year`. */
+export function daysInYear(request: LeaveLike, year: number): number {
+  const split = request.byYear;
+  if (split && Object.keys(split).length > 0) return split[String(year)] ?? 0;
+  return yearOf(request.startDate) === year ? request.workingDays : 0;
+}
+
+/** The years a request touches. */
+export function yearsOf(request: LeaveLike): number[] {
+  const split = request.byYear;
+  if (split && Object.keys(split).length > 0) return Object.keys(split).map(Number).sort();
+  return [yearOf(request.startDate)];
+}
+
 export function computeVacationBalance(input: {
   year: number;
   entitlementDays: number;
@@ -56,9 +72,10 @@ export function computeVacationBalance(input: {
   let used = 0;
   let pending = 0;
   for (const r of input.requests) {
-    if (!consumesBalance(r.type) || yearOf(r.startDate) !== input.year) continue;
-    if (r.status === "approved") used += r.workingDays;
-    else if (r.status === "pending") pending += r.workingDays;
+    if (!consumesBalance(r.type)) continue;
+    const days = daysInYear(r, input.year);
+    if (r.status === "approved") used += days;
+    else if (r.status === "pending") pending += days;
   }
   const total = round(input.entitlementDays + input.carriedOverDays);
   const remaining = round(total - used);
@@ -98,46 +115,53 @@ export function findOverlap(
 }
 
 /**
- * Why a new request can't be made, or null if it can. `balance` is the
- * requester's vacation balance for the request's year; `existing` is all of
- * their requests.
+ * Why a request can't be made at all, or null if it can. Only hard rules:
+ * the dates, zero working days, and overlapping your own leave. The
+ * balance is a warning (balanceWarning), never a reason to refuse.
  */
 export function validateLeaveRequest(input: {
   type: LeaveType;
   startDate: string;
   endDate: string;
   workingDays: number;
-  balance: VacationBalance;
   existing: LeaveLike[];
 }): string | null {
   if (input.endDate < input.startDate) return "The end date is before the start date";
-  if (yearOf(input.startDate) !== yearOf(input.endDate)) {
-    return "Leave that crosses the new year has to be split into two requests";
-  }
   if (input.workingDays <= 0) {
-    return "Those dates have no working days (weekend or public holiday)";
+    return "Those dates have no working days (weekend or official holiday)";
   }
   const overlap = findOverlap(input, input.existing);
   if (overlap) {
     return `Overlaps ${LEAVE_TYPE_LABELS[overlap.type].toLowerCase()} from ${overlap.startDate} to ${overlap.endDate}`;
   }
-  if (consumesBalance(input.type) && input.workingDays > input.balance.available) {
-    return `Only ${input.balance.available} vacation days left for ${input.balance.year}`;
-  }
   return null;
 }
 
 /**
- * Approving re-checks the balance (it may have changed since the request —
- * HR edited the entitlement, another request was approved). The request's
- * own days are in `pending`, so it only has to fit what's left after
- * approved leave.
+ * Remaining days per year after this request, and a warning when any year
+ * goes below zero. `balances` must hold the balance of every year in
+ * `byYear` (the request itself not yet counted in them).
  */
-export function approvalBlocker(request: LeaveLike, balance: VacationBalance): string | null {
-  if (!consumesBalance(request.type)) return null;
-  return request.workingDays > balance.remaining
-    ? `Only ${balance.remaining} vacation days left for ${balance.year}`
-    : null;
+export function balanceAfter(
+  type: LeaveType,
+  byYear: Record<string, number>,
+  balances: VacationBalance[],
+): { remainingAfter: { year: number; days: number }[]; warning: string | null } {
+  if (!consumesBalance(type)) return { remainingAfter: [], warning: null };
+  const remainingAfter = balances.map((b) => ({
+    year: b.year,
+    days: round(b.available - (byYear[String(b.year)] ?? 0)),
+  }));
+  const over = remainingAfter.filter((r) => r.days < 0);
+  const warning =
+    over.length === 0
+      ? null
+      : `Goes over the annual leave balance (${over
+          .map(
+            (r) => `${Math.abs(r.days)} day${Math.abs(r.days) === 1 ? "" : "s"} over in ${r.year}`,
+          )
+          .join(", ")}). HR decides.`;
+  return { remainingAfter, warning };
 }
 
 /**

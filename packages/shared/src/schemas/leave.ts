@@ -54,7 +54,8 @@ export const leaveBalanceSchema = z.object({
 
 export const leaveTeamSchema = z.object({
   workspaceId,
-  status: z.enum(["pending", "all"]).default("pending"),
+  // P8.4 Leave approvals tabs.
+  status: z.enum(["pending", "approved", "rejected", "all"]).default("pending"),
 });
 
 export const leaveCalendarSchema = z.object({
