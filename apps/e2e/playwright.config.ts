@@ -74,6 +74,8 @@ export default defineConfig({
         AUTH_EMAIL_RATE_LIMIT_MAX: "1000",
         SAFE_OUTBOUND_ALLOW_PRIVATE: "true",
         E2E_TEST_HOOKS: "true",
+        // Specs make up @example.com people; signup-domain.spec.ts tests the rule.
+        ALLOWED_EMAIL_DOMAINS: "example.com,trekuartista.com",
       },
     },
     {

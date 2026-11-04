@@ -20,10 +20,7 @@ export function defaultClientColor(name: string): string {
 
 /** Lowercase, without diacritics: ë→e, ç→c. */
 export function foldForMatch(text: string): string {
-  return text
-    .normalize("NFD")
-    .replace(/\p{M}/gu, "")
-    .toLowerCase();
+  return text.normalize("NFD").replace(/\p{M}/gu, "").toLowerCase();
 }
 
 function escapeRegExp(text: string) {

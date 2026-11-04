@@ -1,3 +1,4 @@
+import { assertAllowedEmail } from "../../lib/signup";
 import { recordRoleRequest } from "../../lib/role-requests";
 import { db, schema } from "@canvas/db";
 import {
@@ -124,6 +125,7 @@ export const workspaceRouter = router({
 
   invite: protectedProcedure.input(inviteMemberSchema).mutation(async ({ ctx, input }) => {
     await assertCan(ctx.user, input.workspaceId, "workspace:invite");
+    assertAllowedEmail(input.email);
 
     if (input.customRoleId) {
       const customRole = await db.query.customRoles.findFirst({

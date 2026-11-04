@@ -1,17 +1,24 @@
-import { recordRoleRequest } from "../../lib/role-requests";
 import { db, schema } from "@canvas/db";
 import {
   deleteAccountSchema,
   logInSchema,
+  completeSignUpSchema,
   signUpSchema,
+  signUpTokenSchema,
   updateProfileSchema,
 } from "@canvas/shared";
 import { TRPCError } from "@trpc/server";
-import { and, eq, isNull } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { clearSessionCookie, setSessionCookie } from "../../auth/cookies";
 import { hashPassword, verifyPassword } from "../../auth/password";
 import { createSession, invalidateSession } from "../../auth/session";
 import { assertAuthRateLimit, clientIp, RateLimitError } from "../../lib/rate-limit";
+import {
+  assertAllowedEmail,
+  completeSignUp,
+  describeSignUp,
+  requestSignUp,
+} from "../../lib/signup";
 import { publicProcedure, protectedProcedure, router } from "../trpc";
 
 function tooManyRequests(): never {
@@ -32,54 +39,31 @@ export const authRouter = router({
       throw err;
     }
 
-    const existing = await db.query.users.findFirst({
-      where: eq(schema.users.email, input.email),
-    });
-    if (existing) {
-      throw new TRPCError({ code: "CONFLICT", message: "Email already in use" });
+    await requestSignUp(input);
+    return { sent: true };
+  }),
+
+  // The page behind the emailed link.
+  signUpDetails: publicProcedure.input(signUpTokenSchema).query(async ({ ctx, input }) => {
+    try {
+      await assertAuthRateLimit(clientIp(ctx.req));
+    } catch (err) {
+      if (err instanceof RateLimitError) tooManyRequests();
+      throw err;
     }
+    return describeSignUp(input.token);
+  }),
 
-    const passwordHash = await hashPassword(input.password);
-    const [user] = await db
-      .insert(schema.users)
-      .values({ email: input.email, name: input.name, passwordHash })
-      .returning();
-    if (!user) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
-
-    if (input.inviteId) {
-      const invite = await db.query.invites.findFirst({
-        where: and(
-          eq(schema.invites.id, input.inviteId),
-          eq(schema.invites.email, input.email),
-          isNull(schema.invites.acceptedAt),
-        ),
-      });
-      if (invite && invite.expiresAt.getTime() > Date.now()) {
-        await db.insert(schema.memberships).values({
-          workspaceId: invite.workspaceId,
-          userId: user.id,
-          role: invite.role,
-        });
-        await db
-          .update(schema.invites)
-          .set({ acceptedAt: new Date() })
-          .where(eq(schema.invites.id, invite.id));
-        await db.insert(schema.activity).values({
-          workspaceId: invite.workspaceId,
-          actorId: user.id,
-          entityType: "membership",
-          entityId: user.id,
-          verb: "invite.accepted",
-        });
-        if (input.requestedRole) {
-          await recordRoleRequest(invite.workspaceId, user.id, input.requestedRole);
-        }
-      }
+  completeSignUp: publicProcedure.input(completeSignUpSchema).mutation(async ({ ctx, input }) => {
+    try {
+      await assertAuthRateLimit(clientIp(ctx.req));
+    } catch (err) {
+      if (err instanceof RateLimitError) tooManyRequests();
+      throw err;
     }
-
+    const user = await completeSignUp(input.token, input.password);
     const session = await createSession(user.id);
     setSessionCookie(ctx.res, session.id);
-
     return {
       id: user.id,
       email: user.email,
@@ -97,6 +81,8 @@ export const authRouter = router({
       if (err instanceof RateLimitError) tooManyRequests();
       throw err;
     }
+
+    assertAllowedEmail(input.email);
 
     const user = await db.query.users.findFirst({
       where: eq(schema.users.email, input.email),

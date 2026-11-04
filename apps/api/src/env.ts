@@ -46,6 +46,8 @@ const envSchema = z.object({
   // credential-stuffing protection, not a bug in the app itself.
   AUTH_RATE_LIMIT_MAX: z.coerce.number().default(20),
   AUTH_EMAIL_RATE_LIMIT_MAX: z.coerce.number().default(10),
+  // Who may hold a Canvas account. Comma-separated; the whole domain must match.
+  ALLOWED_EMAIL_DOMAINS: z.string().default("trekuartista.com"),
   SMTP_HOST: optionalString,
   SMTP_PORT: z.coerce.number().default(587),
   SMTP_SECURE: z.coerce.boolean().default(false),

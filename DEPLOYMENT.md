@@ -292,6 +292,9 @@ Restoring production itself (after a disaster), into a new empty Supabase projec
 
 1. `pnpm preflight` on the server ends with **Ready**.
 2. `<WEB_URL>/health` → `{"ok":true,…}` with `api`, `database`, `redis`, `storage` all `ok`.
+
+> **Known gap:** the smoke test below still signs up made-up `@example.com` people. Since sign-up became company-address-only with an emailed link, it can't pass against a live site until it's reworked. Skip step 3 and test by hand for now.
+
 3. **Automated smoke test**, from your PC in the repo (it drives a real browser against the live site):
 
    ```powershell
@@ -314,7 +317,7 @@ Restoring production itself (after a disaster), into a new empty Supabase projec
    delete from users where email like 'smoke-%@example.com';
    ```
    (A small proof photo stays in the bucket; harmless.)
-5. By hand: sign up your real account and create the company workspace (you're its admin). Invite HR, the Operations Manager and the CEOs, then give them their roles (4.6). As HR, add the staff with Directory → Add staff and open Holidays to add this year's movable holidays. Real pay and contract data is entered by HR, not by admin.
+5. By hand: **SMTP must work first**, because sign-up emails a link. Sign up your real account with your @trekuartista.com address and create the company workspace (you're its admin). Invite HR, the Operations Manager and the CEOs, then give them their roles (4.6). As HR, add the staff with Directory → Add staff and open Holidays to add this year's movable holidays. Real pay and contract data is entered by HR, not by admin.
 
 ## 8. Updating the app
 

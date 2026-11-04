@@ -7,6 +7,8 @@ Conventions: UUIDv7 PKs (`id`), `created_at`/`updated_at` timestamptz on all tab
 ## Core
 
 ```sql
+signup_requests  (id, email, name, token_hash uniq, invite_id null,       -- a sign-up waiting on its emailed link;
+                  requested_role null, expires_at, used_at)             -- no users row until it's opened
 users            (id, email uniq, name, avatar_url, bio null, title null, -- title is a cosmetic
                   password_hash null, created_at, updated_at)              -- profile tag, unrelated
                                                                             -- to memberships.role

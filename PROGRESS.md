@@ -3188,3 +3188,33 @@ Requested after Phase 8, outside the spec.
 - `pnpm check` green. `pnpm test`: API 392 + 1 skipped, shared 159, db 11, web 15.
 - `0072` applied, rolled back and re-applied locally.
 - Playwright 87/87, with new `role-requests.spec.ts` (including no HR access before approval, and 403s for non-Admins deciding) and `task-panel.spec.ts`.
+
+## 2026-11-04 Company addresses only, confirmed by email
+
+Requested after Phase 8, outside the spec.
+
+### Done
+
+- **The rule (`ALLOWED_EMAIL_DOMAINS`, default `trekuartista.com`; `email-domain.ts`, unit-tested):** the whole domain must match, so look-alikes and subdomains are refused. It's enforced on sign-up, logging in, Google sign-in, invites and Add staff.
+- **Confirming the address (`lib/signup.ts`, `signup_requests`, migration `0073`, down file included):** Canvas had no check that a person owned the address they typed, which would have made the rule cosmetic. Sign-up now asks for a name and address and emails a 24-hour link. The password is chosen on the page the link opens, and only then does the account exist. Only the token's hash is stored, each link works once, and only the newest link for an address works.
+- **No claiming a colleague's address:** with no account and no password until the link is opened, typing someone else's address gets you nothing. If the address already has an account, the screen says the same thing and the owner gets a "you already have an account" email.
+- **Invites and role requests** are carried on the request and applied when the link is opened. A custom role on an invite now also applies when signing up through it (it was dropped before).
+- **Local development:** with no SMTP, the link is printed in the API log. In production with no SMTP, sign-up says it isn't open yet instead of silently sending nothing.
+
+### Decisions
+
+- **Add staff doesn't send a link.** HR types the address and sets the first password, so the rule applies but HR vouches for the person.
+- **Google sign-in stays,** limited to the same domain, since Google confirms the address itself. Staff use Outlook, so it only helps someone with a Google account on their work address.
+- **Workspaces unchanged.** Any confirmed employee can still create one. The user isn't sure yet whether there will be one or several, so the account-wide admin wasn't built.
+
+### Known gaps
+
+- **Working email is now required before anyone can sign up,** including the first Admin. The M365 sender is still undecided.
+- **`phase7.smoke.ts` can't pass against a live site** until reworked (it signs up `@example.com` people); noted in `DEPLOYMENT.md`.
+- **There's no "forgot password".** It didn't exist before this either. Someone who forgets theirs has no way back in today.
+
+### Verified
+
+- `pnpm check` green. `pnpm test`: API 392 + 1 skipped, shared 166, db 11, web 15.
+- `0073` applied, rolled back and re-applied locally.
+- Playwright 89/89, with new `signup-domain.spec.ts`. Every spec's sign-up now goes through the real link flow; only reading the link uses a test-only route. Real delivery through SMTP is untested.

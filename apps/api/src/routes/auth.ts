@@ -5,6 +5,7 @@ import { fetchGoogleUserInfo, getGoogleClient } from "../auth/google";
 import { createSession } from "../auth/session";
 import { env } from "../env";
 import { assertAuthRateLimit, RateLimitError } from "../lib/rate-limit";
+import { emailIsAllowed } from "../lib/signup";
 import { findOrCreateUserByEmail } from "../lib/user-provisioning";
 
 const OAUTH_STATE_COOKIE = "canvas_oauth_state";
@@ -61,6 +62,10 @@ export function registerAuthRoutes(app: FastifyInstance) {
           // trusting it here would let an unverified address attach to (or
           // create) an account it doesn't actually own.
           return reply.redirect(`${env.WEB_URL}/login?error=google_email_unverified`);
+        }
+        // Google vouches for the address; the company decides who gets in.
+        if (!emailIsAllowed(googleUser.email)) {
+          return reply.redirect(`${env.WEB_URL}/login?error=email_domain`);
         }
         const user = await findOrCreateUserByEmail(
           googleUser.email,

@@ -3,6 +3,7 @@ import { expect, test, type Browser, type Page } from "@playwright/test";
 import { and, eq } from "drizzle-orm";
 import {
   createWorkspaceAndOpen,
+  finishSignUp,
   inviteAndGetLink,
   pageAs,
   seedMember,
@@ -15,6 +16,7 @@ async function signUpThroughInvite(
   browser: Browser,
   inviteLink: string,
   name: string,
+  email: string,
   roleLabel?: string,
 ) {
   const context = await browser.newContext();
@@ -22,12 +24,12 @@ async function signUpThroughInvite(
   await page.goto(inviteLink);
   await page.getByRole("link", { name: /Sign up with/ }).click();
   await page.locator("#name").fill(name);
-  await page.locator("#password").fill("e2e-test-password");
   if (roleLabel) {
     await page.getByLabel("Your role").selectOption({ label: roleLabel });
     await expect(page.getByTestId("role-request-note")).toBeVisible();
   }
   await page.getByRole("button", { name: "Sign up", exact: true }).click();
+  await finishSignUp(page, email);
   await expect(page.getByRole("link", { name: "Open" })).toBeVisible();
   return page;
 }
@@ -75,15 +77,27 @@ test("role requests: picking a role at sign-up grants nothing until an Admin app
   const danInvite = await inviteAndGetLink(admin, danEmail);
 
   // Hanna asks for HR. The important part: she has no HR access yet.
-  const hanna = await signUpThroughInvite(browser, hannaInvite, "Hanna Hope", "HR/Finance Manager");
+  const hanna = await signUpThroughInvite(
+    browser,
+    hannaInvite,
+    "Hanna Hope",
+    hannaEmail,
+    "HR/Finance Manager",
+  );
   const pending = await membershipOf(ws, hannaEmail);
   expect(pending.peopleRole).toBe("employee");
   expect(pending.requestedPeopleRole).toBe("hr_finance");
   expect(await payrollStatus(hanna, ws)).toBe(403);
 
   // Carl asks to be Ops. Eve picks nothing, so there's nothing to approve.
-  const carl = await signUpThroughInvite(browser, carlInvite, "Carl Claim", "Operations Manager");
-  const eve = await signUpThroughInvite(browser, eveInvite, "Eve Employee");
+  const carl = await signUpThroughInvite(
+    browser,
+    carlInvite,
+    "Carl Claim",
+    carlEmail,
+    "Operations Manager",
+  );
+  const eve = await signUpThroughInvite(browser, eveInvite, "Eve Employee", eveEmail);
   expect((await membershipOf(ws, eveEmail)).requestedPeopleRole).toBeNull();
 
   // Only the Admin can see or decide requests.
@@ -183,7 +197,6 @@ test("role requests: picking a role at sign-up grants nothing until an Admin app
     data: {
       name: "Forged",
       email: forgedEmail,
-      password: "e2e-test-password",
       requestedRole: "admin",
     },
   });

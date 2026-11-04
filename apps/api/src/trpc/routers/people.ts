@@ -1,3 +1,4 @@
+import { assertAllowedEmail } from "../../lib/signup";
 import { db, schema } from "@canvas/db";
 import {
   archivePersonSchema,
@@ -342,6 +343,7 @@ export const peopleRouter = router({
       throw new TRPCError({ code: "BAD_REQUEST", message: "Manager must be an active member" });
     }
 
+    assertAllowedEmail(input.email);
     const passwordHash = await hashPassword(input.password);
     const user = await db.transaction(async (tx) => {
       const [created] = await tx

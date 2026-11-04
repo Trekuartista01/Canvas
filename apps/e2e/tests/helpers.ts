@@ -10,10 +10,22 @@ export async function signUp(page: Page, name = "E2E Tester", email = uniqueEmai
   await page.goto("/signup");
   await page.locator("#name").fill(name);
   await page.locator("#email").fill(email);
-  await page.locator("#password").fill("e2e-test-password");
   await page.getByRole("button", { name: "Sign up" }).click();
+  await finishSignUp(page, email);
   await expect(page.getByText(email)).toBeVisible();
   return email;
+}
+
+/** Opens the link sign-up would have emailed, and chooses the password. */
+export async function finishSignUp(page: Page, email: string) {
+  await expect(page.getByTestId("signup-sent")).toContainText(email);
+  const res = await page.request.get(`/test-hooks/signup-link?email=${encodeURIComponent(email)}`);
+  const { path } = (await res.json()) as { path: string };
+  await page.goto(path);
+  await page.locator("#password").fill("e2e-test-password");
+  await page.getByRole("button", { name: "Create account" }).click();
+  // The confirm page shows the address too, so wait until it's really gone.
+  await expect(page).not.toHaveURL(/signup.confirm/);
 }
 
 /** Logs in an existing account (e.g. one HR created) and lands on the workspace list. */

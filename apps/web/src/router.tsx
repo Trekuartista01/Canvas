@@ -5,6 +5,7 @@ import { accountRoute } from "./routes/account";
 import { inviteRoute } from "./routes/invite.$inviteId";
 import { loginRoute } from "./routes/login";
 import { signupRoute } from "./routes/signup";
+import { signupConfirmRoute } from "./routes/signup.confirm";
 import { privacyRoute } from "./routes/privacy";
 import { termsRoute } from "./routes/terms";
 import { publicFormRoute } from "./routes/forms.$publicToken";
@@ -56,6 +57,7 @@ const routeTree = rootRoute.addChildren([
   accountRoute,
   loginRoute,
   signupRoute,
+  signupConfirmRoute,
   privacyRoute,
   termsRoute,
   newWorkspaceRoute,

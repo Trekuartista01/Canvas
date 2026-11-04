@@ -6,12 +6,15 @@ export const passwordSchema = z.string().min(8).max(255);
 
 export const signUpSchema = z.object({
   email: emailSchema,
-  password: passwordSchema,
   name: z.string().trim().min(1).max(100),
   inviteId: z.string().uuid().optional(),
   // Joining through an invite: a request for an Admin to approve, nothing more.
   requestedRole: z.enum(REQUESTABLE_PEOPLE_ROLES).optional(),
 });
+
+export const signUpTokenSchema = z.object({ token: z.string().min(1).max(200) });
+
+export const completeSignUpSchema = signUpTokenSchema.extend({ password: passwordSchema });
 
 export const logInSchema = z.object({
   email: emailSchema,

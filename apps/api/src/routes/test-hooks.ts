@@ -5,6 +5,7 @@ import { env } from "../env";
 import { sendContractEndAlerts } from "../lib/contract-end-alerts";
 import { canPeopleAction } from "../lib/permissions";
 import { computeEmployeeOfMonth } from "../lib/performance-data";
+import { lastSignupLinkForTests } from "../lib/signup";
 
 const eomSchema = z.object({
   workspaceId: z.string().uuid(),
@@ -37,6 +38,13 @@ export function registerTestHookRoutes(app: FastifyInstance) {
       replace: true,
     });
     return reply.send({ ok: true, userId: row?.userId ?? null, score: row?.score ?? null });
+  });
+
+  // The mock email client has no inbox: the link a sign-up would have emailed.
+  app.get<{ Querystring: { email?: string } }>("/test-hooks/signup-link", async (req, reply) => {
+    const path = lastSignupLinkForTests(req.query.email ?? "");
+    if (!path) return reply.code(404).send({ error: "Not found" });
+    return reply.send({ path });
   });
 
   // P8.6: run the contract-ending alert as if it were `now`, for one workspace.

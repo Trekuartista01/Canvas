@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { RoleRequestSelect, type RoleChoice } from "@/components/role-request";
 import { Label } from "@/components/ui/label";
 import { trpc } from "@/lib/trpc";
-import { createRoute, Link, useNavigate } from "@tanstack/react-router";
+import { createRoute, Link } from "@tanstack/react-router";
 import { useState } from "react";
 import { z } from "zod";
 import { rootRoute } from "./__root";
@@ -25,8 +25,6 @@ export const signupRoute = createRoute({
 
 function SignupPage() {
   const { invite: inviteId } = signupRoute.useSearch();
-  const navigate = useNavigate();
-  const utils = trpc.useUtils();
   const invite = trpc.workspace.getInvite.useQuery(
     { inviteId: inviteId! },
     { enabled: !!inviteId },
@@ -34,23 +32,14 @@ function SignupPage() {
 
   const [name, setName] = useState("");
   const [emailInput, setEmailInput] = useState("");
-  const [password, setPassword] = useState("");
+  const [sentTo, setSentTo] = useState<string | null>(null);
   const [requestedRole, setRequestedRole] = useState<RoleChoice>("");
   const [error, setError] = useState<string | null>(null);
 
   const email = invite.data?.email ?? emailInput;
 
   const signUp = trpc.auth.signUp.useMutation({
-    onSuccess: async () => {
-      // See login.tsx's identical fix: refetchType: "all" is required so
-      // this actually awaits the refetch — plain invalidate() only forces
-      // an immediate refetch for queries with an active observer, and
-      // nothing observes auth.me from this page, so RequireAuth would
-      // otherwise read the stale pre-signup cache on its first render and
-      // bounce back to /login before the real refetch resolves.
-      await utils.auth.me.invalidate(undefined, { refetchType: "all" });
-      navigate({ to: "/" });
-    },
+    onSuccess: () => setSentTo(email),
     onError: (err) => setError(err.message),
   });
 
@@ -71,53 +60,60 @@ function SignupPage() {
           </div>
         </div>
 
-        <form
-          className="space-y-4"
-          onSubmit={(e) => {
-            e.preventDefault();
-            setError(null);
-            signUp.mutate({
-              name,
-              email,
-              password,
-              inviteId,
-              // Only someone joining a workspace has anyone to ask.
-              ...(inviteId && requestedRole ? { requestedRole } : {}),
-            });
-          }}
-        >
-          <div className="space-y-1.5">
-            <Label htmlFor="name">Name</Label>
-            <Input id="name" value={name} onChange={(e) => setName(e.target.value)} required />
+        {sentTo ? (
+          <div className="space-y-2 text-sm" data-testid="signup-sent">
+            <p>
+              We've sent a link to <strong>{sentTo}</strong>.
+            </p>
+            <p className="text-muted-foreground">
+              Open it within 24 hours to confirm your email and choose a password. Check your junk
+              folder if you don't see it.
+            </p>
+            <button type="button" className="underline" onClick={() => setSentTo(null)}>
+              Use a different address
+            </button>
           </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="email">Email</Label>
-            <Input
-              id="email"
-              type="email"
-              value={email}
-              onChange={(e) => setEmailInput(e.target.value)}
-              readOnly={!!invite.data}
-              required
-            />
-          </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="password">Password</Label>
-            <Input
-              id="password"
-              type="password"
-              minLength={8}
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-            />
-          </div>
-          {inviteId && <RoleRequestSelect value={requestedRole} onChange={setRequestedRole} />}
-          {error && <p className="text-sm text-red-500">{error}</p>}
-          <Button type="submit" className="w-full" disabled={signUp.isPending}>
-            {signUp.isPending ? "Creating account…" : "Sign up"}
-          </Button>
-        </form>
+        ) : (
+          <form
+            className="space-y-4"
+            onSubmit={(e) => {
+              e.preventDefault();
+              setError(null);
+              signUp.mutate({
+                name,
+                email,
+                inviteId,
+                // Only someone joining a workspace has anyone to ask.
+                ...(inviteId && requestedRole ? { requestedRole } : {}),
+              });
+            }}
+          >
+            <div className="space-y-1.5">
+              <Label htmlFor="name">Name</Label>
+              <Input id="name" value={name} onChange={(e) => setName(e.target.value)} required />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="email">Email</Label>
+              <Input
+                id="email"
+                type="email"
+                value={email}
+                onChange={(e) => setEmailInput(e.target.value)}
+                readOnly={!!invite.data}
+                required
+              />
+            </div>
+            {inviteId && <RoleRequestSelect value={requestedRole} onChange={setRequestedRole} />}
+            {error && (
+              <p className="text-sm text-red-500" role="alert">
+                {error}
+              </p>
+            )}
+            <Button type="submit" className="w-full" disabled={signUp.isPending}>
+              {signUp.isPending ? "Sending…" : "Sign up"}
+            </Button>
+          </form>
+        )}
 
         <a href="/auth/google" className={cn(buttonVariants({ variant: "outline" }), "w-full")}>
           Continue with Google

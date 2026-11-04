@@ -512,6 +512,13 @@
       "when": 1793792966351,
       "tag": "0072_role_requests",
       "breakpoints": true
+    },
+    {
+      "idx": 73,
+      "version": "7",
+      "when": 1793794560370,
+      "tag": "0073_signup_requests",
+      "breakpoints": true
     }
   ]
 }

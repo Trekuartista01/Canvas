@@ -94,7 +94,12 @@ function LoginPage() {
             />
           </div>
           {(error || oauthError) && (
-            <p className="text-sm text-red-500">{error ?? "Google sign-in failed. Try again."}</p>
+            <p className="text-sm text-red-500">
+              {error ??
+                (oauthError === "email_domain"
+                  ? "Canvas is only for company email addresses. Use your work account."
+                  : "Google sign-in failed. Try again.")}
+            </p>
           )}
           <Button type="submit" className="w-full" disabled={logIn.isPending}>
             {logIn.isPending ? "Logging in…" : "Log in"}
