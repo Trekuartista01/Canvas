@@ -3,7 +3,7 @@ import { searchTokens } from "@canvas/shared";
 import { and, count, desc, eq, isNull, or, sql, type AnyColumn, type SQL } from "drizzle-orm";
 import type { SessionUser } from "../auth/session";
 import { activeMembershipCondition } from "./membership";
-import { canPeopleAction } from "./permissions";
+import { canPeopleAction, visibleBoardsCondition } from "./permissions";
 
 const GROUP_LIMIT = 20;
 
@@ -24,10 +24,11 @@ function matchesAllWords(query: string, columns: (AnyColumn | SQL)[]): SQL {
 }
 
 /**
- * The tasks a member may find. task.search and search.global both come here,
- * so board membership (P8.9) has one place to go.
+ * The tasks a member may find: only on boards they can see (P8.9). task.search
+ * and search.global both come here.
  */
-export async function searchVisibleTasks(workspaceId: string, query: string) {
+export async function searchVisibleTasks(user: SessionUser, workspaceId: string, query: string) {
+  const visible = await visibleBoardsCondition(user, workspaceId);
   const tsquery = sql`websearch_to_tsquery('english', ${query})`;
   const rank = sql<number>`ts_rank(${schema.tasks.searchVector}, ${tsquery})`;
   return db
@@ -47,6 +48,8 @@ export async function searchVisibleTasks(workspaceId: string, query: string) {
         isNull(schema.tasks.deletedAt),
         isNull(schema.lists.deletedAt),
         isNull(schema.spaces.deletedAt),
+        isNull(schema.lists.archivedAt),
+        visible,
         sql`${schema.tasks.searchVector} @@ ${tsquery}`,
       ),
     )
@@ -195,7 +198,7 @@ export async function globalSearch(user: SessionUser, workspaceId: string, query
 
   const [people, tasks] = await Promise.all([
     canDirectory ? searchPeople(workspaceId, query, canManageStaff) : [],
-    searchVisibleTasks(workspaceId, query),
+    searchVisibleTasks(user, workspaceId, query),
   ]);
   const shared = { people, tasks };
   if (!canContracts && !canPayroll && !canLeave) return shared;

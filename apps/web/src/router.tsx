@@ -41,6 +41,7 @@ import { myContractRoute } from "./routes/workspace.$workspaceId.my-contract";
 import { contractsRoute } from "./routes/workspace.$workspaceId.contracts";
 import { companyDocumentsRoute } from "./routes/workspace.$workspaceId.company-documents";
 import { payrollRoute } from "./routes/workspace.$workspaceId.payroll";
+import { boardsRoute } from "./routes/workspace.$workspaceId.boards";
 import { myPayRoute } from "./routes/workspace.$workspaceId.my-pay";
 import { performanceRoute } from "./routes/workspace.$workspaceId.performance";
 import { engagementsRoute } from "./routes/workspace.$workspaceId.engagements";
@@ -75,6 +76,7 @@ const routeTree = rootRoute.addChildren([
     myPayRoute,
     performanceRoute,
     engagementsRoute,
+    boardsRoute,
     peopleDirectoryRoute,
     personProfileRoute,
     listRoute,

@@ -1,5 +1,12 @@
 import { expect, test } from "@playwright/test";
-import { createSpaceAndList, createWorkspaceAndOpen, signUp } from "./helpers";
+import {
+  createSpaceAndList,
+  createWorkspaceAndOpen,
+  signUp,
+  addEmailToAllBoards,
+  openList,
+  workspaceIdFrom,
+} from "./helpers";
 
 test("inviting someone lets you pick a custom role directly, and it's applied on acceptance", async ({
   page,
@@ -48,8 +55,9 @@ test("inviting someone lets you pick a custom role directly, and it's applied on
   // Bob himself is blocked from creating a task, same as manually assigning
   // the role would produce (custom-roles.spec.ts / role-templates.spec.ts
   // already cover the reverse assignment path).
+  await addEmailToAllBoards(workspaceIdFrom(page), bobEmail);
   await bobPage.getByRole("link", { name: "Open" }).click();
-  await bobPage.getByRole("link", { name: "Sprint" }).click();
+  await openList(bobPage, "Ops", "Sprint");
   await bobPage.getByRole("button", { name: "Board", exact: true }).click();
   const todoColumn = bobPage.getByTestId("status-column-Pending");
   await todoColumn.getByRole("button", { name: "+ Add task" }).click();

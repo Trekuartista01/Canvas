@@ -56,6 +56,9 @@ export const updateTaskSchema = z.object({
   // and statusId changes, the server appends the task to the end of the
   // new status column instead.
   orderKey: z.string().min(1).optional(),
+  // P8.9: move the card to this list, on this board or another. Its status
+  // follows by kind, so this can't be combined with statusId.
+  listId: z.string().uuid().optional(),
   // TipTap document JSON — never an HTML string. null clears the description.
   descriptionJson: z.unknown().nullable().optional(),
   priority: z.enum(TASK_PRIORITIES).nullable().optional(),
@@ -120,6 +123,8 @@ export const getTaskSchema = z.object({
 export const completeTaskSchema = z.object({
   taskId: z.string().uuid(),
 });
+
+export const boardCardsSchema = z.object({ spaceId: z.string().uuid() });
 
 export const searchTasksSchema = z.object({
   workspaceId: z.string().uuid(),

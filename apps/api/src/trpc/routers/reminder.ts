@@ -3,7 +3,7 @@ import { createReminderSchema, dismissReminderSchema } from "@canvas/shared";
 import { TRPCError } from "@trpc/server";
 import { and, asc, eq, isNull } from "drizzle-orm";
 import { assertCan } from "../../lib/permissions";
-import { requireTask, workspaceIdForTask } from "../../lib/task-queries";
+import { requireTask, workspaceIdForTask, spaceIdForTask } from "../../lib/task-queries";
 import { protectedProcedure, router } from "../trpc";
 
 // Reminders are personal (DATA_MODEL.md: user_id fk, no workspace_id at
@@ -29,7 +29,7 @@ export const reminderRouter = router({
   create: protectedProcedure.input(createReminderSchema).mutation(async ({ ctx, input }) => {
     const task = await requireTask(input.taskId);
     const workspaceId = await workspaceIdForTask(task.id);
-    await assertCan(ctx.user, workspaceId, "task:view");
+    await assertCan(ctx.user, workspaceId, "task:view", { spaceId: await spaceIdForTask(task.id) });
 
     const [reminder] = await db
       .insert(schema.reminders)

@@ -4,6 +4,7 @@ import {
   createWorkspaceAndOpen,
   signUp,
   fillGenerationContext,
+  openList,
 } from "./helpers";
 
 test("Generation UX: set brand palette, generate variants, promote one, attach to task", async ({
@@ -102,7 +103,7 @@ test("Brand Kits: a space's assigned kit wins over the workspace default", async
 
   // Inside Client B Space, generation resolves the space-assigned kit (has a palette).
   await page.getByRole("link", { name: "Home", exact: true }).click();
-  await page.getByRole("link", { name: "Deliverables" }).click();
+  await openList(page, "Client B Space", "Deliverables");
   await page.getByRole("button", { name: "Board", exact: true }).click();
   await page
     .getByTestId("status-column-Pending")
@@ -117,7 +118,7 @@ test("Brand Kits: a space's assigned kit wins over the workspace default", async
 
   // Inside Internal Space (no assignment), generation falls back to the empty default kit.
   await page.getByRole("link", { name: "Home", exact: true }).click();
-  await page.getByRole("link", { name: "Ops" }).click();
+  await openList(page, "Internal Space", "Ops");
   await page.getByRole("button", { name: "Board", exact: true }).click();
   await page
     .getByTestId("status-column-Pending")

@@ -371,7 +371,7 @@ function SpaceAssignmentsSection({ workspaceId }: { workspaceId: string }) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Space assignments</CardTitle>
+        <CardTitle>Board assignments</CardTitle>
       </CardHeader>
       <CardContent className="space-y-3">
         <p className="text-muted-foreground text-xs">

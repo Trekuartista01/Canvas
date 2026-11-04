@@ -14,7 +14,7 @@ import { logActivity } from "../../lib/activity";
 import { AiQuotaError, assertAiQuota } from "../../lib/ai-quota";
 import { referenceContextSuffix, resolveAiReferences } from "../../lib/ai-references";
 import { assertCan } from "../../lib/permissions";
-import { requireTask, workspaceIdForTask } from "../../lib/task-queries";
+import { requireTask, workspaceIdForTask, spaceIdForTask } from "../../lib/task-queries";
 import { brainQueue } from "../../queues/brain-queue";
 import { protectedProcedure, router } from "../trpc";
 import type { SessionUser } from "../../auth/session";
@@ -43,6 +43,9 @@ async function validateConversationContext(user: SessionUser, input: Conversatio
         message: "Task does not belong to this workspace",
       });
     }
+    await assertCan(user, input.workspaceId, "task:view", {
+      spaceId: await spaceIdForTask(task.id),
+    });
   }
 
   if (input.contextType === "doc") {

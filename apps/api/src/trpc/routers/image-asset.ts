@@ -20,7 +20,7 @@ import { referenceContextSuffix, resolveAiReferences } from "../../lib/ai-refere
 import { resolveEffectiveBrandKit } from "../../lib/brand-kit";
 import { publishImageAssetJob } from "../../lib/image-asset-realtime";
 import { assertCan } from "../../lib/permissions";
-import { requireTask, workspaceIdForTask } from "../../lib/task-queries";
+import { requireTask, workspaceIdForTask, spaceIdForTask } from "../../lib/task-queries";
 import { imageQueue } from "../../queues/image-queue";
 import { protectedProcedure, router } from "../trpc";
 
@@ -362,7 +362,9 @@ export const imageAssetRouter = router({
         where: and(eq(schema.imageAssets.id, input.assetId), isNull(schema.imageAssets.deletedAt)),
       });
       if (!asset) throw new TRPCError({ code: "NOT_FOUND" });
-      await assertCan(ctx.user, asset.workspaceId, "attachment:create");
+      await assertCan(ctx.user, asset.workspaceId, "attachment:create", {
+        spaceId: await spaceIdForTask(input.taskId),
+      });
 
       const taskWorkspaceId = await workspaceIdForTask(input.taskId);
       if (taskWorkspaceId !== asset.workspaceId) {
@@ -480,7 +482,9 @@ export const imageAssetRouter = router({
       }
       // Same guest-level participation reasoning as comment:create — pinning
       // a comment to an image you can already see isn't a workspace mutation.
-      await assertCan(ctx.user, asset.workspaceId, "comment:create");
+      await assertCan(ctx.user, asset.workspaceId, "comment:create", {
+        spaceId: await spaceIdForTask(input.taskId),
+      });
 
       const [comment] = await db
         .insert(schema.comments)

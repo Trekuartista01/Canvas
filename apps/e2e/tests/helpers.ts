@@ -1,5 +1,6 @@
 import { db, schema } from "@canvas/db";
 import { expect, type Browser, type Locator, type Page } from "@playwright/test";
+import { eq } from "drizzle-orm";
 
 export function uniqueEmail(prefix = "e2e") {
   return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}@example.com`;
@@ -57,22 +58,45 @@ export async function fillGenerationContext(
 }
 
 /** Creates a space, then a list directly under it, and navigates into the list. */
+/** Creates a board with an extra list and opens that list's own page. */
 export async function createSpaceAndList(page: Page, spaceName: string, listName: string) {
-  await page.getByRole("button", { name: "New space" }).click();
-  await page.getByPlaceholder("Space name").fill(spaceName);
+  await page.getByRole("link", { name: "Boards", exact: true }).click();
+  await page.getByTestId("new-board").click();
+  await page.getByPlaceholder("Board name").fill(spaceName);
   await page.keyboard.press("Enter");
-  const spaceRow = page.locator("div.group", { hasText: spaceName }).first();
-  await expect(spaceRow).toBeVisible();
+  await expect(page.getByRole("tab", { name: spaceName })).toHaveAttribute("aria-selected", "true");
 
-  await spaceRow.hover();
-  await spaceRow.getByRole("button", { name: "New list" }).click();
+  await page.getByTestId("add-list").click();
   await page.getByPlaceholder("List name").fill(listName);
   await page.keyboard.press("Enter");
+  await openList(page, spaceName, listName);
+}
 
-  const listLink = page.getByRole("link", { name: listName });
-  await expect(listLink).toBeVisible();
-  await listLink.click();
+/** From anywhere in a workspace: a board's list, on its own page. */
+export async function openList(page: Page, spaceName: string, listName: string) {
+  await page.getByRole("link", { name: "Boards", exact: true }).click();
+  await page.getByRole("tab", { name: spaceName }).click();
+  await page.getByTestId(`board-list-${listName}`).getByRole("link", { name: listName }).click();
   await expect(page.getByRole("heading", { name: `# ${listName}` })).toBeVisible();
+}
+
+/** Puts a person on every board in the workspace, as an Ops Manager would. */
+export async function addToAllBoards(workspaceId: string, userId: string) {
+  const spaces = await db
+    .select({ id: schema.spaces.id })
+    .from(schema.spaces)
+    .where(eq(schema.spaces.workspaceId, workspaceId));
+  if (spaces.length === 0) return;
+  await db
+    .insert(schema.spaceMembers)
+    .values(spaces.map((s) => ({ spaceId: s.id, userId })))
+    .onConflictDoNothing();
+}
+
+/** The same, for someone known by email (an invited member). */
+export async function addEmailToAllBoards(workspaceId: string, email: string) {
+  const user = await db.query.users.findFirst({ where: eq(schema.users.email, email) });
+  await addToAllBoards(workspaceId, user!.id);
 }
 
 /**

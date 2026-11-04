@@ -1,5 +1,13 @@
 import { expect, test } from "@playwright/test";
-import { createSpaceAndList, createWorkspaceAndOpen, inviteAndGetLink, signUp } from "./helpers";
+import {
+  createSpaceAndList,
+  createWorkspaceAndOpen,
+  inviteAndGetLink,
+  signUp,
+  addEmailToAllBoards,
+  openList,
+  workspaceIdFrom,
+} from "./helpers";
 
 test("Role templates: Staff can't create tasks or see Platform pages; Finance Manager unlocks the Timesheet team overview", async ({
   page,
@@ -55,7 +63,8 @@ test("Role templates: Staff can't create tasks or see Platform pages; Finance Ma
   await expect(bobPage.getByRole("link", { name: "Roles" })).not.toBeVisible();
   await expect(bobPage.getByRole("link", { name: "Admin", exact: true })).not.toBeVisible();
 
-  await bobPage.getByRole("link", { name: "Sprint" }).click();
+  await addEmailToAllBoards(workspaceIdFrom(bobPage), bobEmail);
+  await openList(bobPage, "Ops", "Sprint");
   await bobPage.getByRole("button", { name: "Board", exact: true }).click();
   const bobTodoColumn = bobPage.getByTestId("status-column-Pending");
   await bobTodoColumn.getByRole("button", { name: "+ Add task" }).click();

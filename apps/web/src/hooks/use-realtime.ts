@@ -40,6 +40,7 @@ export function useRealtime(workspaceId: string | undefined) {
 
         if (event.entity === "task" || event.entity === "status") {
           utils.task.list.invalidate({ listId: event.listId });
+          utils.task.board.invalidate();
           if (event.entity === "task") {
             utils.task.get.invalidate({ taskId: event.id });
             utils.task.highlights.invalidate();
@@ -62,6 +63,8 @@ export function useRealtime(workspaceId: string | undefined) {
           utils.checklist.list.invalidate({ taskId: event.taskId });
         } else if (event.entity === "hierarchy") {
           utils.hierarchy.tree.invalidate({ workspaceId: event.workspaceId });
+          utils.task.board.invalidate();
+          utils.hierarchy.members.list.invalidate();
         } else if (event.entity === "tag") {
           utils.tag.list.invalidate({ workspaceId: event.workspaceId });
         } else if (event.entity === "customFieldDef") {

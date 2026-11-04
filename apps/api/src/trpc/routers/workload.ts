@@ -1,7 +1,7 @@
 import { db, schema } from "@canvas/db";
 import { workloadAssignmentsSchema, workloadSummarySchema } from "@canvas/shared";
 import { and, eq, gte, inArray, isNull, lte, or, sql } from "drizzle-orm";
-import { assertCan } from "../../lib/permissions";
+import { assertCan, visibleBoardsCondition } from "../../lib/permissions";
 import { protectedProcedure, router } from "../trpc";
 
 // Same guest-tier gate as task:view — a workload row is just a different
@@ -10,6 +10,7 @@ import { protectedProcedure, router } from "../trpc";
 export const workloadRouter = router({
   assignments: protectedProcedure.input(workloadAssignmentsSchema).query(async ({ ctx, input }) => {
     await assertCan(ctx.user, input.workspaceId, "task:view");
+    const visible = await visibleBoardsCondition(ctx.user, input.workspaceId);
 
     // Mirrors taskDateKey's due→start fallback (packages/shared/calendar.ts):
     // a task lands in the range if its due date is in range, or its due
@@ -38,6 +39,7 @@ export const workloadRouter = router({
       .where(
         and(
           eq(schema.spaces.workspaceId, input.workspaceId),
+          visible,
           isNull(schema.tasks.deletedAt),
           isNull(schema.tasks.parentTaskId),
           landsInRange,
@@ -52,6 +54,7 @@ export const workloadRouter = router({
   // date filter at all.
   openTaskCounts: protectedProcedure.input(workloadSummarySchema).query(async ({ ctx, input }) => {
     await assertCan(ctx.user, input.workspaceId, "task:view");
+    const visible = await visibleBoardsCondition(ctx.user, input.workspaceId);
 
     const rows = await db
       .select({
@@ -66,6 +69,7 @@ export const workloadRouter = router({
       .where(
         and(
           eq(schema.spaces.workspaceId, input.workspaceId),
+          visible,
           isNull(schema.tasks.deletedAt),
           isNull(schema.tasks.parentTaskId),
           inArray(schema.statuses.kind, ["open", "active"]),

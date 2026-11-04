@@ -26,6 +26,7 @@ export * from "./holidays";
 export * from "./working-days";
 export * from "./daily-reports";
 export * from "./leave";
+export * from "./boards";
 export * from "./documents";
 export * from "./search-tokens";
 export * from "./payroll";

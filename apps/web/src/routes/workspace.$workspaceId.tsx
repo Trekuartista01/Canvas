@@ -1,7 +1,6 @@
 import { BrainChatPanel } from "@/components/brain-chat-panel";
 import { CanvasLogo } from "@/components/canvas-logo";
 import { GenerationPanel } from "@/components/generation-panel";
-import { HierarchySidebar } from "@/components/hierarchy-sidebar";
 import { LoginSummaryPanel } from "@/components/login-summary-panel";
 import { NotificationsBell } from "@/components/notifications-bell";
 import { RequireAuth } from "@/components/require-auth";
@@ -164,12 +163,6 @@ function WorkspaceShell() {
 
         <div className="min-h-0 flex-1 overflow-y-auto px-2 py-3">
           {workspaceId && <WorkspaceNav workspaceId={workspaceId} />}
-          {workspaceId && (
-            <>
-              <div className="border-border my-3 border-t" />
-              <HierarchySidebar workspaceId={workspaceId} activeListId={listId} />
-            </>
-          )}
         </div>
 
         <div className="border-border flex items-center gap-2 border-t px-3 py-2.5">

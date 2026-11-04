@@ -2,6 +2,7 @@ import { db, schema } from "@canvas/db";
 import { expect, test, type APIRequestContext, type Browser, type Page } from "@playwright/test";
 import { and, eq } from "drizzle-orm";
 import {
+  addToAllBoards,
   createSpaceAndList,
   createWorkspaceAndOpen,
   pageAs,
@@ -66,11 +67,12 @@ test("P8.8 Smart Search scopes (spec §9): HR finds HR records, nobody else gets
   const olsi = await seedMember(ws, "Olsi Sopi", "employee");
   const gone = await seedMember(ws, "Arben Archived", "employee");
 
-  // Tasks visible to everyone on the board.
+  // Tasks on a board that HR and the employees belong to.
   await createSpaceAndList(owner, "Marketing", "Campaigns");
   await owner.getByRole("button", { name: "Board", exact: true }).click();
   await addTask(owner, "Olsi Sopi onboarding checklist");
   await addTask(owner, "Zone Club launch poster");
+  for (const member of [hana, sam, olsi]) await addToAllBoards(ws, member.userId);
 
   // Olsi's HR records.
   const [contract] = await db
@@ -191,17 +193,24 @@ test("P8.8 Smart Search scopes (spec §9): HR finds HR records, nobody else gets
   expect(archived.body.people.map((p) => [p.name, p.archived])).toEqual([["Arben Archived", true]]);
   expect((await search(hrRequest, ws, "kontrata e punes")).body.hr?.contracts).toHaveLength(1);
 
-  // Line 3 (task half): "Zone" finds its tasks for Ops, CEO and Admin. The
-  // Zone Club client folder joins this with P8.10.
-  // Line 4 (task half): an employee finds the task too. Limiting that to boards
-  // they're a member of arrives with board membership in P8.9.
-  for (const [role, request] of others) {
+  // Line 3 (task half): "Zone" finds its tasks for Ops, CEO and Admin, who reach
+  // every board. The Zone Club client folder joins this with P8.10.
+  for (const [role, request] of others.filter(([r]) => r !== "employee")) {
     const { body } = await search(request, ws, "Zone");
     expect(
       body.tasks.map((t) => t.title),
       role,
     ).toEqual(["Zone Club launch poster"]);
   }
+
+  // Line 4: an employee only gets tasks on boards they're a member of.
+  const samRequest = await requestAs(browser, sam);
+  expect((await search(samRequest, ws, "Zone")).body.tasks.map((t) => t.title)).toEqual([
+    "Zone Club launch poster",
+  ]);
+  await db.delete(schema.spaceMembers).where(eq(schema.spaceMembers.userId, sam.userId));
+  expect((await search(samRequest, ws, "Zone")).body.tasks).toEqual([]);
+  await addToAllBoards(ws, sam.userId);
 
   // The page: HR sees the groups and its links work; an employee sees none.
   const hrPage = await pageAs(browser, hana, ws);

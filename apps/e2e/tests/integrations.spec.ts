@@ -1,7 +1,7 @@
 import http from "node:http";
 import type { AddressInfo } from "node:net";
 import { expect, test } from "@playwright/test";
-import { createSpaceAndList, createWorkspaceAndOpen, signUp } from "./helpers";
+import { createSpaceAndList, createWorkspaceAndOpen, signUp, openList } from "./helpers";
 
 test("M5.6 integrations: Slack notify automation posts a message on status change", async ({
   page,
@@ -54,7 +54,7 @@ test("M5.6 integrations: Slack notify automation posts a message on status chang
     await expect(page.getByTestId(/^automations-link-/)).toBeVisible();
 
     // Trigger it: move "Announce the launch" to Done.
-    await page.getByRole("link", { name: "Launches" }).click();
+    await openList(page, "Marketing", "Launches");
     await page.getByRole("button", { name: "Board", exact: true }).click();
     await page.getByRole("button", { name: "Announce the launch" }).click();
     const panel = page.getByTestId("task-detail-panel");

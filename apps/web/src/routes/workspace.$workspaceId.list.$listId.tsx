@@ -7,7 +7,7 @@ import { TaskGanttView } from "@/components/task-gantt-view";
 import { TaskListView } from "@/components/task-list-view";
 import { TaskTableView } from "@/components/task-table-view";
 import { trpc } from "@/lib/trpc";
-import { createRoute, useNavigate } from "@tanstack/react-router";
+import { createRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { z } from "zod";
 import { workspaceShellRoute } from "./workspace.$workspaceId";
@@ -74,7 +74,14 @@ function ListPage() {
       <div className="flex items-end justify-between px-6 pt-6">
         <div>
           <p className="text-muted-foreground text-xs">
-            {space?.name}
+            <Link
+              to="/w/$workspaceId/boards"
+              params={{ workspaceId }}
+              search={{ board: list.spaceId }}
+              className="hover:underline"
+            >
+              {space?.name}
+            </Link>
             {folder ? ` / ${folder.name}` : ""}
           </p>
           <h1 className="text-lg font-semibold"># {list.name}</h1>

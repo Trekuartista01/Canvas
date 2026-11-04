@@ -14,7 +14,7 @@ import { validateCustomFieldOptions, validateCustomFieldValue } from "../../lib/
 import { nextOrderKey } from "../../lib/order";
 import { assertCan } from "../../lib/permissions";
 import { publish } from "../../lib/realtime";
-import { requireTask, workspaceIdForList } from "../../lib/task-queries";
+import { requireTask, workspaceIdForList, spaceIdForList } from "../../lib/task-queries";
 import { protectedProcedure, router } from "../trpc";
 
 async function requireFieldDef(fieldDefId: string) {
@@ -52,7 +52,9 @@ export const customFieldRouter = router({
   defs: router({
     list: protectedProcedure.input(listCustomFieldDefsSchema).query(async ({ ctx, input }) => {
       const workspaceId = await workspaceIdForList(input.listId);
-      await assertCan(ctx.user, workspaceId, "customFieldDef:view");
+      await assertCan(ctx.user, workspaceId, "customFieldDef:view", {
+        spaceId: await spaceIdForList(input.listId),
+      });
 
       return defsForList(input.listId, workspaceId);
     }),
@@ -164,7 +166,9 @@ export const customFieldRouter = router({
       .query(async ({ ctx, input }) => {
         const task = await requireTask(input.taskId);
         const workspaceId = await workspaceIdForList(task.listId);
-        await assertCan(ctx.user, workspaceId, "customFieldDef:view");
+        await assertCan(ctx.user, workspaceId, "customFieldDef:view", {
+          spaceId: await spaceIdForList(task.listId),
+        });
 
         const defs = await defsForList(task.listId, workspaceId);
         if (defs.length === 0) return [];
@@ -180,7 +184,9 @@ export const customFieldRouter = router({
     set: protectedProcedure.input(setCustomFieldValueSchema).mutation(async ({ ctx, input }) => {
       const task = await requireTask(input.taskId);
       const workspaceId = await workspaceIdForList(task.listId);
-      await assertCan(ctx.user, workspaceId, "customFieldValue:update");
+      await assertCan(ctx.user, workspaceId, "customFieldValue:update", {
+        spaceId: await spaceIdForList(task.listId),
+      });
 
       const def = await requireFieldDef(input.fieldDefId);
       if (def.workspaceId !== workspaceId || (def.listId && def.listId !== task.listId)) {

@@ -1,5 +1,13 @@
 import { expect, test } from "@playwright/test";
-import { createSpaceAndList, createWorkspaceAndOpen, inviteAndGetLink, signUp } from "./helpers";
+import {
+  createSpaceAndList,
+  createWorkspaceAndOpen,
+  inviteAndGetLink,
+  signUp,
+  addEmailToAllBoards,
+  openList,
+  workspaceIdFrom,
+} from "./helpers";
 
 test("comment, @mention, react, and reply across two users; mentioned user gets a notification", async ({
   page,
@@ -32,8 +40,9 @@ test("comment, @mention, react, and reply across two users; mentioned user gets 
   await page.keyboard.press("Enter");
 
   // Bob navigates to the same list and opens the task
+  await addEmailToAllBoards(workspaceIdFrom(page), bobEmail);
   await bobPage.getByRole("link", { name: "Open" }).click();
-  await bobPage.getByRole("link", { name: "Backlog" }).click();
+  await openList(bobPage, "Design", "Backlog");
   await bobPage.getByRole("button", { name: "Board", exact: true }).click();
   await bobPage.getByRole("button", { name: "Review homepage copy" }).click();
   await expect(bobPage.getByLabel("Task title")).toHaveValue("Review homepage copy");

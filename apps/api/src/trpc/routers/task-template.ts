@@ -19,6 +19,8 @@ import {
   requireTask,
   workspaceIdForList,
   workspaceIdForTask,
+  spaceIdForTask,
+  spaceIdForList,
 } from "../../lib/task-queries";
 import { protectedProcedure, router } from "../trpc";
 
@@ -46,7 +48,9 @@ export const taskTemplateRouter = router({
     .mutation(async ({ ctx, input }) => {
       const task = await requireTask(input.taskId);
       const workspaceId = await workspaceIdForTask(task.id);
-      await assertCan(ctx.user, workspaceId, "taskTemplate:create");
+      await assertCan(ctx.user, workspaceId, "taskTemplate:create", {
+        spaceId: await spaceIdForTask(task.id),
+      });
 
       const tags = await db
         .select({ tagId: schema.taskTags.tagId })
@@ -123,7 +127,9 @@ export const taskTemplateRouter = router({
           message: "Template does not belong to this workspace",
         });
       }
-      await assertCan(ctx.user, workspaceId, "task:create");
+      await assertCan(ctx.user, workspaceId, "task:create", {
+        spaceId: await spaceIdForList(input.listId),
+      });
 
       const payload = taskTemplatePayloadSchema.parse(template.payloadJson);
 

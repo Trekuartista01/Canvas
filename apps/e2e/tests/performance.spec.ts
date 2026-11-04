@@ -8,6 +8,7 @@ import {
   openAsHr,
   signUp,
   uniqueEmail,
+  openList,
 } from "./helpers";
 
 const PASSWORD = "initial-pass-123";
@@ -180,7 +181,7 @@ test("M7.8: Employee of the Month from last month's tasks (test hook), banner + 
   // Moving Tina's deadline in another tab updates the board live (WS invalidation).
   const other = await page.context().newPage();
   await other.goto(`/w/${workspaceId}`);
-  await other.getByRole("link", { name: "Field work" }).click();
+  await openList(other, "Ops", "Field work");
   await other.getByRole("button", { name: "Board", exact: true }).click();
   await other.getByRole("button", { name: "Restock the shelves" }).click();
   const dueSaved = other.waitForResponse((res) => res.url().includes("task.update"));

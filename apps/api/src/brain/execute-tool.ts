@@ -1,3 +1,4 @@
+import { canAccessBoard } from "../lib/permissions";
 import { db, schema } from "@canvas/db";
 import { and, asc, eq, inArray, isNull } from "drizzle-orm";
 import { can, type WorkspaceAction } from "../auth/can";
@@ -8,7 +9,7 @@ import { critiqueImage } from "../lib/image-critique";
 import { processImageJob } from "../lib/image-job-processor";
 import { getMembershipRole } from "../lib/membership";
 import { extractPlainText } from "../lib/plain-text";
-import { workspaceIdForTask } from "../lib/task-queries";
+import { workspaceIdForTask, spaceIdForTask } from "../lib/task-queries";
 import {
   isToolName,
   parseToolInput,
@@ -66,6 +67,12 @@ async function resolveTaskId(
   const taskWorkspaceId = await workspaceIdForTask(taskId);
   if (taskWorkspaceId !== ctx.workspaceId) {
     throw new Error("Task does not belong to this workspace");
+  }
+  // P8.9: tools act as the person chatting, so they can't reach a board that
+  // person can't. can() only reads user.id here, as in assertWorkerCan.
+  const user = { id: ctx.userId, email: "", name: "", avatarUrl: null, bio: null, title: null };
+  if (!(await canAccessBoard(user, ctx.workspaceId, await spaceIdForTask(taskId)))) {
+    throw new Error("Forbidden: this person isn't on that board");
   }
   return taskId;
 }

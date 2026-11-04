@@ -14,7 +14,7 @@ import { extractMentionedUserIds } from "../../lib/mentions";
 import { notifyUsers } from "../../lib/notify";
 import { assertCan } from "../../lib/permissions";
 import { publish } from "../../lib/realtime";
-import { requireTask, workspaceIdForTask } from "../../lib/task-queries";
+import { requireTask, workspaceIdForTask, spaceIdForTask } from "../../lib/task-queries";
 import { protectedProcedure, router } from "../trpc";
 
 async function requireComment(commentId: string) {
@@ -61,7 +61,9 @@ async function getReactions(commentIds: string[], currentUserId: string) {
 export const commentRouter = router({
   list: protectedProcedure.input(listCommentsSchema).query(async ({ ctx, input }) => {
     const workspaceId = await workspaceIdForTask(input.taskId);
-    await assertCan(ctx.user, workspaceId, "comment:view");
+    await assertCan(ctx.user, workspaceId, "comment:view", {
+      spaceId: await spaceIdForTask(input.taskId),
+    });
 
     const rows = await db
       .select({
@@ -101,7 +103,9 @@ export const commentRouter = router({
   create: protectedProcedure.input(createCommentSchema).mutation(async ({ ctx, input }) => {
     const task = await requireTask(input.taskId);
     const workspaceId = await workspaceIdForTask(task.id);
-    await assertCan(ctx.user, workspaceId, "comment:create");
+    await assertCan(ctx.user, workspaceId, "comment:create", {
+      spaceId: await spaceIdForTask(task.id),
+    });
 
     let parentCommentId: string | undefined;
     if (input.parentCommentId) {
@@ -162,7 +166,9 @@ export const commentRouter = router({
   delete: protectedProcedure.input(deleteCommentSchema).mutation(async ({ ctx, input }) => {
     const comment = await requireComment(input.commentId);
     const workspaceId = await workspaceIdForTask(comment.taskId);
-    await assertCan(ctx.user, workspaceId, "comment:create");
+    await assertCan(ctx.user, workspaceId, "comment:create", {
+      spaceId: await spaceIdForTask(comment.taskId),
+    });
     if (comment.authorId !== ctx.user.id) {
       throw new TRPCError({ code: "FORBIDDEN", message: "You can only delete your own comments" });
     }
@@ -186,7 +192,9 @@ export const commentRouter = router({
     add: protectedProcedure.input(addReactionSchema).mutation(async ({ ctx, input }) => {
       const comment = await requireComment(input.commentId);
       const workspaceId = await workspaceIdForTask(comment.taskId);
-      await assertCan(ctx.user, workspaceId, "comment:create");
+      await assertCan(ctx.user, workspaceId, "comment:create", {
+        spaceId: await spaceIdForTask(comment.taskId),
+      });
 
       await db
         .insert(schema.reactions)
@@ -206,7 +214,9 @@ export const commentRouter = router({
     remove: protectedProcedure.input(removeReactionSchema).mutation(async ({ ctx, input }) => {
       const comment = await requireComment(input.commentId);
       const workspaceId = await workspaceIdForTask(comment.taskId);
-      await assertCan(ctx.user, workspaceId, "comment:create");
+      await assertCan(ctx.user, workspaceId, "comment:create", {
+        spaceId: await spaceIdForTask(comment.taskId),
+      });
 
       await db
         .delete(schema.reactions)

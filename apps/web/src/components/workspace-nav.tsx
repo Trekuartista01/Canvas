@@ -8,6 +8,7 @@ import {
   CalendarDays,
   CalendarRange,
   CheckSquare,
+  SquareKanban,
   ClipboardCheck,
   ClipboardList,
   Clock3,
@@ -48,6 +49,7 @@ const NAV_GROUPS: { label: string; entries: NavEntry[] }[] = [
       // Home is the team task view managers land on; staff land on My Tasks.
       { label: "Home", to: "/w/$workspaceId", icon: Home, requires: "report:viewTeam" },
       { label: "My Tasks", to: "/w/$workspaceId/my-tasks", icon: CheckSquare },
+      { label: "Boards", to: "/w/$workspaceId/boards", icon: SquareKanban },
       {
         label: "Dashboards",
         to: "/w/$workspaceId/dashboards",

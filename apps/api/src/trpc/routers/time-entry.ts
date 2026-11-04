@@ -11,7 +11,7 @@ import { TRPCError } from "@trpc/server";
 import { and, asc, desc, eq, gte, isNull, lte } from "drizzle-orm";
 import { logActivity } from "../../lib/activity";
 import { assertCan } from "../../lib/permissions";
-import { requireTask, workspaceIdForTask } from "../../lib/task-queries";
+import { requireTask, workspaceIdForTask, spaceIdForTask } from "../../lib/task-queries";
 import { protectedProcedure, router } from "../trpc";
 
 function durationBetween(startedAt: Date, endedAt: Date): number {
@@ -63,7 +63,9 @@ export const timeEntryRouter = router({
     .input(listTimeEntriesForTaskSchema)
     .query(async ({ ctx, input }) => {
       const workspaceId = await workspaceIdForTask(input.taskId);
-      await assertCan(ctx.user, workspaceId, "task:view");
+      await assertCan(ctx.user, workspaceId, "task:view", {
+        spaceId: await spaceIdForTask(input.taskId),
+      });
 
       return db
         .select({
@@ -84,7 +86,7 @@ export const timeEntryRouter = router({
   start: protectedProcedure.input(startTimerSchema).mutation(async ({ ctx, input }) => {
     const task = await requireTask(input.taskId);
     const workspaceId = await workspaceIdForTask(task.id);
-    await assertCan(ctx.user, workspaceId, "task:view");
+    await assertCan(ctx.user, workspaceId, "task:view", { spaceId: await spaceIdForTask(task.id) });
 
     const now = new Date();
     await stopRunningEntry(ctx.user.id, now);
@@ -120,7 +122,9 @@ export const timeEntryRouter = router({
     .mutation(async ({ ctx, input }) => {
       const task = await requireTask(input.taskId);
       const workspaceId = await workspaceIdForTask(task.id);
-      await assertCan(ctx.user, workspaceId, "task:view");
+      await assertCan(ctx.user, workspaceId, "task:view", {
+        spaceId: await spaceIdForTask(task.id),
+      });
 
       const startedAt = new Date(input.startedAt);
       const endedAt = new Date(input.endedAt);

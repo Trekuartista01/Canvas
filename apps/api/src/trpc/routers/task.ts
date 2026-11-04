@@ -15,7 +15,9 @@ import {
   removeTaskDependencySchema,
   rejectTaskSchema,
   removeTaskTagSchema,
+  boardCardsSchema,
   searchTasksSchema,
+  statusForMove,
   setTaskRecurrenceSchema,
   taskCollaboratorSchema,
   taskHighlightsSchema,
@@ -30,6 +32,7 @@ import { and, asc, desc, eq, exists, inArray, isNull, notInArray, or, sql } from
 import { logActivity } from "../../lib/activity";
 import { isWithinAiQuota } from "../../lib/ai-quota";
 import { runAutomationsForTrigger } from "../../lib/automation-runner";
+import { requireSpace } from "../../lib/hierarchy";
 import { searchVisibleTasks } from "../../lib/global-search";
 import { embeddingQueue } from "../../queues/embedding-queue";
 import { validateTaskDependency, wouldCreateCycle } from "../../lib/dependency";
@@ -42,7 +45,8 @@ import {
 } from "../../lib/notify";
 import { getMembershipRole } from "../../lib/membership";
 import { nextOrderKey } from "../../lib/order";
-import { assertCan } from "../../lib/permissions";
+import { loadBoard } from "../../lib/board-data";
+import { addBoardMember, assertCan, visibleBoardsCondition } from "../../lib/permissions";
 import { computeNextRunAt } from "../../lib/recurrence";
 import { publish } from "../../lib/realtime";
 import { validateSubtaskParent } from "../../lib/subtask";
@@ -200,7 +204,9 @@ async function getTaskDependencies(taskId: string) {
 export const taskRouter = router({
   list: protectedProcedure.input(listTasksSchema).query(async ({ ctx, input }) => {
     const workspaceId = await workspaceIdForList(input.listId);
-    await assertCan(ctx.user, workspaceId, "task:view");
+    await assertCan(ctx.user, workspaceId, "task:view", {
+      spaceId: await spaceIdForList(input.listId),
+    });
 
     // Subtasks are reached via their parent's detail panel, not shown as
     // their own top-level card/row here — otherwise they'd appear twice.
@@ -220,7 +226,9 @@ export const taskRouter = router({
   get: protectedProcedure.input(getTaskSchema).query(async ({ ctx, input }) => {
     const task = await requireTask(input.taskId);
     const workspaceId = await workspaceIdForList(task.listId);
-    await assertCan(ctx.user, workspaceId, "task:view");
+    await assertCan(ctx.user, workspaceId, "task:view", {
+      spaceId: await spaceIdForList(task.listId),
+    });
 
     // Five independent reads with no data dependency between them — this
     // used to await them one at a time (five round trips back-to-back on
@@ -247,10 +255,17 @@ export const taskRouter = router({
   // point of search is finding a task without already knowing where it
   // lives. DATA_MODEL.md: "FTS: generated tsvector on tasks.title +
   // description (GIN)" (see schema/tasks.ts's searchVector column).
+  // P8.9: one board's lists and card fronts.
+  board: protectedProcedure.input(boardCardsSchema).query(async ({ ctx, input }) => {
+    const space = await requireSpace(input.spaceId);
+    await assertCan(ctx.user, space.workspaceId, "task:view", { spaceId: space.id });
+    return loadBoard(space.id);
+  }),
+
   search: protectedProcedure.input(searchTasksSchema).query(async ({ ctx, input }) => {
     await assertCan(ctx.user, input.workspaceId, "task:view");
 
-    return searchVisibleTasks(input.workspaceId, input.query);
+    return searchVisibleTasks(ctx.user, input.workspaceId, input.query);
   }),
 
   // Backs the Home page's "Top priority"/"Recently added" sections and the
@@ -263,6 +278,7 @@ export const taskRouter = router({
   // groups these by status kind client-side.
   listMine: protectedProcedure.input(taskHighlightsSchema).query(async ({ ctx, input }) => {
     await assertCan(ctx.user, input.workspaceId, "task:view");
+    const visible = await visibleBoardsCondition(ctx.user, input.workspaceId);
 
     return db
       .select({
@@ -286,6 +302,8 @@ export const taskRouter = router({
       .where(
         and(
           eq(schema.spaces.workspaceId, input.workspaceId),
+          isNull(schema.lists.archivedAt),
+          visible,
           eq(schema.taskAssignees.userId, ctx.user.id),
           isNull(schema.tasks.deletedAt),
         ),
@@ -295,6 +313,7 @@ export const taskRouter = router({
 
   highlights: protectedProcedure.input(taskHighlightsSchema).query(async ({ ctx, input }) => {
     await assertCan(ctx.user, input.workspaceId, "task:view");
+    const visible = await visibleBoardsCondition(ctx.user, input.workspaceId);
 
     const baseSelection = {
       id: schema.tasks.id,
@@ -334,6 +353,8 @@ export const taskRouter = router({
         .where(
           and(
             eq(schema.spaces.workspaceId, input.workspaceId),
+            isNull(schema.lists.archivedAt),
+            visible,
             isNull(schema.tasks.deletedAt),
             isNull(schema.tasks.parentTaskId),
             notDone,
@@ -351,6 +372,8 @@ export const taskRouter = router({
         .where(
           and(
             eq(schema.spaces.workspaceId, input.workspaceId),
+            isNull(schema.lists.archivedAt),
+            visible,
             isNull(schema.tasks.deletedAt),
             isNull(schema.tasks.parentTaskId),
             notDone,
@@ -431,6 +454,8 @@ export const taskRouter = router({
       await db
         .insert(schema.taskAssignees)
         .values(assigneeIds.map((userId) => ({ taskId: task.id, userId })));
+      const spaceId = await spaceIdForList(task.listId);
+      for (const userId of assigneeIds) await addBoardMember(spaceId, userId, ctx.user.id);
       const assignedActivity = await logActivity(
         workspaceId,
         ctx.user.id,
@@ -465,6 +490,35 @@ export const taskRouter = router({
     const spaceId = await spaceIdForList(task.listId);
     await assertCan(ctx.user, workspaceId, "task:update", { spaceId });
 
+    if (input.listId !== undefined && input.statusId !== undefined) {
+      throw new TRPCError({
+        code: "BAD_REQUEST",
+        message: "Move a card or set its status, not both",
+      });
+    }
+    // P8.9: moving a card. Each list has its own statuses, so it takes the same
+    // kind in the target list: the approval state doesn't change by moving.
+    let moveTo: { listId: string; statusId: string } | undefined;
+    if (input.listId !== undefined && input.listId !== task.listId) {
+      const targetSpaceId = await spaceIdForList(input.listId);
+      if ((await workspaceIdForList(input.listId)) !== workspaceId) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "That list is in another workspace" });
+      }
+      await assertCan(ctx.user, workspaceId, "task:create", { spaceId: targetSpaceId });
+      const [current, targetStatuses] = await Promise.all([
+        db.query.statuses.findFirst({ where: eq(schema.statuses.id, task.statusId) }),
+        db
+          .select({ id: schema.statuses.id, kind: schema.statuses.kind })
+          .from(schema.statuses)
+          .where(eq(schema.statuses.listId, input.listId))
+          .orderBy(asc(schema.statuses.orderKey)),
+      ]);
+      const target = statusForMove(targetStatuses, current?.kind ?? "open");
+      if (!target)
+        throw new TRPCError({ code: "BAD_REQUEST", message: "That list has no statuses" });
+      moveTo = { listId: input.listId, statusId: target.id };
+    }
+
     let statusId: string | undefined;
     let newStatusKind: StatusKind | undefined;
     let completedAt: Date | null | undefined;
@@ -497,9 +551,11 @@ export const taskRouter = router({
     // bare status change with no position given appends to the column's end.
     const orderKey =
       input.orderKey ??
-      (statusId !== undefined
-        ? nextOrderKey(await lastTaskOrderKey(task.listId, statusId))
-        : undefined);
+      (moveTo
+        ? nextOrderKey(await lastTaskOrderKey(moveTo.listId, moveTo.statusId))
+        : statusId !== undefined
+          ? nextOrderKey(await lastTaskOrderKey(task.listId, statusId))
+          : undefined);
 
     const [updated] = await db
       .update(schema.tasks)
@@ -518,11 +574,49 @@ export const taskRouter = router({
           isMilestone: input.isMilestone,
           completedAt,
         }),
+        ...(moveTo ?? {}),
         updatedAt: new Date(),
       })
       .where(eq(schema.tasks.id, input.taskId))
       .returning();
     if (!updated) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+
+    if (moveTo) {
+      // Subtasks stay with their card.
+      const subtasks = await db
+        .select({ id: schema.tasks.id, kind: schema.statuses.kind })
+        .from(schema.tasks)
+        .innerJoin(schema.statuses, eq(schema.statuses.id, schema.tasks.statusId))
+        .where(and(eq(schema.tasks.parentTaskId, task.id), isNull(schema.tasks.deletedAt)));
+      if (subtasks.length > 0) {
+        const targetStatuses = await db
+          .select({ id: schema.statuses.id, kind: schema.statuses.kind })
+          .from(schema.statuses)
+          .where(eq(schema.statuses.listId, moveTo.listId))
+          .orderBy(asc(schema.statuses.orderKey));
+        for (const subtask of subtasks) {
+          await db
+            .update(schema.tasks)
+            .set({
+              listId: moveTo.listId,
+              statusId: statusForMove(targetStatuses, subtask.kind)!.id,
+              updatedAt: new Date(),
+            })
+            .where(eq(schema.tasks.id, subtask.id));
+        }
+      }
+      await logActivity(workspaceId, ctx.user.id, "task", task.id, "task.moved", {
+        taskId: task.id,
+        fromListId: task.listId,
+        toListId: moveTo.listId,
+      });
+      await publish(workspaceId, {
+        entity: "task",
+        id: task.id,
+        listId: moveTo.listId,
+        kind: "updated",
+      });
+    }
 
     await logActivity(workspaceId, ctx.user.id, "task", task.id, "task.updated");
     if (justCompleted) {
@@ -583,7 +677,9 @@ export const taskRouter = router({
 
   bulkUpdate: protectedProcedure.input(bulkUpdateTasksSchema).mutation(async ({ ctx, input }) => {
     const workspaceId = await workspaceIdForList(input.listId);
-    await assertCan(ctx.user, workspaceId, "task:update");
+    await assertCan(ctx.user, workspaceId, "task:update", {
+      spaceId: await spaceIdForList(input.listId),
+    });
 
     let newStatusKind: StatusKind | undefined;
     if (input.statusId !== undefined) {
@@ -772,7 +868,9 @@ export const taskRouter = router({
   approvalState: protectedProcedure.input(taskIdSchema).query(async ({ ctx, input }) => {
     const task = await requireTask(input.taskId);
     const workspaceId = await workspaceIdForList(task.listId);
-    await assertCan(ctx.user, workspaceId, "task:view");
+    await assertCan(ctx.user, workspaceId, "task:view", {
+      spaceId: await spaceIdForList(task.listId),
+    });
     const assigneeIds = await getAssigneeIds(task.id);
     const review = await firstStatusOfKind(task.listId, "review");
     return {
@@ -789,7 +887,9 @@ export const taskRouter = router({
     list: protectedProcedure.input(taskIdSchema).query(async ({ ctx, input }) => {
       const task = await requireTask(input.taskId);
       const workspaceId = await workspaceIdForList(task.listId);
-      await assertCan(ctx.user, workspaceId, "task:view");
+      await assertCan(ctx.user, workspaceId, "task:view", {
+        spaceId: await spaceIdForList(task.listId),
+      });
       return db
         .select({
           userId: schema.users.id,
@@ -804,12 +904,15 @@ export const taskRouter = router({
     add: protectedProcedure.input(taskCollaboratorSchema).mutation(async ({ ctx, input }) => {
       const task = await requireTask(input.taskId);
       const workspaceId = await workspaceIdForList(task.listId);
-      await assertCan(ctx.user, workspaceId, "task:update");
+      await assertCan(ctx.user, workspaceId, "task:update", {
+        spaceId: await spaceIdForList(task.listId),
+      });
       await requireWorkspaceMember(workspaceId, input.userId);
       await db
         .insert(schema.taskCollaborators)
         .values({ taskId: task.id, userId: input.userId })
         .onConflictDoNothing();
+      await addBoardMember(await spaceIdForList(task.listId), input.userId, ctx.user.id);
       await logActivity(workspaceId, ctx.user.id, "task", task.id, "task.collaborator_added", {
         userId: input.userId,
       });
@@ -825,7 +928,9 @@ export const taskRouter = router({
     remove: protectedProcedure.input(taskCollaboratorSchema).mutation(async ({ ctx, input }) => {
       const task = await requireTask(input.taskId);
       const workspaceId = await workspaceIdForList(task.listId);
-      await assertCan(ctx.user, workspaceId, "task:update");
+      await assertCan(ctx.user, workspaceId, "task:update", {
+        spaceId: await spaceIdForList(task.listId),
+      });
       await db
         .delete(schema.taskCollaborators)
         .where(
@@ -851,13 +956,17 @@ export const taskRouter = router({
     add: protectedProcedure.input(assignTaskSchema).mutation(async ({ ctx, input }) => {
       const task = await requireTask(input.taskId);
       const workspaceId = await workspaceIdForList(task.listId);
-      await assertCan(ctx.user, workspaceId, "task:update");
+      await assertCan(ctx.user, workspaceId, "task:update", {
+        spaceId: await spaceIdForList(task.listId),
+      });
       await requireWorkspaceMember(workspaceId, input.userId);
 
       await db
         .insert(schema.taskAssignees)
         .values({ taskId: task.id, userId: input.userId })
         .onConflictDoNothing();
+      // Being given a card puts you on its board, or you couldn't open it.
+      await addBoardMember(await spaceIdForList(task.listId), input.userId, ctx.user.id);
 
       const activityRow = await logActivity(
         workspaceId,
@@ -882,7 +991,9 @@ export const taskRouter = router({
     remove: protectedProcedure.input(unassignTaskSchema).mutation(async ({ ctx, input }) => {
       const task = await requireTask(input.taskId);
       const workspaceId = await workspaceIdForList(task.listId);
-      await assertCan(ctx.user, workspaceId, "task:update");
+      await assertCan(ctx.user, workspaceId, "task:update", {
+        spaceId: await spaceIdForList(task.listId),
+      });
 
       await db
         .delete(schema.taskAssignees)
@@ -908,7 +1019,9 @@ export const taskRouter = router({
     add: protectedProcedure.input(addTaskTagSchema).mutation(async ({ ctx, input }) => {
       const task = await requireTask(input.taskId);
       const workspaceId = await workspaceIdForList(task.listId);
-      await assertCan(ctx.user, workspaceId, "task:update");
+      await assertCan(ctx.user, workspaceId, "task:update", {
+        spaceId: await spaceIdForList(task.listId),
+      });
       await requireTagInWorkspace(input.tagId, workspaceId);
 
       await db
@@ -929,7 +1042,9 @@ export const taskRouter = router({
     remove: protectedProcedure.input(removeTaskTagSchema).mutation(async ({ ctx, input }) => {
       const task = await requireTask(input.taskId);
       const workspaceId = await workspaceIdForList(task.listId);
-      await assertCan(ctx.user, workspaceId, "task:update");
+      await assertCan(ctx.user, workspaceId, "task:update", {
+        spaceId: await spaceIdForList(task.listId),
+      });
 
       await db
         .delete(schema.taskTags)
@@ -952,7 +1067,9 @@ export const taskRouter = router({
   dependencies: router({
     list: protectedProcedure.input(listTaskDependenciesSchema).query(async ({ ctx, input }) => {
       const workspaceId = await workspaceIdForList(input.listId);
-      await assertCan(ctx.user, workspaceId, "task:view");
+      await assertCan(ctx.user, workspaceId, "task:view", {
+        spaceId: await spaceIdForList(input.listId),
+      });
 
       return getListDependencyEdges(input.listId);
     }),
@@ -961,7 +1078,9 @@ export const taskRouter = router({
       const task = await requireTask(input.taskId);
       const dependsOnTask = await requireTask(input.dependsOnTaskId);
       const workspaceId = await workspaceIdForList(task.listId);
-      await assertCan(ctx.user, workspaceId, "task:update");
+      await assertCan(ctx.user, workspaceId, "task:update", {
+        spaceId: await spaceIdForList(task.listId),
+      });
 
       const error = validateTaskDependency(task, dependsOnTask);
       if (error) throw new TRPCError({ code: "BAD_REQUEST", message: error });
@@ -1006,7 +1125,9 @@ export const taskRouter = router({
 
         const task = await requireTask(dependency.taskId);
         const workspaceId = await workspaceIdForList(task.listId);
-        await assertCan(ctx.user, workspaceId, "task:update");
+        await assertCan(ctx.user, workspaceId, "task:update", {
+          spaceId: await spaceIdForList(task.listId),
+        });
 
         await db
           .delete(schema.taskDependencies)
@@ -1032,7 +1153,9 @@ export const taskRouter = router({
     set: protectedProcedure.input(setTaskRecurrenceSchema).mutation(async ({ ctx, input }) => {
       const task = await requireTask(input.taskId);
       const workspaceId = await workspaceIdForList(task.listId);
-      await assertCan(ctx.user, workspaceId, "task:update");
+      await assertCan(ctx.user, workspaceId, "task:update", {
+        spaceId: await spaceIdForList(task.listId),
+      });
 
       const rrule = presetToRRule(input.preset);
       const now = new Date();
@@ -1063,7 +1186,9 @@ export const taskRouter = router({
     clear: protectedProcedure.input(clearTaskRecurrenceSchema).mutation(async ({ ctx, input }) => {
       const task = await requireTask(input.taskId);
       const workspaceId = await workspaceIdForList(task.listId);
-      await assertCan(ctx.user, workspaceId, "task:update");
+      await assertCan(ctx.user, workspaceId, "task:update", {
+        spaceId: await spaceIdForList(task.listId),
+      });
 
       await db.delete(schema.recurrenceRules).where(eq(schema.recurrenceRules.taskId, task.id));
 

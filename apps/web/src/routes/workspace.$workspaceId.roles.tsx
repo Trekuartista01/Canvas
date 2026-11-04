@@ -23,7 +23,13 @@ export const rolesRoute = createRoute({
 // Owner-tier actions (workspace:delete) are rejected server-side (can.ts's
 // isGrantable) if granted via a custom role or space override — hidden here
 // too so the checkbox list only offers what will actually save.
-const NON_GRANTABLE = new Set<WorkspaceAction>(["workspace:delete"]);
+// P8.9: so is managing boards, which belongs to boards:manageAll roles alone.
+const NON_GRANTABLE = new Set<WorkspaceAction>([
+  "workspace:delete",
+  "hierarchy:create",
+  "hierarchy:update",
+  "hierarchy:delete",
+]);
 const GRANTABLE_ACTIONS = WORKSPACE_ACTIONS.filter((a) => !NON_GRANTABLE.has(a));
 
 // Only actions actually wired to consult a space override (hierarchy/status/
@@ -403,7 +409,7 @@ function SpaceOverridesSection({ workspaceId }: { workspaceId: string }) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Space permissions</CardTitle>
+        <CardTitle>Board permissions</CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
         <p className="text-muted-foreground text-xs">

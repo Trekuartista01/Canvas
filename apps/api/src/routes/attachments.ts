@@ -8,6 +8,7 @@ import { getSessionUser } from "../auth/session";
 import { logActivity } from "../lib/activity";
 import { sanitizeFilenameForKey, sanitizeForHeader } from "../lib/filename";
 import { processImage } from "../lib/image-processing";
+import { canAccessBoard } from "../lib/permissions";
 import { canViewPrivateAttachment } from "../lib/private-attachments";
 import { isInlineSafeMimeType, safeContentType } from "../lib/mime-safety";
 import { getMembershipRole } from "../lib/membership";
@@ -163,6 +164,17 @@ async function streamAttachment(
   // and HR/approvers, not the whole workspace (lib/private-attachments.ts).
   if ((await canViewPrivateAttachment(user, attachment)) === false) {
     return reply.code(403).send({ error: "Forbidden" });
+  }
+  // P8.9: a card's file needs access to the card's board.
+  if (attachment.taskId) {
+    const [board] = await db
+      .select({ spaceId: schema.lists.spaceId })
+      .from(schema.tasks)
+      .innerJoin(schema.lists, eq(schema.lists.id, schema.tasks.listId))
+      .where(eq(schema.tasks.id, attachment.taskId));
+    if (board && !(await canAccessBoard(user, attachment.workspaceId, board.spaceId))) {
+      return reply.code(403).send({ error: "Forbidden" });
+    }
   }
   const key = kind === "thumb" ? attachment.thumbKey : attachment.fileKey;
   if (!key) return reply.code(404).send({ error: "Not found" });

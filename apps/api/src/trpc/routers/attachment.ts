@@ -25,7 +25,7 @@ import {
   putObject,
   uploadedTypeMatches,
 } from "../../lib/storage";
-import { requireTask, workspaceIdForTask } from "../../lib/task-queries";
+import { requireTask, workspaceIdForTask, spaceIdForTask } from "../../lib/task-queries";
 import { protectedProcedure, router } from "../trpc";
 
 async function bufferFromStream(body: unknown): Promise<Buffer> {
@@ -37,7 +37,9 @@ async function bufferFromStream(body: unknown): Promise<Buffer> {
 export const attachmentRouter = router({
   list: protectedProcedure.input(listAttachmentsSchema).query(async ({ ctx, input }) => {
     const workspaceId = await workspaceIdForTask(input.taskId);
-    await assertCan(ctx.user, workspaceId, "attachment:view");
+    await assertCan(ctx.user, workspaceId, "attachment:view", {
+      spaceId: await spaceIdForTask(input.taskId),
+    });
 
     return db.query.attachments.findMany({
       where: eq(schema.attachments.taskId, input.taskId),
@@ -50,7 +52,9 @@ export const attachmentRouter = router({
       where: eq(schema.attachments.id, input.attachmentId),
     });
     if (!attachment) throw new TRPCError({ code: "NOT_FOUND" });
-    await assertCan(ctx.user, attachment.workspaceId, "attachment:delete");
+    await assertCan(ctx.user, attachment.workspaceId, "attachment:delete", {
+      ...(attachment.taskId ? { spaceId: await spaceIdForTask(attachment.taskId) } : {}),
+    });
 
     await db.delete(schema.attachments).where(eq(schema.attachments.id, attachment.id));
     // A "google_drive" source attachment has no S3 object of its own.
@@ -186,7 +190,9 @@ export const attachmentRouter = router({
       where: eq(schema.attachments.id, input.attachmentId),
     });
     if (!attachment?.taskId) throw new TRPCError({ code: "NOT_FOUND" });
-    await assertCan(ctx.user, attachment.workspaceId, "attachment:create");
+    await assertCan(ctx.user, attachment.workspaceId, "attachment:create", {
+      spaceId: await spaceIdForTask(attachment.taskId),
+    });
     if (input.isProof && !attachment.mime.startsWith("image/")) {
       throw new TRPCError({ code: "BAD_REQUEST", message: "Proof must be a photo" });
     }
@@ -220,7 +226,9 @@ export const attachmentRouter = router({
     .mutation(async ({ ctx, input }) => {
       const task = await requireTask(input.taskId);
       const workspaceId = await workspaceIdForTask(input.taskId);
-      await assertCan(ctx.user, workspaceId, "attachment:create");
+      await assertCan(ctx.user, workspaceId, "attachment:create", {
+        spaceId: await spaceIdForTask(input.taskId),
+      });
 
       const { canonicalUrl } = parseDriveLink(input.url);
 

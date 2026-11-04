@@ -3,7 +3,7 @@ import { listActivitySchema, listWorkspaceActivitySchema } from "@canvas/shared"
 import { and, desc, eq, gte, ilike, lt, lte, notInArray, or } from "drizzle-orm";
 import { HR_ACTIVITY_ENTITY_TYPES } from "../../lib/audit";
 import { assertCan } from "../../lib/permissions";
-import { requireTask, workspaceIdForTask } from "../../lib/task-queries";
+import { requireTask, workspaceIdForTask, spaceIdForTask } from "../../lib/task-queries";
 import { protectedProcedure, router } from "../trpc";
 import { z } from "zod";
 
@@ -21,7 +21,7 @@ export const activityRouter = router({
   list: protectedProcedure.input(listActivitySchema).query(async ({ ctx, input }) => {
     const task = await requireTask(input.taskId);
     const workspaceId = await workspaceIdForTask(task.id);
-    await assertCan(ctx.user, workspaceId, "task:view");
+    await assertCan(ctx.user, workspaceId, "task:view", { spaceId: await spaceIdForTask(task.id) });
 
     return db
       .select({

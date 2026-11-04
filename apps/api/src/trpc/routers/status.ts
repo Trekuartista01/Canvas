@@ -44,7 +44,9 @@ async function spaceIdForList(listId: string) {
 export const statusRouter = router({
   list: protectedProcedure.input(listStatusesSchema).query(async ({ ctx, input }) => {
     const workspaceId = await workspaceIdForList(input.listId);
-    await assertCan(ctx.user, workspaceId, "status:view");
+    await assertCan(ctx.user, workspaceId, "status:view", {
+      spaceId: await spaceIdForList(input.listId),
+    });
 
     return db
       .select()

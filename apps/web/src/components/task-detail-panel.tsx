@@ -12,6 +12,7 @@ import {
 import { ActivitySection } from "@/components/activity-section";
 import { AttachmentsSection } from "@/components/attachments-section";
 import { BrainChatPanel } from "@/components/brain-chat-panel";
+import { CardMoveField } from "@/components/card-move-field";
 import { ClipsSection } from "@/components/clips-section";
 import { CommentsSection } from "@/components/comments-section";
 import { CustomFieldsSection } from "@/components/custom-fields-section";
@@ -389,6 +390,13 @@ export function TaskDetailPanel({
             </Field>
 
             <CollaboratorsField taskId={taskId} members={members.data ?? []} />
+
+            <CardMoveField
+              workspaceId={workspaceId}
+              taskId={taskId}
+              listId={task.data.listId}
+              onArchived={onClose}
+            />
 
             <Field label="Description">
               <DescriptionEditor

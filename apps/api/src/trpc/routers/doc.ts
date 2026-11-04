@@ -1,3 +1,4 @@
+import { spaceIdForTask } from "../../lib/task-queries";
 import { db, schema } from "@canvas/db";
 import {
   addDocTaskLinkSchema,
@@ -139,7 +140,9 @@ export const docRouter = router({
           message: "Task does not belong to this workspace",
         });
       }
-      await assertCan(ctx.user, doc.workspaceId, "task:view");
+      await assertCan(ctx.user, doc.workspaceId, "task:view", {
+        spaceId: await spaceIdForTask(input.taskId),
+      });
 
       await db
         .insert(schema.docTaskLinks)

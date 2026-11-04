@@ -6,6 +6,7 @@ import {
   inviteAndGetLink,
   setPeopleRole,
   signUp,
+  openList,
 } from "./helpers";
 
 const DOC_FIXTURE = fileURLToPath(new URL("../fixtures/test-doc.txt", import.meta.url));
@@ -64,7 +65,7 @@ test("M4.5 forms: build an intake form, submit it anonymously, and see the task 
   // task in the target list.
   await page.getByRole("link", { name: "All workspaces" }).click();
   await page.getByRole("link", { name: "Open" }).click();
-  await page.getByRole("link", { name: "Bug Reports" }).click();
+  await openList(page, "Support", "Bug Reports");
   await expect(page.getByRole("heading", { name: "# Bug Reports" })).toBeVisible();
 
   // Board view's card is a single button that opens the detail panel; list
@@ -164,7 +165,7 @@ test("task-completion forms: bind a form to a task, an anonymous submitter attac
   // Back as the workspace owner: the task moved to Done on the board.
   await page.getByRole("link", { name: "All workspaces" }).click();
   await page.getByRole("link", { name: "Open" }).click();
-  await page.getByRole("link", { name: "Assets" }).click();
+  await openList(page, "Delivery", "Assets");
   await page.getByRole("button", { name: "Board", exact: true }).click();
   await expect(
     page.getByTestId("status-column-Completed").getByText("Design homepage banner"),

@@ -3083,3 +3083,37 @@ It has now failed in every recent full run and passes when run with one other sp
 
 - `pnpm check` green. `pnpm test`: API 392 + 1 skipped, shared 135, db 11, web 15.
 - Playwright: new `search-scope.spec.ts` covers spec §9 by real API calls as HR, employee, Ops, CEO and Admin, plus the page as HR and as an employee. Full suite 82/83; the failure was `email-digest.spec.ts` again (see P8.7).
+
+## 2026-11-04 P8.9: Boards
+
+### Done
+
+- **Migration `0070`** (down file included): `space_members`, `lists.archived_at`. Every active member joined every existing board, so nobody lost access on the day it runs. RLS is on.
+- **Access:** `assertCan` with a `spaceId` now also requires the board, and every task-scoped route passes one (tasks, comments, checklists, attachments, custom fields, reminders, time entries, statuses, templates, doc links, image attachments). Board files through `/uploads`, Brain task conversations and Brain tools check it too. Cross-board reads (`hierarchy.tree`, search, My Tasks, Home, Workload) use `visibleBoardsCondition`. `boards:manageAll` (Ops, CEOs, Admin) reaches everything.
+- **Managing boards:** creating, renaming and archiving boards, their lists and members needs `boards:manageAll`. These actions no longer come from `hierarchy:*`, so they're gone from the custom-role and board-permission pickers.
+- **Being given a card puts you on its board:** assigning, adding a collaborator or transferring, or the person couldn't open it. Assignment still sends its notification.
+- **Boards page (`/boards`):** a switcher across the top (6 tabs, then a dropdown), "+ New board", default lists To Do / In Progress / Review / Done. Lists can be added, renamed, moved left or right, archived and restored. Cards drag within and between lists, optimistically, and "+ Add a card" sits at the bottom of each list. The front shows labels, assignees, due date (red when overdue), checklist progress, comment and attachment counts. Filters: assignee, label, due date.
+- **Card detail:** the existing task panel, plus "Board and list" (move anywhere you can see) and "Archive card".
+- **Moving a card:** `task.update` takes `listId`. Each list has its own statuses, so the card and its subtasks take the same kind in the target list; the approval state doesn't change by moving.
+- **Sidebar:** the space tree is gone, with a "Boards" nav entry instead. "Space" reads "Board" in the UI. A column's title opens `/l/$listId`, which keeps its list, calendar, table and Gantt views and links back to its board.
+- **Spec §9:** the employee half of the "Zone" line is now enforced and tested.
+
+### Decisions
+
+- **Archiving a card or a board is the existing soft delete.** The data stays, but there's no restore screen for those yet. Lists do have Restore, per the spec's list rules.
+- **Folders have no UI any more.** Lists inside folders simply appear as columns. The data and API remain.
+- **Lists reorder with left and right buttons,** not by dragging. It's simpler alongside card dragging, and works from the keyboard.
+- **New people join no boards.** That follows the spec, but Ops must add them, or assign them a card.
+- **Removing someone from a board keeps their assignments.** Those cards stop appearing in their My Tasks and Home until they're back.
+- **Dashboard widgets still count across the whole workspace.** They show totals, not card titles, so they don't reveal a board's contents. Revisit if that's too broad.
+- **Client chip and client filter wait for P8.10,** since clients don't exist yet.
+
+### Verified
+
+- `pnpm check` green. `pnpm test`: API 392 + 1 skipped, shared 145, db 11, web 15.
+- `0070` applied, rolled back and re-applied locally; RLS confirmed on.
+- Playwright: new `boards.spec.ts` uses real pointer drags, reloads to check they persist, and checks refusals by direct API calls as an employee. Older specs moved from the sidebar to the Boards page. Last full run 82/84: `email-digest.spec.ts` and `recurring-tasks-and-reminders.spec.ts`.
+
+### Note: scheduler-timing specs
+
+Both failures wait 20 s for a scheduler tick. `recurring-tasks` is new to this list: it passes with one worker and failed one of two runs in parallel. Measured against the local database, a full tick takes 1.8 s when no digests are due, and the new contract alert accounts for 0.1 s of it. In e2e, though, `DIGEST_INTERVAL_MS=3000` makes all 3,948 accumulated users due on most ticks, at two queries each, which fits the timing but isn't proven. Clearing old e2e data would test it.

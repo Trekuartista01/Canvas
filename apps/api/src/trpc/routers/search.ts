@@ -7,7 +7,7 @@ import { AiQuotaError, assertAiQuota } from "../../lib/ai-quota";
 import { estimateEmbedCostUsd } from "../../lib/ai-usage";
 import { writeAudit } from "../../lib/audit";
 import { globalSearch } from "../../lib/global-search";
-import { assertCan } from "../../lib/permissions";
+import { assertCan, visibleBoardsCondition } from "../../lib/permissions";
 import { protectedProcedure, router } from "../trpc";
 
 export const searchRouter = router({
@@ -71,6 +71,7 @@ export const searchRouter = router({
     });
 
     const distance = cosineDistance(schema.embeddings.vector, queryVector);
+    const visible = await visibleBoardsCondition(ctx.user, input.workspaceId);
 
     return db
       .select({
@@ -91,7 +92,9 @@ export const searchRouter = router({
           eq(schema.embeddings.workspaceId, input.workspaceId),
           isNull(schema.tasks.deletedAt),
           isNull(schema.lists.deletedAt),
+          isNull(schema.lists.archivedAt),
           isNull(schema.spaces.deletedAt),
+          visible,
         ),
       )
       .orderBy(distance)

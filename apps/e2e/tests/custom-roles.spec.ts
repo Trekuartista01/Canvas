@@ -1,5 +1,13 @@
 import { expect, test } from "@playwright/test";
-import { createSpaceAndList, createWorkspaceAndOpen, inviteAndGetLink, signUp } from "./helpers";
+import {
+  createSpaceAndList,
+  createWorkspaceAndOpen,
+  inviteAndGetLink,
+  signUp,
+  addEmailToAllBoards,
+  openList,
+  workspaceIdFrom,
+} from "./helpers";
 
 test("Phase 6: a custom role's grant and a space permission override each let a guest do something their base role normally can't", async ({
   page,
@@ -9,8 +17,8 @@ test("Phase 6: a custom role's grant and a space permission override each let a 
   await createWorkspaceAndOpen(page, "Roles Workspace");
   await createSpaceAndList(page, "Ops", "Sprint");
 
-  // Invite Bob as a guest — guests can view the hierarchy but can't create
-  // lists (hierarchy:create) or tasks (task:create) by default.
+  // Invite Bob as a guest — guests can view a board but can't create tags
+  // (tag:create) or tasks (task:create) by default.
   await page.getByRole("link", { name: "All workspaces" }).click();
   const bobEmail = `bob-${Date.now()}@example.com`;
   const inviteLink = await inviteAndGetLink(page, bobEmail, "guest");
@@ -23,20 +31,20 @@ test("Phase 6: a custom role's grant and a space permission override each let a 
   await expect(bobPage.getByText("Roles Workspace", { exact: true })).toBeVisible();
 
   // Nia re-enters the workspace and creates a custom role based on "guest"
-  // that grants hierarchy:create.
+  // that grants tag:create.
   await page.getByRole("link", { name: "Open" }).click();
   await page.getByRole("link", { name: "Roles" }).click();
-  await page.getByTestId("custom-role-name").fill("List Creator");
+  await page.getByTestId("custom-role-name").fill("Tag Creator");
   await page.getByTestId("custom-role-base").selectOption("guest");
-  await page.getByLabel("Grant hierarchy:create").check();
+  await page.getByLabel("Grant tag:create").check();
   await page.getByTestId("custom-role-create").click();
-  await expect(page.getByTestId("custom-role-list")).toContainText("List Creator");
+  await expect(page.getByTestId("custom-role-list")).toContainText("Tag Creator");
 
   // Assign it to Bob from the members panel (on the workspace home page).
   // exact:true avoids matching the sidebar logo, whose aria-label ("Canvas
   // home") contains "home" as a case-insensitive substring too.
   await page.getByRole("link", { name: "Home", exact: true }).click();
-  await page.getByLabel("Custom role for Bob Guest").selectOption({ label: "List Creator" });
+  await page.getByLabel("Custom role for Bob Guest").selectOption({ label: "Tag Creator" });
 
   // Nia also adds a space override on Ops: guest -> task:create allowed.
   await page.getByRole("link", { name: "Roles" }).click();
@@ -48,20 +56,25 @@ test("Phase 6: a custom role's grant and a space permission override each let a 
   await expect(page.getByTestId("space-override-list")).toContainText("Guest");
   await expect(page.getByTestId("space-override-list")).toContainText("allowed");
 
-  // Bob (still a guest) can now create a list in Ops, thanks to the custom
-  // role's hierarchy:create grant — a real reload/re-fetch, not a client-
-  // side assumption, since Bob's own browser context never saw Nia's edits.
+  // Bob (still a guest) can now create a tag, thanks to the custom role's
+  // grant: a real request, since Bob's own browser never saw Nia's edits.
   await bobPage.getByRole("link", { name: "Open" }).click();
   await bobPage.reload();
-  const opsRow = bobPage.locator("div.group", { hasText: "Ops" }).first();
-  await opsRow.hover();
-  await opsRow.getByRole("button", { name: "New list" }).click();
-  await bobPage.getByPlaceholder("List name").fill("Guest List");
-  await bobPage.keyboard.press("Enter");
-  await expect(bobPage.getByRole("link", { name: "Guest List" })).toBeVisible();
+  const workspaceId = workspaceIdFrom(bobPage);
+  const tag = await bobPage.request.post("/trpc/tag.create", {
+    data: { workspaceId, name: "Guest tag", color: "#22c55e" },
+  });
+  expect(tag.ok()).toBe(true);
+
+  // No custom role reaches board management (spec §10).
+  await addEmailToAllBoards(workspaceId, bobEmail);
+  const list = await bobPage.request.post("/trpc/hierarchy.space.create", {
+    data: { workspaceId, name: "Guest board" },
+  });
+  expect(list.status()).toBe(403);
 
   // Bob can also create a task in Sprint, thanks to the space override.
-  await bobPage.getByRole("link", { name: "Sprint" }).click();
+  await openList(bobPage, "Ops", "Sprint");
   await bobPage.getByRole("button", { name: "Board", exact: true }).click();
   const todoColumn = bobPage.getByTestId("status-column-Pending");
   await todoColumn.getByRole("button", { name: "+ Add task" }).click();

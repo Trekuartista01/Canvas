@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { createSpaceAndList, createWorkspaceAndOpen, signUp } from "./helpers";
+import { createSpaceAndList, createWorkspaceAndOpen, signUp, openList } from "./helpers";
 
 test("M5.1 automations: status → Done runs a tag + comment action, gated by a priority condition, and logs a run", async ({
   page,
@@ -61,7 +61,7 @@ test("M5.1 automations: status → Done runs a tag + comment action, gated by a 
   await expect(page.getByTestId(/^automations-link-/)).toBeVisible();
 
   // Trigger it: move "Fix the login bug" to Done.
-  await page.getByRole("link", { name: "Bugs" }).click();
+  await openList(page, "Support", "Bugs");
   await page.getByRole("button", { name: "Board", exact: true }).click();
   await page.getByRole("button", { name: "Fix the login bug" }).click();
   const updated = page.waitForResponse((res) => res.url().includes("task.update"));

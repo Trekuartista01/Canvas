@@ -4,6 +4,7 @@ import {
   createWorkspaceAndOpen,
   signUp,
   fillGenerationContext,
+  openList,
 } from "./helpers";
 
 test("Phase 6: semantic task search ranks by meaning, and visual search finds a similar generated image", async ({
@@ -43,9 +44,7 @@ test("Phase 6: semantic task search ranks by meaning, and visual search finds a 
   await expect(resultRows.first()).toContainText("Draft onboarding paperwork for new hires");
 
   // --- Visual search: generate two separate images, then find one from the other ---
-  // exact:true avoids the semantic-search result rows still on screen,
-  // whose accessible name also contains "Sprint" (the space/list label).
-  await page.getByRole("link", { name: "Sprint", exact: true }).click();
+  await openList(page, "Ops", "Sprint");
   await page.getByRole("button", { name: "Board", exact: true }).click();
   await todoColumn.getByRole("button", { name: "+ Add task" }).click();
   await page.getByPlaceholder("Task title").fill("Launch art A");

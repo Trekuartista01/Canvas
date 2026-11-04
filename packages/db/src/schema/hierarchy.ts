@@ -1,5 +1,6 @@
 import { boolean, index, pgTable, text, timestamp, unique, uuid } from "drizzle-orm/pg-core";
 import { uuidv7 } from "uuidv7";
+import { users } from "./auth";
 import { brandSettings } from "./image-brain";
 import { workspaces } from "./workspaces";
 
@@ -23,6 +24,29 @@ export const spaces = pgTable(
     deletedAt: timestamp("deleted_at", { withTimezone: true }),
   },
   (table) => [index("spaces_workspace_id_idx").on(table.workspaceId)],
+);
+
+// P8.9 (spec §10): who is on a board. boards:manageAll roles reach every board
+// without a row here; everyone else needs one to see a board or its cards.
+export const spaceMembers = pgTable(
+  "space_members",
+  {
+    id: uuid("id")
+      .primaryKey()
+      .$defaultFn(() => uuidv7()),
+    spaceId: uuid("space_id")
+      .notNull()
+      .references(() => spaces.id, { onDelete: "cascade" }),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    addedBy: uuid("added_by").references(() => users.id, { onDelete: "set null" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    unique("space_members_space_user_uniq").on(table.spaceId, table.userId),
+    index("space_members_user_idx").on(table.userId),
+  ],
 );
 
 export const folders = pgTable(
@@ -55,6 +79,8 @@ export const lists = pgTable(
     folderId: uuid("folder_id").references(() => folders.id, { onDelete: "cascade" }),
     name: text("name").notNull(),
     orderKey: text("order_key").notNull(),
+    // P8.9: an archived list leaves the board with its cards, and can be restored.
+    archivedAt: timestamp("archived_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
     deletedAt: timestamp("deleted_at", { withTimezone: true }),

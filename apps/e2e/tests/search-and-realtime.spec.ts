@@ -1,5 +1,13 @@
 import { expect, test } from "@playwright/test";
-import { createSpaceAndList, createWorkspaceAndOpen, inviteAndGetLink, signUp } from "./helpers";
+import {
+  createSpaceAndList,
+  createWorkspaceAndOpen,
+  inviteAndGetLink,
+  signUp,
+  addEmailToAllBoards,
+  openList,
+  workspaceIdFrom,
+} from "./helpers";
 
 test("search finds a task by title across the workspace", async ({ page }) => {
   await signUp(page, "Search Tester");
@@ -55,8 +63,9 @@ test("task changes made by one user appear live for another user with no reload"
   // Bob navigates to the same board and just leaves it open — no reload or
   // re-navigation happens on Bob's side for the rest of this test, so any
   // update Bob sees below can only have arrived over the WS connection.
+  await addEmailToAllBoards(workspaceIdFrom(page), bobEmail);
   await bobPage.getByRole("link", { name: "Open" }).click();
-  await bobPage.getByRole("link", { name: "Sprint" }).click();
+  await openList(bobPage, "Ops", "Sprint");
   await bobPage.getByRole("button", { name: "Board", exact: true }).click();
 
   // Ada creates a task

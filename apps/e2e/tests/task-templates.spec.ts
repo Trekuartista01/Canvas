@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { createSpaceAndList, createWorkspaceAndOpen, signUp } from "./helpers";
+import { createSpaceAndList, createWorkspaceAndOpen, signUp, openList } from "./helpers";
 
 test("save a task as a template, then create a new task from it", async ({ page }) => {
   test.setTimeout(60_000);
@@ -52,7 +52,7 @@ test("save a task as a template, then create a new task from it", async ({ page 
   await expect(page.getByText("New hire onboarding")).toBeVisible();
 
   // Back to the list; instantiate a second task from the template.
-  await page.getByRole("link", { name: "Onboarding" }).click();
+  await openList(page, "Ops", "Onboarding");
   await expect(page.getByRole("heading", { name: "# Onboarding" })).toBeVisible();
   await page.getByRole("button", { name: "Board", exact: true }).click();
 

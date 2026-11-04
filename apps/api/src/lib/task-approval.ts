@@ -1,3 +1,4 @@
+import { addBoardMember } from "./permissions";
 import { db, schema } from "@canvas/db";
 import type { StatusKind } from "@canvas/shared";
 import { TRPCError } from "@trpc/server";
@@ -15,6 +16,7 @@ import {
   lastTaskOrderKey,
   requireTask,
   workspaceIdForList,
+  spaceIdForList,
 } from "./task-queries";
 import {
   approverIdsToNotify,
@@ -234,6 +236,8 @@ export async function transferTask(
       .values({ taskId: task.id, userId: input.toUserId })
       .onConflictDoNothing();
   });
+  // P8.9: the new assignee has to be able to open what they've been handed.
+  await addBoardMember(await spaceIdForList(task.listId), input.toUserId, user.id);
 
   await postComment(workspaceId, task, user.id, `Transferred: ${input.note}`);
   const activity = await logActivity(workspaceId, user.id, "task", task.id, "task.transferred", {

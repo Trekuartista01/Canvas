@@ -13,7 +13,7 @@ import { logActivity } from "../../lib/activity";
 import { nextOrderKey } from "../../lib/order";
 import { assertCan } from "../../lib/permissions";
 import { publish } from "../../lib/realtime";
-import { requireTask, workspaceIdForTask } from "../../lib/task-queries";
+import { requireTask, workspaceIdForTask, spaceIdForTask } from "../../lib/task-queries";
 import { protectedProcedure, router } from "../trpc";
 
 async function requireChecklist(checklistId: string) {
@@ -55,7 +55,9 @@ async function lastItemOrderKey(checklistId: string): Promise<string | null> {
 export const checklistRouter = router({
   list: protectedProcedure.input(listChecklistsSchema).query(async ({ ctx, input }) => {
     const workspaceId = await workspaceIdForTask(input.taskId);
-    await assertCan(ctx.user, workspaceId, "task:view");
+    await assertCan(ctx.user, workspaceId, "task:view", {
+      spaceId: await spaceIdForTask(input.taskId),
+    });
 
     const checklists = await db.query.checklists.findMany({
       where: eq(schema.checklists.taskId, input.taskId),
@@ -80,7 +82,9 @@ export const checklistRouter = router({
   create: protectedProcedure.input(createChecklistSchema).mutation(async ({ ctx, input }) => {
     const task = await requireTask(input.taskId);
     const workspaceId = await workspaceIdForTask(task.id);
-    await assertCan(ctx.user, workspaceId, "task:update");
+    await assertCan(ctx.user, workspaceId, "task:update", {
+      spaceId: await spaceIdForTask(task.id),
+    });
 
     const lastKey = await lastChecklistOrderKey(task.id);
     const [checklist] = await db
@@ -102,7 +106,9 @@ export const checklistRouter = router({
   delete: protectedProcedure.input(deleteChecklistSchema).mutation(async ({ ctx, input }) => {
     const checklist = await requireChecklist(input.checklistId);
     const workspaceId = await workspaceIdForTask(checklist.taskId);
-    await assertCan(ctx.user, workspaceId, "task:update");
+    await assertCan(ctx.user, workspaceId, "task:update", {
+      spaceId: await spaceIdForTask(checklist.taskId),
+    });
 
     await db.delete(schema.checklists).where(eq(schema.checklists.id, checklist.id));
 
@@ -120,7 +126,9 @@ export const checklistRouter = router({
     create: protectedProcedure.input(createChecklistItemSchema).mutation(async ({ ctx, input }) => {
       const checklist = await requireChecklist(input.checklistId);
       const workspaceId = await workspaceIdForTask(checklist.taskId);
-      await assertCan(ctx.user, workspaceId, "task:update");
+      await assertCan(ctx.user, workspaceId, "task:update", {
+        spaceId: await spaceIdForTask(checklist.taskId),
+      });
 
       const lastKey = await lastItemOrderKey(checklist.id);
       const [item] = await db
@@ -153,7 +161,9 @@ export const checklistRouter = router({
       const item = await requireChecklistItem(input.itemId);
       const checklist = await requireChecklist(item.checklistId);
       const workspaceId = await workspaceIdForTask(checklist.taskId);
-      await assertCan(ctx.user, workspaceId, "task:update");
+      await assertCan(ctx.user, workspaceId, "task:update", {
+        spaceId: await spaceIdForTask(checklist.taskId),
+      });
 
       const [updated] = await db
         .update(schema.checklistItems)
@@ -190,7 +200,9 @@ export const checklistRouter = router({
       const item = await requireChecklistItem(input.itemId);
       const checklist = await requireChecklist(item.checklistId);
       const workspaceId = await workspaceIdForTask(checklist.taskId);
-      await assertCan(ctx.user, workspaceId, "task:update");
+      await assertCan(ctx.user, workspaceId, "task:update", {
+        spaceId: await spaceIdForTask(checklist.taskId),
+      });
 
       await db.delete(schema.checklistItems).where(eq(schema.checklistItems.id, item.id));
 

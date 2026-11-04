@@ -1,6 +1,6 @@
 import { db, schema } from "@canvas/db";
 import { TRPCError } from "@trpc/server";
-import { eq } from "drizzle-orm";
+import { and, eq, exists, sql, type SQL } from "drizzle-orm";
 import type { PeopleAction, WorkspaceAction } from "../auth/can";
 import { can } from "../auth/can";
 import type { SessionUser } from "../auth/session";
@@ -31,6 +31,46 @@ export async function assertCan(
   if (!can(user, action, { type: "workspace", role, customRole, spaceOverride })) {
     throw new TRPCError({ code: "FORBIDDEN" });
   }
+  // P8.9: anything scoped to a board also needs access to that board.
+  if (opts?.spaceId && !(await canAccessBoard(user, workspaceId, opts.spaceId))) {
+    throw new TRPCError({ code: "FORBIDDEN" });
+  }
+}
+
+/** P8.9 (spec §10): boards:manageAll reaches every board, others need a space_members row. */
+export async function canAccessBoard(user: SessionUser, workspaceId: string, spaceId: string) {
+  if (await canPeopleAction(user, workspaceId, "boards:manageAll")) return true;
+  const member = await db.query.spaceMembers.findFirst({
+    where: and(eq(schema.spaceMembers.spaceId, spaceId), eq(schema.spaceMembers.userId, user.id)),
+  });
+  return Boolean(member);
+}
+
+/**
+ * For queries across boards, which must join spaces: the boards this person
+ * may see, applied before anything is ranked or counted. Undefined means all.
+ */
+export async function visibleBoardsCondition(
+  user: SessionUser,
+  workspaceId: string,
+): Promise<SQL | undefined> {
+  if (await canPeopleAction(user, workspaceId, "boards:manageAll")) return undefined;
+  return exists(
+    db
+      .select({ one: sql`1` })
+      .from(schema.spaceMembers)
+      .where(
+        and(
+          eq(schema.spaceMembers.spaceId, schema.spaces.id),
+          eq(schema.spaceMembers.userId, user.id),
+        ),
+      ),
+  );
+}
+
+/** Puts someone on a board, e.g. because a card there was just assigned to them. */
+export async function addBoardMember(spaceId: string, userId: string, addedBy: string | null) {
+  await db.insert(schema.spaceMembers).values({ spaceId, userId, addedBy }).onConflictDoNothing();
 }
 
 /**
