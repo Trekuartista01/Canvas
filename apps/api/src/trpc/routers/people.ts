@@ -9,6 +9,9 @@ import {
   peopleDirectorySchema,
   peopleMemberSchema,
   setManagerSchema,
+  decideRoleRequestSchema,
+  type PeopleRole,
+  listRoleRequestsSchema,
   setPeopleRoleSchema,
   updateConfidentialSchema,
   updateEmployeeProfileSchema,
@@ -18,7 +21,7 @@ import {
   type EmployeeProfileFields,
 } from "@canvas/shared";
 import { TRPCError } from "@trpc/server";
-import { and, asc, eq } from "drizzle-orm";
+import { and, asc, eq, isNotNull } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { can } from "../../auth/can";
 import type { SessionUser } from "../../auth/session";
@@ -111,6 +114,75 @@ async function canPeople(
   } catch {
     return false;
   }
+}
+
+/**
+ * Every change of someone's role goes through here, whether set by hand or by
+ * approving a request: the same refusals, audit row and HR notice. The caller
+ * has checked roles:assign.
+ */
+async function applyRoleChange(
+  ctx: { user: SessionUser; ip: string | null },
+  input: { workspaceId: string; userId: string; peopleRole: PeopleRole },
+) {
+  const membership = await requireTargetMembership(input.workspaceId, input.userId);
+  if (membership.role === "owner") {
+    throw new TRPCError({
+      code: "BAD_REQUEST",
+      message: "The workspace owner is always an admin",
+    });
+  }
+  if (input.peopleRole === "hr_finance" && input.userId === ctx.user.id) {
+    throw new TRPCError({
+      code: "FORBIDDEN",
+      message: "You can't give yourself the HR/Finance Manager role",
+    });
+  }
+  const from = membership.peopleRole;
+  if (from === input.peopleRole) {
+    await db
+      .update(schema.memberships)
+      .set({ requestedPeopleRole: null, roleRequestedAt: null })
+      .where(eq(schema.memberships.id, membership.id));
+    return { userId: input.userId, peopleRole: input.peopleRole };
+  }
+
+  // Told before and after the change, so an HR user who loses the role hears too.
+  const hrBefore = await listHrUserIds(input.workspaceId);
+  await db
+    .update(schema.memberships)
+    // Settles any waiting request: the Admin has decided.
+    .set({ peopleRole: input.peopleRole, requestedPeopleRole: null, roleRequestedAt: null })
+    .where(eq(schema.memberships.id, membership.id));
+  const target = await db.query.users.findFirst({ where: eq(schema.users.id, input.userId) });
+  const activity = await logActivity(
+    input.workspaceId,
+    ctx.user.id,
+    "person",
+    input.userId,
+    "person.role_changed",
+    { from, to: input.peopleRole, name: target?.name ?? "" },
+  );
+
+  if (
+    PRIVILEGED_PEOPLE_ROLES.includes(from) ||
+    PRIVILEGED_PEOPLE_ROLES.includes(input.peopleRole)
+  ) {
+    await writeAudit({
+      workspaceId: input.workspaceId,
+      actorId: ctx.user.id,
+      action: "person.role_changed",
+      entity: "person",
+      entityId: input.userId,
+      ip: ctx.ip,
+      payload: { from, to: input.peopleRole },
+    });
+    const hrIds = [...new Set([...hrBefore, ...(await listHrUserIds(input.workspaceId))])];
+    await notifyUsers(activity.id, hrIds);
+    const line = `${ctx.user.name} changed roles: ${target?.name ?? "someone"} is now ${PEOPLE_ROLE_LABELS[input.peopleRole]}.`;
+    void emailUsers(hrIds, "Canvas: a role was changed", line);
+  }
+  return { userId: input.userId, peopleRole: input.peopleRole };
 }
 
 export const peopleRouter = router({
@@ -345,58 +417,68 @@ export const peopleRouter = router({
     await assertCanPeople(ctx.user, input.workspaceId, "roles:assign", {
       targetUserId: input.userId,
     });
-    const membership = await requireTargetMembership(input.workspaceId, input.userId);
-    if (membership.role === "owner") {
-      throw new TRPCError({
-        code: "BAD_REQUEST",
-        message: "The workspace owner is always an admin",
-      });
-    }
-    if (input.peopleRole === "hr_finance" && input.userId === ctx.user.id) {
-      throw new TRPCError({
-        code: "FORBIDDEN",
-        message: "You can't give yourself the HR/Finance Manager role",
-      });
-    }
-    const from = membership.peopleRole;
-    if (from === input.peopleRole) return { userId: input.userId, peopleRole: input.peopleRole };
-
-    // Told before and after the change, so an HR user who loses the role hears too.
-    const hrBefore = await listHrUserIds(input.workspaceId);
-    await db
-      .update(schema.memberships)
-      .set({ peopleRole: input.peopleRole })
-      .where(eq(schema.memberships.id, membership.id));
-    const target = await db.query.users.findFirst({ where: eq(schema.users.id, input.userId) });
-    const activity = await logActivity(
-      input.workspaceId,
-      ctx.user.id,
-      "person",
-      input.userId,
-      "person.role_changed",
-      { from, to: input.peopleRole, name: target?.name ?? "" },
-    );
-
-    if (
-      PRIVILEGED_PEOPLE_ROLES.includes(from) ||
-      PRIVILEGED_PEOPLE_ROLES.includes(input.peopleRole)
-    ) {
-      await writeAudit({
-        workspaceId: input.workspaceId,
-        actorId: ctx.user.id,
-        action: "person.role_changed",
-        entity: "person",
-        entityId: input.userId,
-        ip: ctx.ip,
-        payload: { from, to: input.peopleRole },
-      });
-      const hrIds = [...new Set([...hrBefore, ...(await listHrUserIds(input.workspaceId))])];
-      await notifyUsers(activity.id, hrIds);
-      const line = `${ctx.user.name} changed roles: ${target?.name ?? "someone"} is now ${PEOPLE_ROLE_LABELS[input.peopleRole]}.`;
-      void emailUsers(hrIds, "Canvas: a role was changed", line);
-    }
-    return { userId: input.userId, peopleRole: input.peopleRole };
+    return applyRoleChange(ctx, input);
   }),
+
+  // Who asked for a role when joining and is still waiting. Admin only.
+  roleRequests: protectedProcedure.input(listRoleRequestsSchema).query(async ({ ctx, input }) => {
+    await assertCanPeople(ctx.user, input.workspaceId, "roles:assign");
+    const rows = await db
+      .select({
+        userId: schema.users.id,
+        name: schema.users.name,
+        email: schema.users.email,
+        requestedRole: schema.memberships.requestedPeopleRole,
+        requestedAt: schema.memberships.roleRequestedAt,
+      })
+      .from(schema.memberships)
+      .innerJoin(schema.users, eq(schema.users.id, schema.memberships.userId))
+      .leftJoin(
+        schema.employeeProfiles,
+        eq(schema.employeeProfiles.membershipId, schema.memberships.id),
+      )
+      .where(
+        and(
+          eq(schema.memberships.workspaceId, input.workspaceId),
+          isNotNull(schema.memberships.requestedPeopleRole),
+          activeMembershipCondition,
+        ),
+      )
+      .orderBy(asc(schema.memberships.roleRequestedAt));
+    return rows.map((r) => ({ ...r, requestedRole: r.requestedRole as PeopleRole }));
+  }),
+
+  // Approving applies the role that's stored, not anything in this request.
+  decideRoleRequest: protectedProcedure
+    .input(decideRoleRequestSchema)
+    .mutation(async ({ ctx, input }) => {
+      await assertCanPeople(ctx.user, input.workspaceId, "roles:assign", {
+        targetUserId: input.userId,
+      });
+      const membership = await requireTargetMembership(input.workspaceId, input.userId);
+      const requested = membership.requestedPeopleRole;
+      if (!requested) {
+        throw new TRPCError({ code: "CONFLICT", message: "That request has already been decided" });
+      }
+      if (input.approve) {
+        await applyRoleChange(ctx, { ...input, peopleRole: requested });
+      } else {
+        await db
+          .update(schema.memberships)
+          .set({ requestedPeopleRole: null, roleRequestedAt: null })
+          .where(eq(schema.memberships.id, membership.id));
+      }
+      const activity = await logActivity(
+        input.workspaceId,
+        ctx.user.id,
+        "person",
+        input.userId,
+        input.approve ? "person.role_request_approved" : "person.role_request_declined",
+        { requested },
+      );
+      await notifyUsers(activity.id, [input.userId]);
+      return { userId: input.userId, approved: input.approve };
+    }),
 
   setManager: protectedProcedure.input(setManagerSchema).mutation(async ({ ctx, input }) => {
     await assertCanPeople(ctx.user, input.workspaceId, "people:manageStaff", {

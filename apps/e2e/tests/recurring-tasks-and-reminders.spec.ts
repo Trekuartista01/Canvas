@@ -1,5 +1,6 @@
 import { db, schema } from "@canvas/db";
-import { expect, test } from "@playwright/test";
+import { expect } from "@playwright/test";
+import { test } from "./work-open";
 import { and, desc, eq } from "drizzle-orm";
 import { createSpaceAndList, createWorkspaceAndOpen, signUp } from "./helpers";
 

@@ -4,6 +4,7 @@ import { CanvasLogo } from "@/components/canvas-logo";
 import { Card } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
+import { RoleRequestSelect, type RoleChoice } from "@/components/role-request";
 import { Label } from "@/components/ui/label";
 import { trpc } from "@/lib/trpc";
 import { createRoute, Link, useNavigate } from "@tanstack/react-router";
@@ -34,6 +35,7 @@ function SignupPage() {
   const [name, setName] = useState("");
   const [emailInput, setEmailInput] = useState("");
   const [password, setPassword] = useState("");
+  const [requestedRole, setRequestedRole] = useState<RoleChoice>("");
   const [error, setError] = useState<string | null>(null);
 
   const email = invite.data?.email ?? emailInput;
@@ -74,7 +76,14 @@ function SignupPage() {
           onSubmit={(e) => {
             e.preventDefault();
             setError(null);
-            signUp.mutate({ name, email, password, inviteId });
+            signUp.mutate({
+              name,
+              email,
+              password,
+              inviteId,
+              // Only someone joining a workspace has anyone to ask.
+              ...(inviteId && requestedRole ? { requestedRole } : {}),
+            });
           }}
         >
           <div className="space-y-1.5">
@@ -103,6 +112,7 @@ function SignupPage() {
               required
             />
           </div>
+          {inviteId && <RoleRequestSelect value={requestedRole} onChange={setRequestedRole} />}
           {error && <p className="text-sm text-red-500">{error}</p>}
           <Button type="submit" className="w-full" disabled={signUp.isPending}>
             {signUp.isPending ? "Creating account…" : "Sign up"}

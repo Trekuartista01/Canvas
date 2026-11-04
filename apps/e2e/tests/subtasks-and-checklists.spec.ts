@@ -1,4 +1,5 @@
-import { expect, test } from "@playwright/test";
+import { expect } from "@playwright/test";
+import { test } from "./work-open";
 import { createSpaceAndList, createWorkspaceAndOpen, signUp } from "./helpers";
 
 test("add a subtask and a checklist to a task, and verify both persist", async ({ page }) => {

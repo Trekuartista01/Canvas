@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { REQUESTABLE_PEOPLE_ROLES } from "../people";
 
 export const emailSchema = z.string().trim().toLowerCase().email();
 export const passwordSchema = z.string().min(8).max(255);
@@ -8,6 +9,8 @@ export const signUpSchema = z.object({
   password: passwordSchema,
   name: z.string().trim().min(1).max(100),
   inviteId: z.string().uuid().optional(),
+  // Joining through an invite: a request for an Admin to approve, nothing more.
+  requestedRole: z.enum(REQUESTABLE_PEOPLE_ROLES).optional(),
 });
 
 export const logInSchema = z.object({

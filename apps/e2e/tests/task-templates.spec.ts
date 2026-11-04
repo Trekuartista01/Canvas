@@ -1,4 +1,5 @@
-import { expect, test } from "@playwright/test";
+import { expect } from "@playwright/test";
+import { test } from "./work-open";
 import { createSpaceAndList, createWorkspaceAndOpen, signUp, openList } from "./helpers";
 
 test("save a task as a template, then create a new task from it", async ({ page }) => {

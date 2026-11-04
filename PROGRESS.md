@@ -3165,3 +3165,26 @@ Accumulated e2e data was the cause. After truncating the local database's public
 | 11  | "Zone – story posts" suggests Zone Club, in the folder, Ops/CEO/Admin only               | Pass                            | `clients.spec.ts`                                                                                              |
 
 **Still to check on real services, all at deployment:** the Vendim PDF and its layout (LibreOffice); real email through SMTP (everything here used the mock); PDF preview from Supabase Storage; a real HEIC photo.
+
+## 2026-11-04 Role requests at sign-up; Work section closed
+
+Requested after Phase 8, outside the spec.
+
+### Done
+
+- **Asking for a role:** someone joining through an invite picks Employee, HR/Finance Manager, Operations Manager or CEO, on the sign-up form or the "Accept & join" page. Picking anything but Employee stores a request (`memberships.requested_people_role`, migration `0072`, down file included). **It grants nothing:** they stay Employee until decided.
+- **Deciding:** Directory shows Admins a "Role requests" queue with Approve and Decline. Admins get a bell notice and an email, and the person is told the outcome. Approving goes through `applyRoleChange`, the same code as setting a role by hand, so the audit row, HR notice and "can't make yourself HR" all apply. It applies the stored request, not anything in the call. `roles:assign` only. Setting a role by hand settles a waiting request.
+- **Task panel:** the Work section starts closed on every task.
+
+### Decisions
+
+- **No question without an invite.** Someone signing up with no invite has no workspace, so there's nobody to ask. They create their own and own it.
+- **Admin can't be requested.** Admin isn't a job to claim; it's the owner's and whoever they promote.
+- **People added by HR through "Add staff" skip this:** HR sets their role there.
+- **Test helper:** `tests/work-open.ts` opens Work for the specs about what's inside it. `task-panel.spec.ts` covers the closed default.
+
+### Verified
+
+- `pnpm check` green. `pnpm test`: API 392 + 1 skipped, shared 159, db 11, web 15.
+- `0072` applied, rolled back and re-applied locally.
+- Playwright 87/87, with new `role-requests.spec.ts` (including no HR access before approval, and 403s for non-Admins deciding) and `task-panel.spec.ts`.

@@ -36,4 +36,7 @@ export const NOTIFICATION_VERB_LABELS: Record<string, string> = {
   "contract.expiring": "Contract expiring soon",
   // P8.1 — to HR: rendered with the person and new role from the payload.
   "person.role_changed": "changed roles",
+  "person.role_requested": "asked for a role",
+  "person.role_request_approved": "approved your role request",
+  "person.role_request_declined": "turned down your role request",
 };

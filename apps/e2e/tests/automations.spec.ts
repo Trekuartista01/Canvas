@@ -1,4 +1,5 @@
-import { expect, test } from "@playwright/test";
+import { expect } from "@playwright/test";
+import { test } from "./work-open";
 import { createSpaceAndList, createWorkspaceAndOpen, signUp, openList } from "./helpers";
 
 test("M5.1 automations: status → Done runs a tag + comment action, gated by a priority condition, and logs a run", async ({

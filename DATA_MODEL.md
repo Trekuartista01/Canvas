@@ -13,6 +13,7 @@ users            (id, email uniq, name, avatar_url, bio null, title null, -- tit
 sessions         (id, user_id fk, expires_at)
 workspaces       (id, name, slug uniq, plan text default 'internal', created_at)
 memberships      (id, workspace_id fk, user_id fk, role enum('owner','admin','member','guest'),
+                  requested_people_role null, role_requested_at null,   -- asked for when joining; grants nothing until an Admin approves
                   people_role enum('admin','ceo','hr_finance',          -- P8.1; owner is always admin,
                     'operations_manager','employee') default 'employee', -- never HR
                   manager_user_id fk users null,                        -- reports to (no permissions)

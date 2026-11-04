@@ -108,6 +108,10 @@ export const memberships = pgTable(
     // M7.1: replaces the old is_operations_manager flag — people_role
     // 'operations_manager' is who task.ts's notifyOperationsManagers reaches.
     peopleRole: peopleRole("people_role").notNull().default("employee"),
+    // What they said they hold when joining. Grants nothing until an Admin
+    // approves it, which moves it into people_role.
+    requestedPeopleRole: peopleRole("requested_people_role"),
+    roleRequestedAt: timestamp("role_requested_at", { withTimezone: true }),
     // "Reports to" — the direct manager, shown on the profile. Since P8.1 it
     // grants no permissions (the staff_manager role is gone).
     managerUserId: uuid("manager_user_id").references(() => users.id, { onDelete: "set null" }),

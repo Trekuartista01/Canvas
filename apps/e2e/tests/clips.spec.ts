@@ -1,5 +1,6 @@
 import { fileURLToPath } from "node:url";
-import { expect, test } from "@playwright/test";
+import { expect } from "@playwright/test";
+import { test } from "./work-open";
 import { createSpaceAndList, createWorkspaceAndOpen, signUp } from "./helpers";
 
 const CLIP_FIXTURE = fileURLToPath(new URL("../fixtures/test-clip.webm", import.meta.url));

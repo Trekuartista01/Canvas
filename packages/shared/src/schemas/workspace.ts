@@ -1,3 +1,4 @@
+import { REQUESTABLE_PEOPLE_ROLES } from "../people";
 import { z } from "zod";
 import { emailSchema } from "./auth";
 import { MEMBERSHIP_ROLES } from "../roles";
@@ -15,6 +16,8 @@ export const inviteMemberSchema = z.object({
 
 export const acceptInviteSchema = z.object({
   inviteId: z.string().uuid(),
+  // A request for an Admin to approve, nothing more (see signUpSchema).
+  requestedRole: z.enum(REQUESTABLE_PEOPLE_ROLES).optional(),
 });
 
 export const listMembersSchema = z.object({

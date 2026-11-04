@@ -13,6 +13,13 @@ export const PEOPLE_ROLES = [
 ] as const;
 export type PeopleRole = (typeof PEOPLE_ROLES)[number];
 
+/**
+ * What someone can ask for when joining. Never Admin, and never effective until
+ * an Admin approves it. Employee is what everyone already has.
+ */
+export const REQUESTABLE_PEOPLE_ROLES = ["hr_finance", "operations_manager", "ceo"] as const;
+export type RequestablePeopleRole = (typeof REQUESTABLE_PEOPLE_ROLES)[number];
+
 export const PEOPLE_ROLE_LABELS: Record<PeopleRole, string> = {
   admin: "Admin",
   ceo: "CEO",

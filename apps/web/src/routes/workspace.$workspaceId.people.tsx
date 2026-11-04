@@ -1,3 +1,4 @@
+import { RoleRequests } from "@/components/role-request";
 import {
   EMPTY_PROFILE_DRAFT,
   type EmployeeProfileDraft,
@@ -63,6 +64,8 @@ function PeopleDirectoryPage() {
 
   return (
     <div className="mx-auto flex h-full max-w-4xl flex-col gap-4 p-6" data-testid="people-page">
+      {access.can("roles:assign") && <RoleRequests workspaceId={workspaceId} />}
+
       <div className="flex flex-wrap items-center gap-2">
         <span className="bg-accent-soft text-accent flex h-9 w-9 items-center justify-center rounded-md">
           <Contact className="h-5 w-5" aria-hidden />

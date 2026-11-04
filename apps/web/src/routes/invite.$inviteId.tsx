@@ -1,7 +1,9 @@
+import { RoleRequestSelect, type RoleChoice } from "@/components/role-request";
 import { Button } from "@/components/ui/button";
 import { useSession } from "@/hooks/use-session";
 import { trpc } from "@/lib/trpc";
 import { createRoute, Link, useNavigate } from "@tanstack/react-router";
+import { useState } from "react";
 import { rootRoute } from "./__root";
 
 export const inviteRoute = createRoute({
@@ -16,6 +18,7 @@ function InvitePage() {
   const navigate = useNavigate();
   const utils = trpc.useUtils();
   const invite = trpc.workspace.getInvite.useQuery({ inviteId });
+  const [requestedRole, setRequestedRole] = useState<RoleChoice>("");
 
   const accept = trpc.workspace.acceptInvite.useMutation({
     onSuccess: async () => {
@@ -67,9 +70,15 @@ function InvitePage() {
       )}
 
       {user && user.email === invite.data.email && (
-        <Button onClick={() => accept.mutate({ inviteId })} disabled={accept.isPending}>
-          {accept.isPending ? "Joining…" : `Accept & join ${invite.data.workspaceName}`}
-        </Button>
+        <div className="w-full max-w-sm space-y-4">
+          <RoleRequestSelect value={requestedRole} onChange={setRequestedRole} />
+          <Button
+            onClick={() => accept.mutate({ inviteId, ...(requestedRole ? { requestedRole } : {}) })}
+            disabled={accept.isPending}
+          >
+            {accept.isPending ? "Joining…" : `Accept & join ${invite.data.workspaceName}`}
+          </Button>
+        </div>
       )}
     </main>
   );

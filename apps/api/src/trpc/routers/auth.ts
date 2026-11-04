@@ -1,3 +1,4 @@
+import { recordRoleRequest } from "../../lib/role-requests";
 import { db, schema } from "@canvas/db";
 import {
   deleteAccountSchema,
@@ -70,6 +71,9 @@ export const authRouter = router({
           entityId: user.id,
           verb: "invite.accepted",
         });
+        if (input.requestedRole) {
+          await recordRoleRequest(invite.workspaceId, user.id, input.requestedRole);
+        }
       }
     }
 

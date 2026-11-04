@@ -415,7 +415,7 @@ export function TaskDetailPanel({
               />
             </Field>
 
-            <DetailGroup label="Work">
+            <DetailGroup label="Work" defaultOpen={false}>
               {!task.data.parentTaskId && (
                 <SubtasksSection
                   taskId={taskId}
@@ -492,14 +492,23 @@ export function TaskDetailPanel({
 // labeled header — defaults open so nothing already relying on these fields
 // being visible (tests, deep links) changes behavior; it just gives the
 // panel a way to collapse past the core fields instead of one flat scroll.
-function DetailGroup({ label, children }: { label: string; children: React.ReactNode }) {
-  const [open, setOpen] = useState(true);
+function DetailGroup({
+  label,
+  defaultOpen = true,
+  children,
+}: {
+  label: string;
+  defaultOpen?: boolean;
+  children: React.ReactNode;
+}) {
+  const [open, setOpen] = useState(defaultOpen);
   return (
     <div className="border-border border-t pt-4">
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
         aria-expanded={open}
+        data-testid={`detail-group-${label}`}
         className="text-muted-foreground hover:text-foreground flex w-full items-center gap-1.5 text-xs font-semibold tracking-wide uppercase"
       >
         <span className={open ? "rotate-90" : ""} aria-hidden>

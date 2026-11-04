@@ -1,6 +1,7 @@
 import http from "node:http";
 import type { AddressInfo } from "node:net";
-import { expect, test } from "@playwright/test";
+import { expect } from "@playwright/test";
+import { test } from "./work-open";
 import { createSpaceAndList, createWorkspaceAndOpen, signUp, openList } from "./helpers";
 
 test("M5.6 integrations: Slack notify automation posts a message on status change", async ({

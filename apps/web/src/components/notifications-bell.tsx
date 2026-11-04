@@ -72,6 +72,14 @@ function missingYear(payload: unknown): string {
   return typeof year === "number" ? String(year) : "next year";
 }
 
+// "person.role_requested": "HR/Finance Manager".
+function requestedRoleLabel(payload: unknown): string {
+  const requested = (payload as { requested?: unknown } | null)?.requested;
+  return typeof requested === "string" && requested in PEOPLE_ROLE_LABELS
+    ? PEOPLE_ROLE_LABELS[requested as PeopleRole]
+    : "a new role";
+}
+
 // P8.1 "person.role_changed": "Sam Staff is now HR/Finance Manager".
 function roleChangeLine(payload: unknown): string {
   if (!payload || typeof payload !== "object") return "";
@@ -181,6 +189,11 @@ export function NotificationsBell() {
                         to: "/w/$workspaceId/daily-report",
                         params: { workspaceId: n.workspaceId },
                       });
+                    } else if (n.verb === "person.role_requested") {
+                      navigate({
+                        to: "/w/$workspaceId/people",
+                        params: { workspaceId: n.workspaceId },
+                      });
                     } else if (n.verb === "contract.expiring") {
                       navigate({
                         to: "/w/$workspaceId/contracts",
@@ -231,6 +244,11 @@ export function NotificationsBell() {
                     <span>
                       <span className="font-medium">{n.actorName}</span> changed roles:{" "}
                       {roleChangeLine(n.payloadJson)}
+                    </span>
+                  ) : n.verb === "person.role_requested" ? (
+                    <span>
+                      <span className="font-medium">{n.actorName}</span> asked to be{" "}
+                      {requestedRoleLabel(n.payloadJson)}
                     </span>
                   ) : n.verb === "contract.expiring" ? (
                     <span>{contractNotificationText(n.payloadJson)}</span>

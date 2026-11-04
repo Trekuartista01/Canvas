@@ -1,3 +1,4 @@
+import { recordRoleRequest } from "../../lib/role-requests";
 import { db, schema } from "@canvas/db";
 import {
   acceptInviteSchema,
@@ -227,6 +228,9 @@ export const workspaceRouter = router({
     const workspace = await db.query.workspaces.findFirst({
       where: eq(schema.workspaces.id, invite.workspaceId),
     });
+    if (input.requestedRole) {
+      await recordRoleRequest(invite.workspaceId, ctx.user.id, input.requestedRole);
+    }
     return workspace;
   }),
 

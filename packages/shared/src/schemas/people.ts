@@ -60,6 +60,10 @@ export const updateEmployeeProfileSchema = employeeProfileFieldsSchema.extend({
 
 export const setPeopleRoleSchema = z.object({ workspaceId, userId, peopleRole: peopleRoleEnum });
 
+export const listRoleRequestsSchema = z.object({ workspaceId });
+
+export const decideRoleRequestSchema = z.object({ workspaceId, userId, approve: z.boolean() });
+
 export const setManagerSchema = z.object({ workspaceId, userId, managerUserId: userId.nullable() });
 
 export type CreateStaffInput = z.infer<typeof createStaffSchema>;

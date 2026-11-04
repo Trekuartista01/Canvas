@@ -1,4 +1,5 @@
-import { expect, test } from "@playwright/test";
+import { expect } from "@playwright/test";
+import { test } from "./work-open";
 import { createSpaceAndList, createWorkspaceAndOpen, signUp } from "./helpers";
 
 test("Brain tools: generate image via chat, show status, then attach to task", async ({ page }) => {
