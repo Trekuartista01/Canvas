@@ -1,3 +1,4 @@
+import { GlobalSearch } from "@/components/global-search";
 import { ImageVersionThumb } from "@/components/image-version-thumb";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -26,6 +27,7 @@ function SemanticSearchPage() {
         <h1 className="text-lg font-semibold">Smart search</h1>
       </div>
 
+      <GlobalSearch workspaceId={workspaceId} />
       <TaskSemanticSearch workspaceId={workspaceId} />
       <VisualSearch workspaceId={workspaceId} />
     </div>

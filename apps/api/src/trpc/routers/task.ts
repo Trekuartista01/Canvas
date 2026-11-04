@@ -30,6 +30,7 @@ import { and, asc, desc, eq, exists, inArray, isNull, notInArray, or, sql } from
 import { logActivity } from "../../lib/activity";
 import { isWithinAiQuota } from "../../lib/ai-quota";
 import { runAutomationsForTrigger } from "../../lib/automation-runner";
+import { searchVisibleTasks } from "../../lib/global-search";
 import { embeddingQueue } from "../../queues/embedding-queue";
 import { validateTaskDependency, wouldCreateCycle } from "../../lib/dependency";
 import { completeTaskWithDefaultStatus } from "../../lib/task-completion";
@@ -249,31 +250,7 @@ export const taskRouter = router({
   search: protectedProcedure.input(searchTasksSchema).query(async ({ ctx, input }) => {
     await assertCan(ctx.user, input.workspaceId, "task:view");
 
-    const tsquery = sql`websearch_to_tsquery('english', ${input.query})`;
-    const rank = sql<number>`ts_rank(${schema.tasks.searchVector}, ${tsquery})`;
-
-    return db
-      .select({
-        id: schema.tasks.id,
-        title: schema.tasks.title,
-        listId: schema.tasks.listId,
-        listName: schema.lists.name,
-        spaceName: schema.spaces.name,
-      })
-      .from(schema.tasks)
-      .innerJoin(schema.lists, eq(schema.lists.id, schema.tasks.listId))
-      .innerJoin(schema.spaces, eq(schema.spaces.id, schema.lists.spaceId))
-      .where(
-        and(
-          eq(schema.spaces.workspaceId, input.workspaceId),
-          isNull(schema.tasks.deletedAt),
-          isNull(schema.lists.deletedAt),
-          isNull(schema.spaces.deletedAt),
-          sql`${schema.tasks.searchVector} @@ ${tsquery}`,
-        ),
-      )
-      .orderBy(desc(rank))
-      .limit(20);
+    return searchVisibleTasks(input.workspaceId, input.query);
   }),
 
   // Backs the Home page's "Top priority"/"Recently added" sections and the

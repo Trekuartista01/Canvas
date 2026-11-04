@@ -1,14 +1,43 @@
 import { db, schema } from "@canvas/db";
-import { imagesLikeThisSchema, tasksByTextSchema } from "@canvas/shared";
+import { globalSearchSchema, imagesLikeThisSchema, tasksByTextSchema } from "@canvas/shared";
 import { TRPCError } from "@trpc/server";
 import { and, cosineDistance, eq, isNull, ne } from "drizzle-orm";
 import { getEmbeddingEngine } from "../../embedding-engine";
 import { AiQuotaError, assertAiQuota } from "../../lib/ai-quota";
 import { estimateEmbedCostUsd } from "../../lib/ai-usage";
+import { writeAudit } from "../../lib/audit";
+import { globalSearch } from "../../lib/global-search";
 import { assertCan } from "../../lib/permissions";
 import { protectedProcedure, router } from "../trpc";
 
 export const searchRouter = router({
+  // P8.8 (spec §9): people, tasks and, for HR alone, HR records. Plain database
+  // queries: no embedding call, and the scoping lives in globalSearch.
+  global: protectedProcedure.input(globalSearchSchema).query(async ({ ctx, input }) => {
+    await assertCan(ctx.user, input.workspaceId, "task:view");
+    const results = await globalSearch(ctx.user, input.workspaceId, input.query);
+    if ("hr" in results) {
+      const { contracts, payroll, leave, vendims } = results.hr;
+      if (contracts.length + payroll.length + leave.length + vendims.length > 0) {
+        await writeAudit({
+          workspaceId: input.workspaceId,
+          actorId: ctx.user.id,
+          action: "search.hr_results",
+          entity: "search",
+          ip: ctx.ip,
+          payload: {
+            query: input.query,
+            contracts: contracts.length,
+            payroll: payroll.length,
+            leave: leave.length,
+            vendims: vendims.length,
+          },
+        });
+      }
+    }
+    return results;
+  }),
+
   // Phase 6: semantic search over tasks. The query embedding is computed
   // inline here, not queued — a documented, narrow exception to CLAUDE.md's
   // "AI calls run in a worker" rule: this call exists only to answer the
@@ -61,6 +90,8 @@ export const searchRouter = router({
           eq(schema.embeddings.entityType, "task"),
           eq(schema.embeddings.workspaceId, input.workspaceId),
           isNull(schema.tasks.deletedAt),
+          isNull(schema.lists.deletedAt),
+          isNull(schema.spaces.deletedAt),
         ),
       )
       .orderBy(distance)

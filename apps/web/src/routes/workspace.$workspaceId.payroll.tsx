@@ -13,11 +13,14 @@ import { createRoute } from "@tanstack/react-router";
 import type { inferRouterOutputs } from "@trpc/server";
 import { Banknote } from "lucide-react";
 import { useMemo, useRef, useState, type FormEvent } from "react";
+import { z } from "zod";
 import { workspaceShellRoute } from "./workspace.$workspaceId";
 
 export const payrollRoute = createRoute({
   getParentRoute: () => workspaceShellRoute,
   path: "/payroll",
+  // ?person=<id> opens that person's record (Smart Search results).
+  validateSearch: z.object({ person: z.string().uuid().optional() }),
   component: GuardedPayrollPage,
 });
 
@@ -41,7 +44,8 @@ function PayrollPage() {
   const access = useMyAccess(workspaceId);
   const canManage = access.can("payroll:manage");
   const [tab, setTab] = useState<"table" | "audit">("table");
-  const [openUserId, setOpenUserId] = useState<string | null>(null);
+  const { person } = payrollRoute.useSearch();
+  const [openUserId, setOpenUserId] = useState<string | null>(person ?? null);
 
   return (
     <div className="mx-auto flex h-full max-w-6xl flex-col gap-4 p-6" data-testid="payroll-page">

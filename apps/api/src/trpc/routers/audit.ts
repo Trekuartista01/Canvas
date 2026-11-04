@@ -34,7 +34,7 @@ export const auditRouter = router({
 
     // Contract entries point at the contract; the person is in the payload.
     const payloadOf = (payload: unknown) =>
-      (payload ?? {}) as { userId?: unknown; fields?: unknown; format?: unknown };
+      (payload ?? {}) as { userId?: unknown; fields?: unknown; format?: unknown; query?: unknown };
     const missing = [
       ...new Set(
         rows
@@ -60,6 +60,7 @@ export const auditRouter = router({
           subjectName ?? (typeof p.userId === "string" ? (nameOf.get(p.userId) ?? null) : null),
         fields: Array.isArray(p.fields) ? (p.fields as string[]) : null,
         format: typeof p.format === "string" ? p.format : null,
+        query: typeof p.query === "string" ? p.query : null,
       };
     });
   }),

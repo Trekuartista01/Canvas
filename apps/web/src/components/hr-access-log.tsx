@@ -25,6 +25,7 @@ const ACTION_LABELS: Record<string, string> = {
   "person.profile_updated": "changed the profile of",
   "person.created": "added",
   "person.role_changed": "changed the role of",
+  "search.hr_results": "searched HR records for",
 };
 
 /** "leave.self_approved" → "leave self approved", for anything not listed above. */
@@ -76,6 +77,7 @@ export function HrAccessLog({ workspaceId }: { workspaceId: string }) {
                 {r.fields && (
                   <span className="text-muted-foreground"> ({r.fields.join(", ")})</span>
                 )}
+                {r.query && <span className="font-medium"> "{r.query}"</span>}
                 {r.format && (
                   <span className="text-muted-foreground"> as {r.format.toUpperCase()}</span>
                 )}

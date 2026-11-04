@@ -3056,3 +3056,30 @@ During the real deploy: Cloudflare billing doesn't accept Kosovo cards, so R2 ca
 ### Note: `email-digest.spec.ts`
 
 It has now failed in every recent full run and passes when run with one other spec. A likely cause, not proven: the local test database has 3,438 users, and with the e2e `DIGEST_INTERVAL_MS=3000` nearly all of them are due on each tick, at about two queries each, so a tick can outlast the spec's 20 s poll. Production's interval is a day, with few users, so this looks specific to the test setup. Clearing old e2e data would test the theory.
+
+## 2026-11-04 P8.8: Smart Search scoping
+
+### Done
+
+- **`search.global` (`lib/global-search.ts`):** one query that decides what the caller may find before searching. Everyone gets directory cards (public fields) and tasks. HR also gets contracts, payroll entries, leave requests and Vendims. A scope the caller lacks is never queried and its `hr` key is absent from the response, so nothing is ranked, counted or hinted at. Archived people are found by HR only.
+- **Name matching:** every word must appear, ignoring case and Albanian ë/ç; LIKE wildcards are escaped (`searchTokens`, unit-tested).
+- **`searchVisibleTasks`:** `task.search` and `search.global` now share it, so P8.9's board membership goes in one place. `search.tasksByText` no longer returns tasks in deleted lists or spaces.
+- **UI:** a "Search people and work" card at the top of Smart Search, with links to the profile, task, Contracts (`?person=`), Payroll (new `?person=` opens the record) and Leave approvals (`?request=`).
+- **Access log:** an HR search that returns HR rows writes `search.hr_results` with the query and the counts.
+
+### Decisions
+
+- **No `scope` column on `embeddings`, which differs from the approved plan.** No HR record has ever been embedded, and embedding them would send salaries and contract details to the embedding provider. The spec's HR-scope rule applies "if search uses embeddings"; HR search here is plain SQL instead, so there's no AI index to leak from. No migration needed.
+- Payroll results say that a record exists and for whom. Amounts stay on the Payroll page, behind its own audited read.
+- Confidential People fields aren't searched: the personal number is encrypted, so HR finds the person by name and opens their profile.
+- Result groups are capped at 20 rows, so they aren't virtualized.
+
+### TODOs for later milestones (also in ROADMAP.md)
+
+- **P8.9:** limit task results to boards the person belongs to. Today every member sees every task, so the "employee only gets tasks on their boards" half of spec §9's "Zone" line isn't enforced or tested yet.
+- **P8.10:** add clients and client folders behind `clients:manage`, and test the "Zone Club client folder" half.
+
+### Verified
+
+- `pnpm check` green. `pnpm test`: API 392 + 1 skipped, shared 135, db 11, web 15.
+- Playwright: new `search-scope.spec.ts` covers spec §9 by real API calls as HR, employee, Ops, CEO and Admin, plus the page as HR and as an employee. Full suite 82/83; the failure was `email-digest.spec.ts` again (see P8.7).

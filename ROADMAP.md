@@ -87,6 +87,6 @@ Spec: `docs/hr-ops-spec.md` (build order = its 10 phases). Added 2026-11-02, bui
 - P8.6 Contracts page (drag-and-drop, private files) + daily contract-ending alert.
 - P8.7 Payroll guard + My Pay Details confirmation modal.
 - P8.8 Smart Search scoping (HR / Ops scopes, filtered before ranking).
-- P8.9 Tasks → Trello-style Boards (Board = Space, columns = Lists).
-- P8.10 Clients page + auto-detect.
+- P8.9 Tasks → Trello-style Boards (Board = Space, columns = Lists). Owes P8.8: limit `searchVisibleTasks` and `search.tasksByText` to boards the person belongs to, and finish the spec §9 "Zone" employee test.
+- P8.10 Clients page + auto-detect. Owes P8.8: add clients and client folders to `globalSearch` behind `clients:manage`, and finish the spec §9 "Zone" Ops/CEO/Admin test.
 - ✅ Accept: the spec's acceptance checklist.
