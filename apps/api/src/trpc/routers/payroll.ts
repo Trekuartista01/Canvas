@@ -1,7 +1,6 @@
 import { db, schema } from "@canvas/db";
 import { payrollMemberSchema, upsertPayrollSchema, workspaceScopedSchema } from "@canvas/shared";
 import { TRPCError } from "@trpc/server";
-import { and, desc, eq, inArray, like } from "drizzle-orm";
 import { logActivity } from "../../lib/activity";
 import { writeAudit } from "../../lib/audit";
 import { getMembershipRole } from "../../lib/membership";
@@ -130,6 +129,7 @@ export const payrollRouter = router({
     return row?.recordId
       ? {
           netSalaryEur: row.netSalaryEur,
+          payCurrency: row.payCurrency,
           bankName: row.bankName,
           accountHolder: row.accountHolder,
           idCardNumber: row.idCardNumber,
@@ -137,58 +137,5 @@ export const payrollRouter = router({
           updatedAt: row.updatedAt,
         }
       : null;
-  }),
-
-  // The audit trail itself: who viewed, changed or exported payroll.
-  audit: protectedProcedure.input(workspaceScopedSchema).query(async ({ ctx, input }) => {
-    await assertCanPeople(ctx.user, input.workspaceId, "payroll:view");
-    const rows = await db
-      .select({
-        id: schema.activity.id,
-        verb: schema.activity.verb,
-        payload: schema.activity.payloadJson,
-        createdAt: schema.activity.createdAt,
-        actorName: schema.users.name,
-      })
-      .from(schema.activity)
-      .innerJoin(schema.users, eq(schema.users.id, schema.activity.actorId))
-      .where(
-        and(
-          eq(schema.activity.workspaceId, input.workspaceId),
-          like(schema.activity.verb, "payroll.%"),
-        ),
-      )
-      .orderBy(desc(schema.activity.createdAt))
-      .limit(2000);
-    const subjectIds = [
-      ...new Set(
-        rows
-          .map((r) => (r.payload as { userId?: unknown } | null)?.userId)
-          .filter((id): id is string => typeof id === "string"),
-      ),
-    ];
-    const subjects =
-      subjectIds.length > 0
-        ? await db
-            .select({ id: schema.users.id, name: schema.users.name })
-            .from(schema.users)
-            .where(inArray(schema.users.id, subjectIds))
-        : [];
-    const nameOf = new Map(subjects.map((s) => [s.id, s.name]));
-    return rows.map(({ payload, ...r }) => {
-      const p = (payload ?? {}) as {
-        userId?: string;
-        fields?: string[];
-        format?: string;
-        rows?: number;
-      };
-      return {
-        ...r,
-        subjectName: p.userId ? (nameOf.get(p.userId) ?? null) : null,
-        fields: p.fields ?? null,
-        format: p.format ?? null,
-        rowCount: p.rows ?? null,
-      };
-    });
   }),
 });

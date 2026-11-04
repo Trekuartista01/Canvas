@@ -1,3 +1,4 @@
+import { RequireAccess } from "@/components/require-access";
 import type { AppRouter } from "@canvas/api";
 import { HolidayCalendar } from "@/components/holiday-calendar";
 import { LeaveForm } from "@/components/leave-form";
@@ -38,8 +39,17 @@ export const leaveApprovalsRoute = createRoute({
   getParentRoute: () => workspaceShellRoute,
   path: "/leave-approvals",
   validateSearch: searchSchema,
-  component: LeaveApprovalsPage,
+  component: GuardedLeaveApprovalsPage,
 });
+
+function GuardedLeaveApprovalsPage() {
+  const { workspaceId } = leaveApprovalsRoute.useParams();
+  return (
+    <RequireAccess workspaceId={workspaceId} action="leave:approve">
+      <LeaveApprovalsPage />
+    </RequireAccess>
+  );
+}
 
 type Outputs = inferRouterOutputs<AppRouter>["leave"];
 type TeamRow = Outputs["team"][number];

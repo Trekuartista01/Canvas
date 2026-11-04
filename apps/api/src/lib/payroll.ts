@@ -48,8 +48,10 @@ export interface PayrollRow {
   email: string;
   jobTitle: string | null;
   recordId: string | null;
+  /** In payCurrency, despite the column's name (P8.3). */
   netSalaryEur: number | null;
   grossSalary: number | null;
+  payCurrency: string;
   bankName: string | null;
   accountHolder: string | null;
   /** Full value when revealed, "•••• 1234" otherwise. */
@@ -75,6 +77,7 @@ export async function loadPayrollRows(
       name: schema.users.name,
       email: schema.users.email,
       jobTitle: schema.employeeProfiles.jobTitle,
+      payCurrency: schema.employeeProfiles.payCurrency,
       record: schema.payrollRecords,
       updatedByName: updater.name,
     })
@@ -111,6 +114,7 @@ export async function loadPayrollRows(
     const iban = decryptPayrollField(workspaceId, r.userId, "iban", record?.ibanEnc ?? null);
     return {
       ...r,
+      payCurrency: r.payCurrency ?? "EUR",
       recordId: record?.id ?? null,
       netSalaryEur: record?.netSalaryEur ?? null,
       grossSalary: record?.grossSalary ?? null,

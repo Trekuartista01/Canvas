@@ -1,6 +1,6 @@
 import { db, schema } from "@canvas/db";
 import { workspaceScopedSchema } from "@canvas/shared";
-import { desc, eq } from "drizzle-orm";
+import { desc, eq, inArray } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { assertCanPeople } from "../../lib/permissions";
 import { protectedProcedure, router } from "../trpc";
@@ -12,7 +12,7 @@ export const auditRouter = router({
     await assertCanPeople(ctx.user, input.workspaceId, "hr:audit");
     const actor = alias(schema.users, "actor");
     const subject = alias(schema.users, "subject");
-    return db
+    const rows = await db
       .select({
         id: schema.auditLog.id,
         action: schema.auditLog.action,
@@ -31,5 +31,36 @@ export const auditRouter = router({
       .where(eq(schema.auditLog.workspaceId, input.workspaceId))
       .orderBy(desc(schema.auditLog.createdAt))
       .limit(2000);
+
+    // Contract entries point at the contract; the person is in the payload.
+    const payloadOf = (payload: unknown) =>
+      (payload ?? {}) as { userId?: unknown; fields?: unknown; format?: unknown };
+    const missing = [
+      ...new Set(
+        rows
+          .filter((r) => !r.subjectName)
+          .map((r) => payloadOf(r.payload).userId)
+          .filter((id): id is string => typeof id === "string"),
+      ),
+    ];
+    const people =
+      missing.length > 0
+        ? await db
+            .select({ id: schema.users.id, name: schema.users.name })
+            .from(schema.users)
+            .where(inArray(schema.users.id, missing))
+        : [];
+    const nameOf = new Map(people.map((p) => [p.id, p.name]));
+
+    return rows.map(({ payload, subjectName, ...r }) => {
+      const p = payloadOf(payload);
+      return {
+        ...r,
+        subjectName:
+          subjectName ?? (typeof p.userId === "string" ? (nameOf.get(p.userId) ?? null) : null),
+        fields: Array.isArray(p.fields) ? (p.fields as string[]) : null,
+        format: typeof p.format === "string" ? p.format : null,
+      };
+    });
   }),
 });

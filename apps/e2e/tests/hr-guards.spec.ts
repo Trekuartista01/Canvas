@@ -126,7 +126,7 @@ test("HR routes: 403 for admin, owner, CEO, Operations Manager and employees; 20
       path: "payroll.upsert",
       input: { workspaceId: ws, userId, netSalaryEur: 1 },
     },
-    { kind: "query", path: "payroll.audit", input: { workspaceId: ws } },
+    { kind: "query", path: "audit.list", input: { workspaceId: ws } },
     { kind: "query", path: "audit.list", input: { workspaceId: ws } },
     { kind: "rest", path: `/payroll-export/${ws}/payroll.xlsx` },
     { kind: "rest", path: `/payroll-export/${ws}/payroll.pdf` },

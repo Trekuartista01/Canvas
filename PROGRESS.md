@@ -3030,3 +3030,29 @@ During the real deploy: Cloudflare billing doesn't accept Kosovo cards, so R2 ca
 - `pnpm check` green. `pnpm test`: API 391 + 1 skipped, shared 127, db 11, web 15.
 - `0069` applied, rolled back and re-applied on the local database.
 - Playwright: new `contract-end-alert.spec.ts` and `contracts-page.spec.ts`; `documents.spec.ts` and `hr-guards.spec.ts` updated. Full suite 81 of 82 on the first run; the one failure was `email-digest.spec.ts`, the known intermittent timeout (see P8.4/P8.5), which passed when rerun on its own.
+
+## 2026-11-04 P8.7: Payroll guard + My Pay Details confirmation
+
+### Done
+
+- **My Pay Details (spec §8):** a confirmation modal with the spec's sentence comes first; `payroll.mine` runs only after **Open** (`enabled`), and `gcTime: 0` keeps nothing cached after leaving, so it asks on every visit. **Cancel** or Escape goes back. **Hide** blurs the values and **Show** restores them without another fetch. The API takes no user id: it always uses the session.
+- **Client guard:** `RequireAccess` doesn't mount a page without the permission, so opening a hidden URL shows "You don't have access" and runs none of its queries. On Payroll, Contracts and Leave approvals.
+- **Access log tab (spec §1):** the Payroll page's "Audit trail" read only payroll rows from `activity`, and `audit.list` had no UI. The new tab reads `audit.list`: every HR view, download and change, with the person and the IP. `payroll.audit` is removed.
+- **Currency (left open in P8.3):** salaries show in the person's pay currency on the Payroll page, its form, My Pay and both exports. Exports get a Currency column. Totals are per currency, never summed together. `formatEur` became `formatMoney`.
+
+### Decisions
+
+- My Pay still shows the net salary only, as before. The gross salary added in P8.3 stays in People → Confidential; the spec doesn't ask for it here.
+- Hide blurs every value on the card, not just the salary.
+- Viewing the access log isn't itself logged: it would fill the log with entries about the log.
+- The net salary column is still named `net_salary_eur`. Renaming it isn't worth a migration.
+
+### Verified
+
+- `pnpm check` green. `pnpm test`: API 392 + 1 skipped, shared 130, db 11, web 15.
+- Playwright: `payroll.spec.ts` extended: no `payroll.*` request and no salary in any response before Open, Cancel, asking again on return, Hide/Show without a refetch, a forged user id ignored, a direct URL refused, USD amounts. Last full run 81/82; the failure was `email-digest.spec.ts` again.
+- `profile.spec.ts` failed once in one full run ("Saved" not visible), then passed 3/3 on its own and in the next full run. Not investigated further.
+
+### Note: `email-digest.spec.ts`
+
+It has now failed in every recent full run and passes when run with one other spec. A likely cause, not proven: the local test database has 3,438 users, and with the e2e `DIGEST_INTERVAL_MS=3000` nearly all of them are due on each tick, at about two queries each, so a tick can outlast the spec's 20 s poll. Production's interval is a day, with few users, so this looks specific to the test setup. Clearing old e2e data would test the theory.

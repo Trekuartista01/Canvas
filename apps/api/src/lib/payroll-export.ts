@@ -1,4 +1,4 @@
-import { formatIban } from "@canvas/shared";
+import { formatIban, totalsByCurrency } from "@canvas/shared";
 import ExcelJS from "exceljs";
 import { PDFDocument, StandardFonts, rgb, type PDFFont } from "pdf-lib";
 import type { PayrollRow } from "./payroll";
@@ -11,7 +11,8 @@ const COLUMNS = [
   { header: "Employee", key: "name", width: 28 },
   { header: "Email", key: "email", width: 30 },
   { header: "Position", key: "jobTitle", width: 22 },
-  { header: "Net salary (EUR)", key: "netSalaryEur", width: 16 },
+  { header: "Net salary", key: "netSalaryEur", width: 14 },
+  { header: "Currency", key: "payCurrency", width: 9 },
   { header: "ID card number", key: "idCardNumber", width: 18 },
   { header: "Bank", key: "bankName", width: 22 },
   { header: "IBAN", key: "iban", width: 30 },
@@ -34,12 +35,13 @@ export async function buildPayrollXlsx(rows: PayrollRow[], workspaceName: string
   for (const row of rows) {
     sheet.addRow(Object.fromEntries(COLUMNS.map((c) => [c.key, cell(row, c.key) ?? ""])));
   }
-  sheet.getColumn("netSalaryEur").numFmt = '#,##0.00 "€"';
+  sheet.getColumn("netSalaryEur").numFmt = "#,##0.00";
   // Text, so long ID numbers aren't turned into scientific notation.
   sheet.getColumn("idCardNumber").numFmt = "@";
-  const total = rows.reduce((sum, r) => sum + (r.netSalaryEur ?? 0), 0);
-  const totalRow = sheet.addRow({ name: "Total", netSalaryEur: total });
-  totalRow.font = { bold: true };
+  for (const { currency, total } of totalsByCurrency(rows)) {
+    const totalRow = sheet.addRow({ name: "Total", netSalaryEur: total, payCurrency: currency });
+    totalRow.font = { bold: true };
+  }
   workbook.title = `Payroll — ${workspaceName}`;
   return Buffer.from(await workbook.xlsx.writeBuffer());
 }
@@ -80,7 +82,7 @@ export async function buildPayrollPdf(
   const margin = 32;
   const size = 8;
   const rowHeight = 15;
-  const widths = [120, 0, 90, 70, 80, 95, 135, 110];
+  const widths = [120, 0, 80, 60, 40, 75, 90, 125, 100];
   widths[1] = W - margin * 2 - widths.reduce((a, b) => a + b, 0);
   const pdfColumns = COLUMNS.map((c, i) => ({ ...c, width: widths[i]! }));
   const stamp = generatedAt.toLocaleString("en-GB", { timeZone: "Europe/Belgrade" });
@@ -147,12 +149,19 @@ export async function buildPayrollPdf(
       regular,
     );
   }
-  const total = rows.reduce((sum, r) => sum + (r.netSalaryEur ?? 0), 0);
-  line(
-    pdfColumns.map((c) =>
-      c.key === "name" ? "Total" : c.key === "netSalaryEur" ? money(total) : "",
-    ),
-    bold,
-  );
+  for (const { currency, total } of totalsByCurrency(rows)) {
+    line(
+      pdfColumns.map((c) =>
+        c.key === "name"
+          ? "Total"
+          : c.key === "netSalaryEur"
+            ? money(total)
+            : c.key === "payCurrency"
+              ? currency
+              : "",
+      ),
+      bold,
+    );
+  }
   return pdf.save();
 }

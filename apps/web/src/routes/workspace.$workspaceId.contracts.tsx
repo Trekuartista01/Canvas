@@ -3,6 +3,7 @@ import { BlurhashThumb } from "@/components/blurhash-thumb";
 import { ContractFilePicker, ContractUploadProgress } from "@/components/contract-file-picker";
 import { ContractFileViewer } from "@/components/contract-file-viewer";
 import { orderContracts } from "@/components/contract-list-helpers";
+import { RequireAccess } from "@/components/require-access";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -37,8 +38,17 @@ export const contractsRoute = createRoute({
   getParentRoute: () => workspaceShellRoute,
   path: "/contracts",
   validateSearch: searchSchema,
-  component: ContractsPage,
+  component: GuardedContractsPage,
 });
+
+function GuardedContractsPage() {
+  const { workspaceId } = contractsRoute.useParams();
+  return (
+    <RequireAccess workspaceId={workspaceId} action="contract:manage">
+      <ContractsPage />
+    </RequireAccess>
+  );
+}
 
 type Outputs = inferRouterOutputs<AppRouter>["contract"];
 type Contract = Outputs["forPerson"][number];

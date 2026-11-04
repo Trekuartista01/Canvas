@@ -1,11 +1,13 @@
 import type { AppRouter } from "@canvas/api";
+import { HrAccessLog } from "@/components/hr-access-log";
+import { RequireAccess } from "@/components/require-access";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useModalA11y } from "@/hooks/use-modal-a11y";
 import { useMyAccess } from "@/hooks/use-my-access";
 import { trpc } from "@/lib/trpc";
-import { formatEur, formatIban, isValidIban } from "@canvas/shared";
+import { formatIban, formatMoney, isValidIban, totalsByCurrency } from "@canvas/shared";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { createRoute } from "@tanstack/react-router";
 import type { inferRouterOutputs } from "@trpc/server";
@@ -16,15 +18,24 @@ import { workspaceShellRoute } from "./workspace.$workspaceId";
 export const payrollRoute = createRoute({
   getParentRoute: () => workspaceShellRoute,
   path: "/payroll",
-  component: PayrollPage,
+  component: GuardedPayrollPage,
 });
+
+function GuardedPayrollPage() {
+  const { workspaceId } = payrollRoute.useParams();
+  return (
+    <RequireAccess workspaceId={workspaceId} action="payroll:view">
+      <PayrollPage />
+    </RequireAccess>
+  );
+}
 
 type Row = inferRouterOutputs<AppRouter>["payroll"]["list"][number];
 const GRID = "grid grid-cols-[minmax(10rem,1.4fr)_7rem_minmax(8rem,1fr)_9rem_7rem_7rem] gap-3";
 
 // M7.7 HR payroll (payroll:view). The table shows ID-card numbers and IBANs
 // masked; the drawer reveals one person's record — each of those reads,
-// every edit and every export is in the audit trail.
+// every edit and every export is in the access log.
 function PayrollPage() {
   const { workspaceId } = payrollRoute.useParams();
   const access = useMyAccess(workspaceId);
@@ -56,7 +67,7 @@ function PayrollPage() {
           variant={tab === "audit" ? "default" : "ghost"}
           onClick={() => setTab("audit")}
         >
-          Audit trail
+          Access log
         </Button>
         <a
           href={`/payroll-export/${workspaceId}/payroll.xlsx`}
@@ -77,7 +88,7 @@ function PayrollPage() {
       {tab === "table" ? (
         <PayrollTable workspaceId={workspaceId} onOpen={setOpenUserId} />
       ) : (
-        <AuditTrail workspaceId={workspaceId} />
+        <HrAccessLog workspaceId={workspaceId} />
       )}
 
       {openUserId && (
@@ -106,7 +117,7 @@ function PayrollTable({
     const q = search.trim().toLowerCase();
     return (list.data ?? []).filter((r) => !q || r.name.toLowerCase().includes(q));
   }, [list.data, search]);
-  const total = rows.reduce((sum, r) => sum + (r.netSalaryEur ?? 0), 0);
+  const totals = totalsByCurrency(rows);
   const parentRef = useRef<HTMLDivElement>(null);
   const virtualizer = useVirtualizer({
     count: rows.length,
@@ -126,7 +137,10 @@ function PayrollTable({
           className="h-8 w-60 text-sm"
         />
         <span className="text-muted-foreground ml-auto text-xs" data-testid="payroll-total">
-          {rows.length} people · total net {formatEur(total)}
+          {rows.length} people · total net{" "}
+          {totals.length === 0
+            ? formatMoney(0)
+            : totals.map((t) => formatMoney(t.total, t.currency)).join(" + ")}
         </span>
       </div>
       <div className={`${GRID} text-muted-foreground px-3 text-[11px] font-medium`}>
@@ -159,7 +173,7 @@ function PayrollTable({
                       <span className="text-muted-foreground text-xs"> · {r.jobTitle}</span>
                     )}
                   </span>
-                  <span className="tabular-nums">{formatEur(r.netSalaryEur)}</span>
+                  <span className="tabular-nums">{formatMoney(r.netSalaryEur, r.payCurrency)}</span>
                   <span className="truncate">{r.bankName ?? "—"}</span>
                   <span className="text-muted-foreground font-mono text-xs">{r.iban ?? "—"}</span>
                   <span className="text-muted-foreground font-mono text-xs">
@@ -284,7 +298,7 @@ function PayrollForm({
             : ""}
         </p>
       </div>
-      <Field id="payroll-salary" label="Net salary (EUR / month)">
+      <Field id="payroll-salary" label={`Net salary (${record.payCurrency} / month)`}>
         <Input
           id="payroll-salary"
           inputMode="decimal"
@@ -356,58 +370,6 @@ function Field({ id, label, children }: { id: string; label: string; children: R
         {label}
       </Label>
       {children}
-    </div>
-  );
-}
-
-const AUDIT_LABELS: Record<string, string> = {
-  "payroll.list_viewed": "opened the payroll table",
-  "payroll.viewed": "viewed the record of",
-  "payroll.updated": "changed the record of",
-  "payroll.exported": "exported payroll",
-  "payroll.self_viewed": "viewed their own pay details",
-};
-
-function AuditTrail({ workspaceId }: { workspaceId: string }) {
-  const audit = trpc.payroll.audit.useQuery({ workspaceId });
-  const rows = audit.data ?? [];
-  const parentRef = useRef<HTMLDivElement>(null);
-  const virtualizer = useVirtualizer({
-    count: rows.length,
-    getScrollElement: () => parentRef.current,
-    estimateSize: () => 34,
-    overscan: 15,
-  });
-  return (
-    <div ref={parentRef} className="min-h-0 flex-1 overflow-auto" data-testid="payroll-audit">
-      <div style={{ height: virtualizer.getTotalSize(), position: "relative" }}>
-        {virtualizer.getVirtualItems().map((item) => {
-          const r = rows[item.index]!;
-          return (
-            <div
-              key={r.id}
-              className="border-border absolute right-0 left-0 flex gap-3 border-b px-2 py-1.5 text-sm"
-              style={{ transform: `translateY(${item.start}px)` }}
-            >
-              <span className="text-muted-foreground w-36 shrink-0 text-xs tabular-nums">
-                {new Date(r.createdAt).toLocaleString()}
-              </span>
-              <span className="truncate">
-                <span className="font-medium">{r.actorName}</span> {AUDIT_LABELS[r.verb] ?? r.verb}
-                {r.subjectName && r.verb !== "payroll.self_viewed" && (
-                  <span className="font-medium"> {r.subjectName}</span>
-                )}
-                {r.fields && (
-                  <span className="text-muted-foreground"> ({r.fields.join(", ")})</span>
-                )}
-                {r.format && (
-                  <span className="text-muted-foreground"> as {r.format.toUpperCase()}</span>
-                )}
-              </span>
-            </div>
-          );
-        })}
-      </div>
     </div>
   );
 }

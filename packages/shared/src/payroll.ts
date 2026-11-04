@@ -26,11 +26,30 @@ export function formatIban(value: string): string {
 }
 
 /**
- * "1.234,50 €" — the euro format used in Kosovo. de-DE produces exactly that
+ * "1.234,50 €" — the money format used in Kosovo. de-DE produces exactly that
  * and ships with every ICU build; sq-XK isn't available everywhere (Chrome
- * falls back to "€1,234.50").
+ * falls back to "€1,234.50"). P8.7: in the person's pay currency.
  */
-export function formatEur(amount: number | null): string {
+export function formatMoney(amount: number | null, currency = "EUR"): string {
   if (amount === null) return "—";
-  return new Intl.NumberFormat("de-DE", { style: "currency", currency: "EUR" }).format(amount);
+  return new Intl.NumberFormat("de-DE", { style: "currency", currency }).format(amount);
+}
+
+/**
+ * Net salaries added up per currency, EUR first: amounts in different
+ * currencies are never summed together.
+ */
+export function totalsByCurrency(
+  rows: { netSalaryEur: number | null; payCurrency: string }[],
+): { currency: string; total: number }[] {
+  const totals = new Map<string, number>();
+  for (const { netSalaryEur, payCurrency } of rows) {
+    if (netSalaryEur === null) continue;
+    totals.set(payCurrency, (totals.get(payCurrency) ?? 0) + netSalaryEur);
+  }
+  return [...totals]
+    .map(([currency, total]) => ({ currency, total }))
+    .sort((a, b) =>
+      a.currency === "EUR" ? -1 : b.currency === "EUR" ? 1 : a.currency.localeCompare(b.currency),
+    );
 }

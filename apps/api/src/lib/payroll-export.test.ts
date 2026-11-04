@@ -12,6 +12,7 @@ const row = (i: number, over: Partial<PayrollRow> = {}): PayrollRow => ({
   recordId: `r${i}`,
   netSalaryEur: 650.5,
   grossSalary: 850,
+  payCurrency: "EUR",
   bankName: "Banka Kombëtare",
   accountHolder: `Person ${i}`,
   idCardNumber: "1234567890",
@@ -32,11 +33,29 @@ describe("buildPayrollXlsx", () => {
     await workbook.xlsx.load(buffer as unknown as ExcelJS.Buffer);
     const sheet = workbook.getWorksheet("Payroll")!;
     expect(sheet.getRow(1).getCell(1).value).toBe("Employee");
-    expect(sheet.getRow(2).getCell(5).value).toBe("1234567890");
-    expect(sheet.getRow(2).getCell(7).value).toBe("XK05 1212 0123 4567 8906");
-    expect(sheet.getRow(3).getCell(7).value).toBe("");
+    expect(sheet.getRow(2).getCell(5).value).toBe("EUR");
+    expect(sheet.getRow(2).getCell(6).value).toBe("1234567890");
+    expect(sheet.getRow(2).getCell(8).value).toBe("XK05 1212 0123 4567 8906");
+    expect(sheet.getRow(3).getCell(8).value).toBe("");
     expect(sheet.getRow(4).getCell(1).value).toBe("Total");
     expect(sheet.getRow(4).getCell(4).value).toBe(1650.5);
+  });
+});
+
+describe("buildPayrollXlsx totals", () => {
+  it("gives each currency its own total", async () => {
+    const buffer = await buildPayrollXlsx(
+      [row(1), row(2, { netSalaryEur: 1000, payCurrency: "USD" }), row(3)],
+      "Trekuartista",
+    );
+    const workbook = new ExcelJS.Workbook();
+    // justified: exceljs types its own pre-generic Buffer; the bytes are the same.
+    await workbook.xlsx.load(buffer as unknown as ExcelJS.Buffer);
+    const sheet = workbook.getWorksheet("Payroll")!;
+    expect(sheet.getRow(5).getCell(4).value).toBe(1301);
+    expect(sheet.getRow(5).getCell(5).value).toBe("EUR");
+    expect(sheet.getRow(6).getCell(4).value).toBe(1000);
+    expect(sheet.getRow(6).getCell(5).value).toBe("USD");
   });
 });
 
