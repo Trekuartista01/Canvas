@@ -27,6 +27,8 @@ export * from "./working-days";
 export * from "./daily-reports";
 export * from "./leave";
 export * from "./boards";
+export * from "./client-match";
+export * from "./schemas/clients";
 export * from "./documents";
 export * from "./search-tokens";
 export * from "./payroll";

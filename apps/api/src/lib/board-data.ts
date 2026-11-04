@@ -41,10 +41,14 @@ export async function loadBoard(spaceId: string) {
         orderKey: schema.tasks.orderKey,
         dueDate: schema.tasks.dueDate,
         statusKind: schema.statuses.kind,
+        clientId: schema.clients.id,
+        clientName: schema.clients.name,
+        clientColor: schema.clients.color,
       })
       .from(schema.tasks)
       .innerJoin(schema.lists, eq(schema.lists.id, schema.tasks.listId))
       .innerJoin(schema.statuses, eq(schema.statuses.id, schema.tasks.statusId))
+      .leftJoin(schema.clients, eq(schema.clients.id, schema.tasks.clientId))
       .where(liveCard)
       .orderBy(asc(schema.tasks.createdAt)),
     db
@@ -108,10 +112,14 @@ export async function loadBoard(spaceId: string) {
   return {
     lists: lists.filter((l) => !l.archivedAt).map(({ archivedAt: _archived, ...l }) => l),
     archivedLists: lists.filter((l) => l.archivedAt).map(({ id, name }) => ({ id, name })),
-    cards: cards.map((card) => {
+    cards: cards.map(({ clientId, clientName, clientColor, ...card }) => {
       const checklist = checklistByTask.get(card.id);
       return {
         ...card,
+        client:
+          clientId && clientName && clientColor
+            ? { id: clientId, name: clientName, color: clientColor }
+            : null,
         assignees: assigneesByTask.get(card.id) ?? [],
         tags: tagsByTask.get(card.id) ?? [],
         comments: commentCount.get(card.id) ?? 0,

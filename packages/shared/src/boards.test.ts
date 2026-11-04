@@ -81,6 +81,14 @@ describe("filterBoardCards", () => {
     expect(ids(filterBoardCards(cards, { due: "no_date" }, TODAY))).toEqual(["undated"]);
   });
 
+  it("filters by client", () => {
+    const withClient = [
+      { ...card("zone"), client: { id: "z" } },
+      { ...card("none"), client: null },
+    ];
+    expect(ids(filterBoardCards(withClient, { clientId: "z" }, TODAY))).toEqual(["zone"]);
+  });
+
   it("needs every filter to match", () => {
     expect(filterBoardCards(cards, { assigneeId: "sam", tagId: "red" }, TODAY)).toEqual([]);
   });

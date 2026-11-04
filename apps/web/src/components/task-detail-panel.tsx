@@ -13,6 +13,7 @@ import { ActivitySection } from "@/components/activity-section";
 import { AttachmentsSection } from "@/components/attachments-section";
 import { BrainChatPanel } from "@/components/brain-chat-panel";
 import { CardMoveField } from "@/components/card-move-field";
+import { ClientField } from "@/components/client-field";
 import { ClipsSection } from "@/components/clips-section";
 import { CommentsSection } from "@/components/comments-section";
 import { CustomFieldsSection } from "@/components/custom-fields-section";
@@ -390,6 +391,14 @@ export function TaskDetailPanel({
             </Field>
 
             <CollaboratorsField taskId={taskId} members={members.data ?? []} />
+
+            <ClientField
+              workspaceId={workspaceId}
+              taskId={taskId}
+              client={task.data.client}
+              detected={!task.data.clientSetManually}
+              suggestions={task.data.clientSuggestions}
+            />
 
             <CardMoveField
               workspaceId={workspaceId}

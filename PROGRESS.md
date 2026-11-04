@@ -3117,3 +3117,51 @@ It has now failed in every recent full run and passes when run with one other sp
 ### Note: scheduler-timing specs
 
 Both failures wait 20 s for a scheduler tick. `recurring-tasks` is new to this list: it passes with one worker and failed one of two runs in parallel. Measured against the local database, a full tick takes 1.8 s when no digests are due, and the new contract alert accounts for 0.1 s of it. In e2e, though, `DIGEST_INTERVAL_MS=3000` makes all 3,948 accumulated users due on most ticks, at two queries each, which fits the timing but isn't proven. Clearing old e2e data would test it.
+
+## 2026-11-04 P8.10: Clients + auto-detect
+
+### Done
+
+- **Migration `0071`** (down file included): `clients`, plus `tasks.client_id` and `client_set_manually`. RLS is on. `DATA_MODEL.md` now also has the P8.6 and P8.9 tables.
+- **Matching (`client-match.ts`, unit-tested):** name and aliases, case-insensitive, whole words, diacritics ignored (ë→e, ç→c).
+- **Auto-link:** a card with one client mentioned links itself when created (including from forms and templates; recurring cards copy their template's client). It follows later title or description edits, in both directions. With several matches, nothing is chosen and they're offered as suggestions. Setting or clearing by hand sets `client_set_manually`, and detection stops for that card.
+- **`clients` router, `clients:manage` only:** list with open-task counts, folder (every linked card across boards), options, create, update, archive, restore, logo upload. Named `clients` because tRPC reserves `client`.
+- **`task.setClient`:** anyone who can edit the card may clear it or pick a client the card mentions. Any other client needs `clients:manage`.
+- **UI:** Clients page (virtualized folder grid, search, show archived), folder page (grouped by board and list, opens the card on its board), Client field in the card ("Detected: Zone Club" chip, suggestions, searchable dropdown and "+ New client" for managers), a chip on the card front, and a client filter on the board.
+- **Search:** Ops, CEOs and Admin now get client folders and their linked cards. The key is absent for everyone else, as HR's is. This completes spec §9's "Zone" lines.
+
+### Decisions
+
+- **Board members don't get the full client list.** The spec keeps client routes to Ops, CEOs and Admin and lets members see the chip, so the dropdown and "+ New client" are managers only. A member can still clear a client or pick from what the card mentions, and the board's client filter lists only clients already on that board.
+- **Adding a client or alias doesn't rescan existing cards.** Detection runs when a card is created or its text changes.
+- **Two live clients can't share a name** (case-insensitive), so chips aren't ambiguous.
+- **Logos are private:** stored under `client-logos/`, served through 5-minute signed links from the router, Ops/CEO/Admin only. Chips use the client's colour.
+- **Field vs Section:** the new card fields use `Section`. `Field` is a `<label>`, so clicking its text would trigger the first button inside, which here could clear the client.
+
+### Verified
+
+- `pnpm check` green. `pnpm test`: API 392 + 1 skipped, shared 159, db 11, web 15.
+- `0071` applied, rolled back and re-applied locally.
+- Playwright: **85/85**, with new `clients.spec.ts`; `search-scope.spec.ts` finishes spec §9; `contracts-page.spec.ts` now drops 3 images at once.
+
+### `email-digest` and `recurring-tasks` flakes: cause found
+
+Accumulated e2e data was the cause. After truncating the local database's public tables (3,948 users, 2,606 workspaces), the full suite passed 84/84 twice in a row, and 85/85 since. If these return, clear the local test data again.
+
+## Phase 8 acceptance checklist (spec), 2026-11-04
+
+| #   | Line                                                                                     | Result                          | Evidence                                                                                                       |
+| --- | ---------------------------------------------------------------------------------------- | ------------------------------- | -------------------------------------------------------------------------------------------------------------- |
+| 1   | Admin/CEO get 403 on HR pages; nav hidden                                                | Pass                            | `hr-guards.spec.ts`                                                                                            |
+| 2   | Admin/CEO: Clients and board management work as for Ops                                  | Pass                            | `boards.spec.ts`, `clients.spec.ts`                                                                            |
+| 3   | Admin can't self-grant HR; role changes email HR                                         | Pass in-app; email not asserted | `people.spec.ts`; the email call is in `people.ts` but no test reads the email                                 |
+| 4   | 30.12.2026–05.01.2027 day count; HR pop-up and email                                     | Pass in-app; email not asserted | `leave-approvals.spec.ts`                                                                                      |
+| 5   | HR approves: notification and email with return date; PDF + DOCX Vendim match the layout | **Partly verified**             | DOCX tested. **PDF never generated** (no LibreOffice on this laptop or dev WSL), so layout unchecked           |
+| 6   | Drag 3 images: saved, previewed, expiring links only                                     | Pass                            | `contracts-page.spec.ts` (a real drop event, dispatched by the test)                                           |
+| 7   | Contract alert dates, once only                                                          | Pass                            | 03.11.2026 by unit test; 04.01.2027 and the rerun in `contract-end-alert.spec.ts`; emails seen in the mock log |
+| 8   | My Pay: no pay data before Open                                                          | Pass                            | `payroll.spec.ts`                                                                                              |
+| 9   | Smart Search per section 9                                                               | Pass                            | `search-scope.spec.ts`                                                                                         |
+| 10  | Boards switcher on top; cards drag and persist                                           | Pass                            | `boards.spec.ts` (real pointer drags)                                                                          |
+| 11  | "Zone – story posts" suggests Zone Club, in the folder, Ops/CEO/Admin only               | Pass                            | `clients.spec.ts`                                                                                              |
+
+**Still to check on real services, all at deployment:** the Vendim PDF and its layout (LibreOffice); real email through SMTP (everything here used the mock); PDF preview from Supabase Storage; a real HEIC photo.

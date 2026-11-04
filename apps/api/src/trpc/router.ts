@@ -21,6 +21,7 @@ import { reminderRouter } from "./routers/reminder";
 import { roleRouter } from "./routers/role";
 import { searchRouter } from "./routers/search";
 import { statusRouter } from "./routers/status";
+import { clientRouter } from "./routers/client";
 import { tagRouter } from "./routers/tag";
 import { taskRouter } from "./routers/task";
 import { taskTemplateRouter } from "./routers/task-template";
@@ -51,6 +52,7 @@ export const appRouter = router({
   reminder: reminderRouter,
   activity: activityRouter,
   admin: adminRouter,
+  clients: clientRouter,
   tag: tagRouter,
   taskTemplate: taskTemplateRouter,
   timeEntry: timeEntryRouter,

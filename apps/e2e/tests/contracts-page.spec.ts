@@ -9,18 +9,25 @@ const IMAGE = fileURLToPath(new URL("../fixtures/test-image.png", import.meta.ur
 const PDF = fileURLToPath(new URL("../fixtures/test-contract.pdf", import.meta.url));
 const NOT_ALLOWED = fileURLToPath(new URL("../fixtures/test-doc.txt", import.meta.url));
 
-/** A real drop event, the way a file dragged in from the desktop arrives. */
-async function dropFile(zone: Locator, path: string, name: string, type: string) {
-  const base64 = readFileSync(path).toString("base64");
-  await zone.evaluate(
-    (el, file) => {
+/** A real drop event, the way files dragged in from the desktop arrive. */
+async function dropFiles(zone: Locator, files: { path: string; name: string; type: string }[]) {
+  const payload = files.map((f) => ({
+    base64: readFileSync(f.path).toString("base64"),
+    name: f.name,
+    type: f.type,
+  }));
+  await zone.evaluate((el, list) => {
+    const transfer = new DataTransfer();
+    for (const file of list) {
       const bytes = Uint8Array.from(atob(file.base64), (c) => c.charCodeAt(0));
-      const transfer = new DataTransfer();
       transfer.items.add(new File([bytes], file.name, { type: file.type }));
-      el.dispatchEvent(new DragEvent("drop", { dataTransfer: transfer, bubbles: true }));
-    },
-    { base64, name, type },
-  );
+    }
+    el.dispatchEvent(new DragEvent("drop", { dataTransfer: transfer, bubbles: true }));
+  }, payload);
+}
+
+async function dropFile(zone: Locator, path: string, name: string, type: string) {
+  await dropFiles(zone, [{ path, name, type }]);
 }
 
 async function imageLoaded(image: Locator) {
@@ -125,9 +132,20 @@ test("P8.6 Contracts page: drag-and-drop with preview, signed viewing, replace a
   // More pages later.
   await card.getByRole("button", { name: "Add pages" }).click();
   const more = card.getByTestId("contract-add-files");
-  await dropFile(more.getByTestId("contract-dropzone"), IMAGE, "page-3.png", "image/png");
+  // Three images dragged in at once, all previewed, all saved.
+  await dropFiles(
+    more.getByTestId("contract-dropzone"),
+    ["page-3.png", "page-4.png", "page-5.png"].map((name) => ({
+      path: IMAGE,
+      name,
+      type: "image/png",
+    })),
+  );
+  await expect(more.getByTestId("contract-pending-files").locator("li")).toHaveCount(3);
   await save(hr, "contract-add-files-save", "contract.addFiles");
   await expect(card.getByTestId("contract-file-page-3.png")).toBeVisible();
+  await expect(card.getByTestId("contract-file-page-4.png")).toBeVisible();
+  await expect(card.getByTestId("contract-file-page-5.png")).toBeVisible();
 
   // Deleting asks first, and Cancel keeps the file.
   const third = card.getByTestId("contract-file-page-3.png");

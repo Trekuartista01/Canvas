@@ -21,13 +21,18 @@ memberships      (id, workspace_id fk, user_id fk, role enum('owner','admin','me
 spaces           (id, workspace_id fk, name, icon, order_key,
                   brand_kit_id fk brand_settings null,                     -- overrides workspace default kit
                   deleted_at)
-folders          (id, space_id fk, name, order_key, deleted_at)          -- optional layer
-lists            (id, space_id fk, folder_id fk null, name, order_key, deleted_at)
+space_members    (id, space_id fk, user_id fk, added_by fk users null,   -- P8.9, who's on a board
+                  uniq(space_id, user_id))                              -- boards:manageAll needs no row
+clients          (id, workspace_id fk, name, aliases text[], logo_key,   -- P8.10, Ops/CEO/Admin
+                  color, created_by fk users null, archived_at)
+folders          (id, space_id fk, name, order_key, deleted_at)          -- optional layer, no UI since P8.9
+lists            (id, space_id fk, folder_id fk null, name, order_key, archived_at, deleted_at)
 
 statuses         (id, list_id fk, name, color,
                   kind enum('open','active','review','done','closed'),    -- review = awaiting approval (M7.2)
                   order_key)                                             -- custom per list
 tasks            (id, list_id fk, parent_task_id fk null,                -- subtasks
+                  client_id fk clients null, client_set_manually,       -- P8.10
                   title, description_json jsonb,                         -- rich text (TipTap JSON)
                   status_id fk, priority enum('urgent','high','normal','low') null,
                   start_date, due_date, due_time time null,              -- Europe/Belgrade wall clock
@@ -106,8 +111,12 @@ employment_contracts(id, workspace_id fk, user_id fk,                   -- M7.6
                   kind enum('contract','annex','amendment'),
                   parent_contract_id fk employment_contracts null,      -- annex/amendment → its contract
                   title, start_date, expiry_date null,
-                  attachment_id fk attachments,                         -- contracts/… key: employee + HR only
+                  contract_type null, end_alert_sent_at null,           -- P8.6
+                  attachment_id fk attachments null,                    -- P8.6: unused, see contract_files
+                  -- old:                         -- contracts/… key: employee + HR only
                   uploaded_by fk users, deleted_at)                     -- replace keeps the old attachment row
+contract_files   (id, contract_id fk, attachment_id fk attachments uniq, -- P8.6, a contract's pages
+                  order_key, uploaded_by fk users null, deleted_at)
 contract_expiry_notices(id, contract_id fk, threshold_days, expiry_date, -- 30/7-day ledger
                   sent_at, uniq(contract_id, threshold_days, expiry_date))
 company_document_categories(id, workspace_id fk, name, deleted_at)

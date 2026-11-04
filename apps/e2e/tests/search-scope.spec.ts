@@ -18,6 +18,7 @@ const SALARY = 1234.5;
 interface SearchBody {
   people: { userId: string; name: string; archived: boolean }[];
   tasks: { title: string }[];
+  clients?: { name: string }[];
   hr?: {
     contracts: { title: string; files: number }[];
     payroll: { userName: string }[];
@@ -165,7 +166,7 @@ test("P8.8 Smart Search scopes (spec §9): HR finds HR records, nobody else gets
       body.tasks.map((t) => t.title),
       role,
     ).toEqual(["Olsi Sopi onboarding checklist"]);
-    expect(Object.keys(body).sort(), role).toEqual(["people", "tasks"]);
+    expect(body.hr, role).toBeUndefined();
     expect(raw, role).not.toContain(CONTRACT_TITLE);
     expect(raw, role).not.toContain("vendim");
 
@@ -193,21 +194,49 @@ test("P8.8 Smart Search scopes (spec §9): HR finds HR records, nobody else gets
   expect(archived.body.people.map((p) => [p.name, p.archived])).toEqual([["Arben Archived", true]]);
   expect((await search(hrRequest, ws, "kontrata e punes")).body.hr?.contracts).toHaveLength(1);
 
-  // Line 3 (task half): "Zone" finds its tasks for Ops, CEO and Admin, who reach
-  // every board. The Zone Club client folder joins this with P8.10.
+  // Line 3: "Zone" finds the Zone Club folder and its tasks for Ops, CEO and
+  // Admin, including a card linked by hand whose title doesn't say "Zone".
+  const [zoneClub] = await db
+    .insert(schema.clients)
+    .values({ workspaceId: ws, name: "Zone Club", aliases: ["Zone"], color: "#2563eb" })
+    .returning({ id: schema.clients.id });
+  const [linked] = await db
+    .select({ id: schema.tasks.id })
+    .from(schema.tasks)
+    .innerJoin(schema.lists, eq(schema.lists.id, schema.tasks.listId))
+    .innerJoin(schema.spaces, eq(schema.spaces.id, schema.lists.spaceId))
+    .where(
+      and(
+        eq(schema.spaces.workspaceId, ws),
+        eq(schema.tasks.title, "Olsi Sopi onboarding checklist"),
+      ),
+    );
+  await db
+    .update(schema.tasks)
+    .set({ clientId: zoneClub!.id, clientSetManually: true })
+    .where(eq(schema.tasks.id, linked!.id));
   for (const [role, request] of others.filter(([r]) => r !== "employee")) {
     const { body } = await search(request, ws, "Zone");
     expect(
       body.tasks.map((t) => t.title),
       role,
-    ).toEqual(["Zone Club launch poster"]);
+    ).toEqual(["Zone Club launch poster", "Olsi Sopi onboarding checklist"]);
+    expect(
+      body.clients?.map((c) => c.name),
+      role,
+    ).toEqual(["Zone Club"]);
   }
+
+  // HR has no Ops scope, and it's absent for them like HR's is for everyone else.
+  const hrZone = await search(await requestAs(browser, hana), ws, "Zone");
+  expect(hrZone.body.clients).toBeUndefined();
+  expect(hrZone.raw).not.toContain('"clients"');
 
   // Line 4: an employee only gets tasks on boards they're a member of.
   const samRequest = await requestAs(browser, sam);
-  expect((await search(samRequest, ws, "Zone")).body.tasks.map((t) => t.title)).toEqual([
-    "Zone Club launch poster",
-  ]);
+  const samZone = await search(samRequest, ws, "Zone");
+  expect(samZone.body.tasks.map((t) => t.title)).toEqual(["Zone Club launch poster"]);
+  expect(samZone.body.clients).toBeUndefined();
   await db.delete(schema.spaceMembers).where(eq(schema.spaceMembers.userId, sam.userId));
   expect((await search(samRequest, ws, "Zone")).body.tasks).toEqual([]);
   await addToAllBoards(ws, sam.userId);

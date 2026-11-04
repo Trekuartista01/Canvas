@@ -17,7 +17,7 @@ import {
 } from "drizzle-orm/pg-core";
 import { uuidv7 } from "uuidv7";
 import { users } from "./auth";
-import { lists } from "./hierarchy";
+import { lists, clients } from "./hierarchy";
 
 // Drizzle has no built-in tsvector column type — this is a plain wrapper,
 // not a real client-side value type (the generated column below is always
@@ -76,6 +76,10 @@ export const tasks = pgTable(
     // no way to read a jsonb TipTap doc directly, so searchVector below is
     // generated from this column instead of descriptionJson itself.
     descriptionText: text("description_text"),
+    // P8.10: who this card is for. Detection fills it from the card's text until
+    // someone sets or clears it by hand (client_set_manually), then it's theirs.
+    clientId: uuid("client_id").references(() => clients.id, { onDelete: "set null" }),
+    clientSetManually: boolean("client_set_manually").notNull().default(false),
     statusId: uuid("status_id")
       .notNull()
       .references(() => statuses.id),
@@ -113,6 +117,7 @@ export const tasks = pgTable(
   },
   (table) => [
     index("tasks_search_vector_idx").using("gin", table.searchVector),
+    index("tasks_client_id_idx").on(table.clientId),
     // Phase 6 performance hardening: neither is auto-indexed by Postgres
     // (only the primary key is), and every list/board/table/calendar/gantt
     // view query filters by listId; parentTaskId backs subtask lookups,

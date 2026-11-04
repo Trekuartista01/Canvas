@@ -7,6 +7,7 @@ import {
   Banknote,
   CalendarDays,
   CalendarRange,
+  Building2,
   CheckSquare,
   SquareKanban,
   ClipboardCheck,
@@ -50,6 +51,12 @@ const NAV_GROUPS: { label: string; entries: NavEntry[] }[] = [
       { label: "Home", to: "/w/$workspaceId", icon: Home, requires: "report:viewTeam" },
       { label: "My Tasks", to: "/w/$workspaceId/my-tasks", icon: CheckSquare },
       { label: "Boards", to: "/w/$workspaceId/boards", icon: SquareKanban },
+      {
+        label: "Clients",
+        to: "/w/$workspaceId/clients",
+        icon: Building2,
+        requires: "clients:manage",
+      },
       {
         label: "Dashboards",
         to: "/w/$workspaceId/dashboards",

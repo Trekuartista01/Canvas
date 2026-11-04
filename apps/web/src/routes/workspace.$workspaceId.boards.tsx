@@ -272,6 +272,7 @@ function BoardView({
   const tags = trpc.tag.list.useQuery({ workspaceId });
   const [assigneeId, setAssigneeId] = useState("");
   const [tagId, setTagId] = useState("");
+  const [clientId, setClientId] = useState("");
   const [due, setDue] = useState<BoardDueFilter | "">("");
   const [activeCard, setActiveCard] = useState<Card | null>(null);
   const [addingList, setAddingList] = useState(false);
@@ -332,11 +333,25 @@ function BoardView({
   const cards = useMemo(() => {
     const visible = filterBoardCards(
       board.data?.cards ?? [],
-      { assigneeId: assigneeId || undefined, tagId: tagId || undefined, due: due || undefined },
+      {
+        assigneeId: assigneeId || undefined,
+        tagId: tagId || undefined,
+        clientId: clientId || undefined,
+        due: due || undefined,
+      },
       today,
     );
     return [...visible].sort(byOrderKey);
-  }, [board.data, assigneeId, tagId, due, today]);
+  }, [board.data, assigneeId, tagId, clientId, due, today]);
+
+  // Only clients already on this board's cards: the full list is Ops-only.
+  const boardClients = useMemo(() => {
+    const byId = new Map<string, string>();
+    for (const c of board.data?.cards ?? []) {
+      if (c.client) byId.set(c.client.id, c.client.name);
+    }
+    return [...byId].sort((a, b) => a[1].localeCompare(b[1]));
+  }, [board.data]);
 
   const cardsByList = useMemo(() => {
     const map = new Map<string, Card[]>();
@@ -387,7 +402,7 @@ function BoardView({
     );
   }
 
-  const filtered = Boolean(assigneeId || tagId || due);
+  const filtered = Boolean(assigneeId || tagId || clientId || due);
   const archived = board.data?.archivedLists ?? [];
 
   return (
@@ -423,6 +438,19 @@ function BoardView({
           ))}
         </select>
         <select
+          aria-label="Filter by client"
+          value={clientId}
+          onChange={(e) => setClientId(e.target.value)}
+          className="border-border bg-background h-7 rounded border px-1"
+        >
+          <option value="">All clients</option>
+          {boardClients.map(([id, name]) => (
+            <option key={id} value={id}>
+              {name}
+            </option>
+          ))}
+        </select>
+        <select
           aria-label="Filter by due date"
           value={due}
           onChange={(e) => setDue(e.target.value as BoardDueFilter | "")}
@@ -442,6 +470,7 @@ function BoardView({
             onClick={() => {
               setAssigneeId("");
               setTagId("");
+              setClientId("");
               setDue("");
             }}
           >
@@ -803,6 +832,15 @@ function CardFront({ card, today, onOpen }: { card: Card; today: string; onOpen:
       className="border-border bg-background cursor-grab touch-none space-y-1.5 rounded-md border p-2 text-sm active:cursor-grabbing"
       data-testid={`board-card-${card.title}`}
     >
+      {card.client && (
+        <span
+          className="inline-block max-w-full truncate rounded-full px-1.5 py-0.5 text-[10px] font-medium"
+          style={{ backgroundColor: `${card.client.color}26`, color: card.client.color }}
+          data-testid="card-client-front"
+        >
+          {card.client.name}
+        </span>
+      )}
       {card.tags.length > 0 && (
         <ul className="flex flex-wrap gap-1">
           {card.tags.map((tag) => (

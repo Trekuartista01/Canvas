@@ -40,6 +40,7 @@ export const BOARD_DUE_FILTER_LABELS: Record<BoardDueFilter, string> = {
 export interface BoardCardFilters {
   assigneeId?: string;
   tagId?: string;
+  clientId?: string;
   due?: BoardDueFilter;
 }
 
@@ -48,6 +49,7 @@ interface FilterableCard {
   statusKind: string;
   assignees: { userId: string }[];
   tags: { id: string }[];
+  client?: { id: string } | null;
 }
 
 function addDaysIso(date: string, days: number): string {
@@ -67,6 +69,7 @@ export function filterBoardCards<C extends FilterableCard>(
       return false;
     }
     if (filters.tagId && !card.tags.some((t) => t.id === filters.tagId)) return false;
+    if (filters.clientId && card.client?.id !== filters.clientId) return false;
     if (filters.due === "overdue") return isCardOverdue(card, today);
     if (filters.due === "no_date") return card.dueDate === null;
     if (filters.due === "this_week") {

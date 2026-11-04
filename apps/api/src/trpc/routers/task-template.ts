@@ -1,3 +1,4 @@
+import { clientForNewCard } from "../../lib/client-detect";
 import { db, schema } from "@canvas/db";
 import {
   createTaskTemplateFromTaskSchema,
@@ -146,6 +147,7 @@ export const taskTemplateRouter = router({
           priority: payload.priority,
           orderKey: nextOrderKey(lastKey),
           createdBy: ctx.user.id,
+          clientId: await clientForNewCard(workspaceId, payload.title),
         })
         .returning();
       if (!task) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });

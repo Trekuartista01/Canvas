@@ -65,6 +65,9 @@ export function useRealtime(workspaceId: string | undefined) {
           utils.hierarchy.tree.invalidate({ workspaceId: event.workspaceId });
           utils.task.board.invalidate();
           utils.hierarchy.members.list.invalidate();
+        } else if (event.entity === "client") {
+          // Only Ops, CEOs and Admin have these cached.
+          utils.clients.invalidate();
         } else if (event.entity === "tag") {
           utils.tag.list.invalidate({ workspaceId: event.workspaceId });
         } else if (event.entity === "customFieldDef") {

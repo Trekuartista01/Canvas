@@ -43,10 +43,12 @@ export function GlobalSearch({ workspaceId }: { workspaceId: string }) {
   );
   const data = results.data;
   const hr = data && "hr" in data ? data.hr : null;
+  const clients = data && "clients" in data ? data.clients : [];
   const nothing =
     data &&
     data.people.length === 0 &&
     data.tasks.length === 0 &&
+    clients.length === 0 &&
     (!hr ||
       (hr.contracts.length === 0 &&
         hr.payroll.length === 0 &&
@@ -124,6 +126,23 @@ export function GlobalSearch({ workspaceId }: { workspaceId: string }) {
                       <span className={HINT}>
                         {t.spaceName} / {t.listName}
                       </span>
+                    </Link>
+                  </li>
+                ))}
+              </Group>
+            )}
+
+            {clients.length > 0 && (
+              <Group title="Clients" testId="global-search-clients">
+                {clients.map((c) => (
+                  <li key={c.id}>
+                    <Link
+                      to="/w/$workspaceId/clients/$clientId"
+                      params={{ workspaceId, clientId: c.id }}
+                      className={ROW}
+                    >
+                      <span className="font-medium">{c.name}</span>
+                      <span className={HINT}>Client folder</span>
                     </Link>
                   </li>
                 ))}

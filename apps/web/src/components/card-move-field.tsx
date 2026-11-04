@@ -1,4 +1,4 @@
-import { Field } from "@/components/detail-field";
+import { Section } from "@/components/detail-field";
 import { trpc } from "@/lib/trpc";
 import { useState } from "react";
 
@@ -42,7 +42,7 @@ export function CardMoveField({
   const error = move.error ?? archive.error;
 
   return (
-    <Field label="Board and list">
+    <Section label="Board and list">
       <div className="flex flex-wrap items-center gap-2 text-xs" data-testid="card-move">
         <select
           aria-label="Board"
@@ -102,6 +102,6 @@ export function CardMoveField({
           {error.message}
         </p>
       )}
-    </Field>
+    </Section>
   );
 }

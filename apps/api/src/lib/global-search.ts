@@ -1,6 +1,17 @@
 import { db, schema } from "@canvas/db";
 import { searchTokens } from "@canvas/shared";
-import { and, count, desc, eq, isNull, or, sql, type AnyColumn, type SQL } from "drizzle-orm";
+import {
+  and,
+  count,
+  desc,
+  eq,
+  inArray,
+  isNull,
+  or,
+  sql,
+  type AnyColumn,
+  type SQL,
+} from "drizzle-orm";
 import type { SessionUser } from "../auth/session";
 import { activeMembershipCondition } from "./membership";
 import { canPeopleAction, visibleBoardsCondition } from "./permissions";
@@ -174,6 +185,56 @@ async function searchLeave(workspaceId: string, query: string, vendimsOnly: bool
     .limit(GROUP_LIMIT);
 }
 
+/** Client folders by name or alias, and the cards linked to them. */
+async function searchClients(workspaceId: string, query: string) {
+  const clients = await db
+    .select({
+      id: schema.clients.id,
+      name: schema.clients.name,
+      color: schema.clients.color,
+    })
+    .from(schema.clients)
+    .where(
+      and(
+        eq(schema.clients.workspaceId, workspaceId),
+        isNull(schema.clients.archivedAt),
+        matchesAllWords(query, [
+          schema.clients.name,
+          sql`array_to_string(${schema.clients.aliases}, ' ')`,
+        ]),
+      ),
+    )
+    .orderBy(schema.clients.name)
+    .limit(GROUP_LIMIT);
+  if (clients.length === 0) return { clients, linkedTasks: [] };
+  const linkedTasks = await db
+    .select({
+      id: schema.tasks.id,
+      title: schema.tasks.title,
+      listId: schema.tasks.listId,
+      listName: schema.lists.name,
+      spaceName: schema.spaces.name,
+    })
+    .from(schema.tasks)
+    .innerJoin(schema.lists, eq(schema.lists.id, schema.tasks.listId))
+    .innerJoin(schema.spaces, eq(schema.spaces.id, schema.lists.spaceId))
+    .where(
+      and(
+        inArray(
+          schema.tasks.clientId,
+          clients.map((c) => c.id),
+        ),
+        isNull(schema.tasks.deletedAt),
+        isNull(schema.lists.deletedAt),
+        isNull(schema.lists.archivedAt),
+        isNull(schema.spaces.deletedAt),
+      ),
+    )
+    .orderBy(desc(schema.tasks.createdAt))
+    .limit(GROUP_LIMIT);
+  return { clients, linkedTasks };
+}
+
 /**
  * P8.8 (spec §9): what this caller may find, decided before anything is
  * searched. A scope the caller lacks is never queried, so its rows are neither
@@ -182,18 +243,19 @@ async function searchLeave(workspaceId: string, query: string, vendimsOnly: bool
  * - Shared (everyone): directory cards and tasks.
  * - HR (each group by its own permission, hr_finance only): contracts, payroll
  *   entries, leave requests, Vendims.
- * - Ops: clients and client folders join here with P8.10, behind clients:manage.
+ * - Ops (clients:manage): client folders, and the cards linked to them.
  *
  * None of this uses embeddings: HR records are never sent to the embedding
  * provider, so there is no AI index for confidential data to leak from.
  */
 export async function globalSearch(user: SessionUser, workspaceId: string, query: string) {
-  const [canDirectory, canManageStaff, canContracts, canPayroll, canLeave] = await Promise.all([
+  const [canDirectory, canManageStaff, canContracts, canPayroll, canLeave, canClients] = await Promise.all([
     canPeopleAction(user, workspaceId, "people:viewDirectory"),
     canPeopleAction(user, workspaceId, "people:manageStaff"),
     canPeopleAction(user, workspaceId, "contract:manage"),
     canPeopleAction(user, workspaceId, "payroll:view"),
     canPeopleAction(user, workspaceId, "leave:approve"),
+    canPeopleAction(user, workspaceId, "clients:manage"),
   ]);
 
   const [people, tasks] = await Promise.all([
@@ -201,6 +263,15 @@ export async function globalSearch(user: SessionUser, workspaceId: string, query
     searchVisibleTasks(user, workspaceId, query),
   ]);
   const shared = { people, tasks };
+  if (canClients) {
+    const { clients, linkedTasks } = await searchClients(workspaceId, query);
+    const found = new Set(tasks.map((t) => t.id));
+    return {
+      people,
+      tasks: [...tasks, ...linkedTasks.filter((t) => !found.has(t.id))],
+      clients,
+    };
+  }
   if (!canContracts && !canPayroll && !canLeave) return shared;
 
   const [contracts, payroll, leave, vendims] = await Promise.all([

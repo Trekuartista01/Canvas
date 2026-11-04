@@ -10,6 +10,12 @@ export const REALTIME_KINDS = ["created", "updated", "deleted"] as const;
 const kind = z.enum(REALTIME_KINDS);
 
 export const realtimeEventSchema = z.discriminatedUnion("entity", [
+  z.object({
+    entity: z.literal("client"),
+    id: z.string().uuid(),
+    workspaceId: z.string().uuid(),
+    kind,
+  }),
   z.object({ entity: z.literal("task"), id: z.string().uuid(), listId: z.string().uuid(), kind }),
   z.object({
     entity: z.literal("status"),

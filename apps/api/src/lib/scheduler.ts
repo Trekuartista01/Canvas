@@ -60,6 +60,9 @@ async function spawnDueRecurringTasks() {
         dueDate: dateOnly(rule.nextRunAt),
         orderKey: nextOrderKey(lastKey),
         createdBy: template.createdBy,
+        // P8.10: the next occurrence is for the same client.
+        clientId: template.clientId,
+        clientSetManually: template.clientSetManually,
       })
       .returning();
     if (!spawned) continue;

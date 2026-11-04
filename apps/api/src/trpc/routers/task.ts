@@ -1,3 +1,4 @@
+import { extractPlainText } from "../../lib/plain-text";
 import { db, schema } from "@canvas/db";
 import {
   addTaskDependencySchema,
@@ -15,7 +16,9 @@ import {
   removeTaskDependencySchema,
   rejectTaskSchema,
   removeTaskTagSchema,
+  autoClientFor,
   boardCardsSchema,
+  setTaskClientSchema,
   searchTasksSchema,
   statusForMove,
   setTaskRecurrenceSchema,
@@ -46,7 +49,13 @@ import {
 import { getMembershipRole } from "../../lib/membership";
 import { nextOrderKey } from "../../lib/order";
 import { loadBoard } from "../../lib/board-data";
-import { addBoardMember, assertCan, visibleBoardsCondition } from "../../lib/permissions";
+import { cardText, clientForNewCard, detectClients } from "../../lib/client-detect";
+import {
+  addBoardMember,
+  assertCan,
+  canPeopleAction,
+  visibleBoardsCondition,
+} from "../../lib/permissions";
 import { computeNextRunAt } from "../../lib/recurrence";
 import { publish } from "../../lib/realtime";
 import { validateSubtaskParent } from "../../lib/subtask";
@@ -234,15 +243,29 @@ export const taskRouter = router({
     // used to await them one at a time (five round trips back-to-back on
     // every task-detail-panel open); running them concurrently turns that
     // into one round trip's worth of latency.
-    const [assignees, tags, subtasks, dependencies, recurrenceRule] = await Promise.all([
-      getAssignees(task.id),
-      getTags(task.id),
-      task.parentTaskId ? Promise.resolve([]) : getSubtasks(task.id),
-      getTaskDependencies(task.id),
-      db.query.recurrenceRules.findFirst({ where: eq(schema.recurrenceRules.taskId, task.id) }),
-    ]);
+    const [assignees, tags, subtasks, dependencies, recurrenceRule, client, mentioned] =
+      await Promise.all([
+        getAssignees(task.id),
+        getTags(task.id),
+        task.parentTaskId ? Promise.resolve([]) : getSubtasks(task.id),
+        getTaskDependencies(task.id),
+        db.query.recurrenceRules.findFirst({ where: eq(schema.recurrenceRules.taskId, task.id) }),
+        task.clientId
+          ? db.query.clients.findFirst({
+              where: eq(schema.clients.id, task.clientId),
+              columns: { id: true, name: true, color: true },
+            })
+          : Promise.resolve(null),
+        // Several clients in the text: a person picks. Only what the card itself
+        // mentions, so this never reveals the rest of the client list.
+        task.clientId || task.clientSetManually
+          ? Promise.resolve([])
+          : detectClients(workspaceId, cardText(task)),
+      ]);
     return {
       ...task,
+      client: client ?? null,
+      clientSuggestions: mentioned.map(({ id, name, color }) => ({ id, name, color })),
       assignees,
       tags,
       subtasks,
@@ -441,6 +464,7 @@ export const taskRouter = router({
         dueDate: input.dueDate ?? null,
         dueTime: input.dueDate ? (input.dueTime ?? null) : null,
         requiresProof: input.requiresProof ?? false,
+        clientId: await clientForNewCard(workspaceId, input.title),
       })
       .returning();
     if (!task) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
@@ -557,9 +581,33 @@ export const taskRouter = router({
           ? nextOrderKey(await lastTaskOrderKey(task.listId, statusId))
           : undefined);
 
+    // P8.10: an automatically linked card follows its text, until someone sets
+    // or clears the client by hand.
+    const textChanged = input.title !== undefined || input.descriptionJson !== undefined;
+    let autoClient: { clientId: string | null } | undefined;
+    if (textChanged && !task.clientSetManually) {
+      const matches = await detectClients(
+        workspaceId,
+        cardText({
+          title: input.title ?? task.title,
+          descriptionText:
+            input.descriptionJson !== undefined
+              ? extractPlainText(input.descriptionJson)
+              : task.descriptionText,
+        }),
+      );
+      autoClient = {
+        clientId: autoClientFor(
+          matches.map((m) => m.id),
+          task.clientId,
+        ),
+      };
+    }
+
     const [updated] = await db
       .update(schema.tasks)
       .set({
+        ...(autoClient ?? {}),
         ...buildTaskUpdateFields({
           title: input.title,
           statusId,
@@ -658,6 +706,43 @@ export const taskRouter = router({
       kind: "updated",
     });
     return updated;
+  }),
+
+  // P8.10: the card's Client, set by hand. Anyone who can edit the card may clear
+  // it or pick what the card itself mentions; any other client is clients:manage.
+  setClient: protectedProcedure.input(setTaskClientSchema).mutation(async ({ ctx, input }) => {
+    const task = await requireTask(input.taskId);
+    const workspaceId = await workspaceIdForList(task.listId);
+    await assertCan(ctx.user, workspaceId, "task:update", {
+      spaceId: await spaceIdForList(task.listId),
+    });
+    if (input.clientId !== null && input.clientId !== task.clientId) {
+      const client = await db.query.clients.findFirst({
+        where: and(
+          eq(schema.clients.id, input.clientId),
+          eq(schema.clients.workspaceId, workspaceId),
+          isNull(schema.clients.archivedAt),
+        ),
+        columns: { id: true },
+      });
+      if (!client) throw new TRPCError({ code: "BAD_REQUEST", message: "That client isn't available" });
+      if (!(await canPeopleAction(ctx.user, workspaceId, "clients:manage"))) {
+        const mentioned = await detectClients(workspaceId, cardText(task));
+        if (!mentioned.some((m) => m.id === client.id)) {
+          throw new TRPCError({ code: "FORBIDDEN" });
+        }
+      }
+    }
+    await db
+      .update(schema.tasks)
+      .set({ clientId: input.clientId, clientSetManually: true, updatedAt: new Date() })
+      .where(eq(schema.tasks.id, task.id));
+    await logActivity(workspaceId, ctx.user.id, "task", task.id, "task.client_set", {
+      taskId: task.id,
+      clientId: input.clientId,
+    });
+    await publish(workspaceId, { entity: "task", id: task.id, listId: task.listId, kind: "updated" });
+    return { id: task.id };
   }),
 
   // Marks a task done via its list's own default done status — the Home

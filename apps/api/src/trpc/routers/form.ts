@@ -1,3 +1,4 @@
+import { clientForNewCard } from "../../lib/client-detect";
 import { db, schema } from "@canvas/db";
 import {
   createFormSchema,
@@ -258,6 +259,7 @@ export const formRouter = router({
         statusId: status.id,
         orderKey: nextOrderKey(lastKey),
         createdBy: form.createdBy,
+        clientId: await clientForNewCard(form.workspaceId, title),
       })
       .returning();
     if (!task) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });

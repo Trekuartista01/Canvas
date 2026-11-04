@@ -30,6 +30,8 @@ export const PRIVATE_PREFIXES = {
   // P8.6 stay under LEGACY_CONTRACT_PREFIX; both are HR files.
   contract: "hr/contracts/",
   companyDocument: "company-documents/",
+  // P8.10: shown through signed links from the client router, Ops/CEO/Admin only.
+  clientLogo: "client-logos/",
 } as const;
 export const LEGACY_CONTRACT_PREFIX = "contracts/";
 

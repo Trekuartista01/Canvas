@@ -49,6 +49,29 @@ export const spaceMembers = pgTable(
   ],
 );
 
+// P8.10 (spec §11): who a card is for. A client's folder is a filtered view of
+// the cards linked to it; the cards stay on their boards.
+export const clients = pgTable(
+  "clients",
+  {
+    id: uuid("id")
+      .primaryKey()
+      .$defaultFn(() => uuidv7()),
+    workspaceId: uuid("workspace_id")
+      .notNull()
+      .references(() => workspaces.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    aliases: text("aliases").array().notNull().default([]),
+    logoKey: text("logo_key"),
+    color: text("color").notNull(),
+    createdBy: uuid("created_by").references(() => users.id, { onDelete: "set null" }),
+    archivedAt: timestamp("archived_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [index("clients_workspace_id_idx").on(table.workspaceId)],
+);
+
 export const folders = pgTable(
   "folders",
   {
