@@ -43,8 +43,7 @@ function PrivacyPage() {
         <h2>Information We Collect</h2>
         <p>
           <strong>Account information:</strong> your name, email address, and (for email/password
-          accounts) a securely hashed password. If you sign in with Google, we store the
-          name/email/profile picture Google provides.
+          accounts) a securely hashed password.
         </p>
         <p>
           <strong>Content you create:</strong> tasks, docs, comments, images you upload or generate,

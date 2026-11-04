@@ -1,8 +1,6 @@
 import { Button } from "@/components/ui/button";
-import { buttonVariants } from "@/components/ui/button-variants";
 import { CanvasLogo } from "@/components/canvas-logo";
 import { Card } from "@/components/ui/card";
-import { cn } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
 import { RoleRequestSelect, type RoleChoice } from "@/components/role-request";
 import { Label } from "@/components/ui/label";
@@ -114,10 +112,6 @@ function SignupPage() {
             </Button>
           </form>
         )}
-
-        <a href="/auth/google" className={cn(buttonVariants({ variant: "outline" }), "w-full")}>
-          Continue with Google
-        </a>
 
         <p className="text-muted-foreground text-center text-sm">
           Already have an account?{" "}

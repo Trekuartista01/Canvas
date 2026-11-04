@@ -2,6 +2,7 @@ import { db, schema } from "@canvas/db";
 import {
   deleteAccountSchema,
   logInSchema,
+  requestPasswordResetSchema,
   completeSignUpSchema,
   signUpSchema,
   signUpTokenSchema,
@@ -12,7 +13,18 @@ import { and, eq } from "drizzle-orm";
 import { clearSessionCookie, setSessionCookie } from "../../auth/cookies";
 import { hashPassword, verifyPassword } from "../../auth/password";
 import { createSession, invalidateSession } from "../../auth/session";
-import { assertAuthRateLimit, clientIp, RateLimitError } from "../../lib/rate-limit";
+import {
+  completePasswordReset,
+  describePasswordReset,
+  requestPasswordReset,
+} from "../../lib/password-reset";
+import {
+  assertAuthRateLimit,
+  assertLoginFailuresUnderLimit,
+  clientIp,
+  RateLimitError,
+  recordLoginFailure,
+} from "../../lib/rate-limit";
 import {
   assertAllowedEmail,
   completeSignUp,
@@ -21,46 +33,36 @@ import {
 } from "../../lib/signup";
 import { publicProcedure, protectedProcedure, router } from "../trpc";
 
-function tooManyRequests(): never {
-  throw new TRPCError({
-    code: "TOO_MANY_REQUESTS",
-    message: "Too many attempts. Try again in a minute.",
-  });
+/** A limit that was hit becomes a 429 with its own message. */
+async function limited<T>(check: () => Promise<T>): Promise<T> {
+  try {
+    return await check();
+  } catch (err) {
+    if (err instanceof RateLimitError) {
+      throw new TRPCError({ code: "TOO_MANY_REQUESTS", message: err.message });
+    }
+    throw err;
+  }
 }
 
 export const authRouter = router({
   me: publicProcedure.query(({ ctx }) => ctx.user),
 
   signUp: publicProcedure.input(signUpSchema).mutation(async ({ ctx, input }) => {
-    try {
-      await assertAuthRateLimit(clientIp(ctx.req));
-    } catch (err) {
-      if (err instanceof RateLimitError) tooManyRequests();
-      throw err;
-    }
+    await limited(() => assertAuthRateLimit(clientIp(ctx.req)));
 
-    await requestSignUp(input);
+    await limited(() => requestSignUp(input));
     return { sent: true };
   }),
 
   // The page behind the emailed link.
   signUpDetails: publicProcedure.input(signUpTokenSchema).query(async ({ ctx, input }) => {
-    try {
-      await assertAuthRateLimit(clientIp(ctx.req));
-    } catch (err) {
-      if (err instanceof RateLimitError) tooManyRequests();
-      throw err;
-    }
+    await limited(() => assertAuthRateLimit(clientIp(ctx.req)));
     return describeSignUp(input.token);
   }),
 
   completeSignUp: publicProcedure.input(completeSignUpSchema).mutation(async ({ ctx, input }) => {
-    try {
-      await assertAuthRateLimit(clientIp(ctx.req));
-    } catch (err) {
-      if (err instanceof RateLimitError) tooManyRequests();
-      throw err;
-    }
+    await limited(() => assertAuthRateLimit(clientIp(ctx.req)));
     const user = await completeSignUp(input.token, input.password);
     const session = await createSession(user.id);
     setSessionCookie(ctx.res, session.id);
@@ -74,13 +76,31 @@ export const authRouter = router({
     };
   }),
 
+  // "Forgot password". Same answer whether or not the address has an account.
+  requestPasswordReset: publicProcedure
+    .input(requestPasswordResetSchema)
+    .mutation(async ({ ctx, input }) => {
+      await limited(() => assertAuthRateLimit(clientIp(ctx.req)));
+      await limited(() => requestPasswordReset(input.email));
+      return { sent: true };
+    }),
+
+  passwordResetDetails: publicProcedure.input(signUpTokenSchema).query(async ({ ctx, input }) => {
+    await limited(() => assertAuthRateLimit(clientIp(ctx.req)));
+    return describePasswordReset(input.token);
+  }),
+
+  completePasswordReset: publicProcedure
+    .input(completeSignUpSchema)
+    .mutation(async ({ ctx, input }) => {
+      await limited(() => assertAuthRateLimit(clientIp(ctx.req)));
+      await completePasswordReset(input.token, input.password);
+      return { ok: true as const };
+    }),
+
   logIn: publicProcedure.input(logInSchema).mutation(async ({ ctx, input }) => {
-    try {
-      await assertAuthRateLimit(clientIp(ctx.req), input.email);
-    } catch (err) {
-      if (err instanceof RateLimitError) tooManyRequests();
-      throw err;
-    }
+    await limited(() => assertAuthRateLimit(clientIp(ctx.req), input.email));
+    await limited(() => assertLoginFailuresUnderLimit(input.email, clientIp(ctx.req)));
 
     assertAllowedEmail(input.email);
 
@@ -88,11 +108,13 @@ export const authRouter = router({
       where: eq(schema.users.email, input.email),
     });
     if (!user || !user.passwordHash) {
+      await recordLoginFailure(input.email, clientIp(ctx.req));
       throw new TRPCError({ code: "UNAUTHORIZED", message: "Invalid email or password" });
     }
 
     const valid = await verifyPassword(user.passwordHash, input.password);
     if (!valid) {
+      await recordLoginFailure(input.email, clientIp(ctx.req));
       throw new TRPCError({ code: "UNAUTHORIZED", message: "Invalid email or password" });
     }
 

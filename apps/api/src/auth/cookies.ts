@@ -23,11 +23,3 @@ export function clearSessionCookie(res: FastifyReply) {
   // Must mirror setCookie options (esp. `secure`) or browsers keep the cookie.
   res.clearCookie(SESSION_COOKIE_NAME, cookieBase());
 }
-
-/** Shared flags for short-lived OAuth state/PKCE cookies. */
-export function oauthCookieOptions(maxAgeSec: number) {
-  return {
-    ...cookieBase(),
-    maxAge: maxAgeSec,
-  };
-}

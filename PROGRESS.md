@@ -3218,3 +3218,28 @@ Requested after Phase 8, outside the spec.
 - `pnpm check` green. `pnpm test`: API 392 + 1 skipped, shared 166, db 11, web 15.
 - `0073` applied, rolled back and re-applied locally.
 - Playwright 89/89, with new `signup-domain.spec.ts`. Every spec's sign-up now goes through the real link flow; only reading the link uses a test-only route. Real delivery through SMTP is untested.
+
+## 2026-11-04 Forgot password, Google sign-in removed, auth rate limits
+
+Requested after Phase 8, outside the spec.
+
+### Done
+
+- **Forgot password:** "Forgot password?" on the login page emails a one-hour link (`lib/password-reset.ts`, `password_reset_tokens`, migration `0074`, down file included). Only the token's hash is stored, each link works once, and only the newest works. Choosing a new password signs out every device, sends a "your password was changed" email, and goes to the login page. The answer is the same in words and timing whether or not the address has an account: the email work happens after responding.
+- **Google sign-in removed:** the routes, buttons, `GOOGLE_*` settings, the preflight check, the CSP entry for Google avatars, the `arctic` package, and the privacy-policy sentence. `ARCHITECTURE.md` and `PRD.md` are updated. Google Drive attachments and Gemini are separate features and stay.
+- **Rate limits (`lib/rate-limit.ts`):**
+  - Per minute: 20 per IP on sign-up, login, forgot password and both link pages; 10 per email on login (already existed, now on the new routes too).
+  - New, per hour: 5 emails to one address (sign-up and reset together are counted per address), so nobody can flood a colleague's inbox. It counts every address alike, so it reveals nothing about who has an account.
+  - New, per hour: 20 wrong passwords per address and IP, because 10 a minute still allowed thousands of guesses a day. It's per IP as well so someone elsewhere can't lock the real person out.
+  - All configurable in `.env` (`AUTH_*`).
+
+### To check at deployment
+
+- **Which IP the limits see.** `clientIp` trusts the nearest proxy hop, written for one reverse proxy in front of the app. The planned laptop setup goes through Tailscale Funnel: if its proxy is the hop the app sees, every visitor shares one IP and the per-IP limits apply to the whole company at once. The office also shares one public IP in any case, so 20 a minute may need raising.
+
+### Verified
+
+- `pnpm check` green. `pnpm test`: API 391 + 1 skipped, shared 166, db 11, web 15.
+- `0074` applied, rolled back and re-applied locally; RLS confirmed on.
+- Playwright 92/92, with new `password-reset.spec.ts`. It covers the 5-email and 20-wrong-password limits for real. The per-minute limits aren't exercised end to end: e2e raises them to 1000 so parallel runs don't trip them.
+- Real delivery through SMTP is still untested.

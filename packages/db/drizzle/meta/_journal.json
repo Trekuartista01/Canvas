@@ -519,6 +519,13 @@
       "when": 1793794560370,
       "tag": "0073_signup_requests",
       "breakpoints": true
+    },
+    {
+      "idx": 74,
+      "version": "7",
+      "when": 1793796390871,
+      "tag": "0074_password_reset",
+      "breakpoints": true
     }
   ]
 }

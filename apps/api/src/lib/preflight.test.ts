@@ -25,10 +25,9 @@ const levels = (env: Record<string, string | undefined>) =>
   Object.fromEntries(configFindings(env).map((f) => [f.check, f.level]));
 
 describe("configFindings", () => {
-  it("passes a correct production config (Google sign-in optional)", () => {
+  it("passes a correct production config", () => {
     const findings = configFindings(good);
     expect(findings.filter((f) => f.level === "fail")).toEqual([]);
-    expect(levels(good)["Google sign-in"]).toBe("warn");
   });
 
   it("catches the usual mistakes", () => {
@@ -44,20 +43,6 @@ describe("configFindings", () => {
       "fail",
     );
     expect(levels({ ...good, SMTP_HOST: undefined }).SMTP).toBe("warn");
-  });
-
-  it("requires the Google redirect to match WEB_URL when Google sign-in is on", () => {
-    const google = { ...good, GOOGLE_CLIENT_ID: "id" };
-    expect(
-      levels({
-        ...google,
-        GOOGLE_REDIRECT_URI: "https://canvas.trekuartista.com/auth/google/callback",
-      })["Google sign-in"],
-    ).toBe("ok");
-    expect(
-      levels({ ...google, GOOGLE_REDIRECT_URI: "http://localhost:3001/auth/google/callback" })
-        .GOOGLE_REDIRECT_URI,
-    ).toBe("fail");
   });
 });
 

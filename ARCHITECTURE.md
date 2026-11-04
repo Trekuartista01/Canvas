@@ -13,7 +13,7 @@
 | Realtime | WebSocket (fastify-websocket) publishing invalidation events; clients refetch via TanStack Query | Simple, replace with CRDT only for Docs |
 | Jobs | BullMQ + Redis (local: WSL in dev, apt on the server) | Image generation runs async; notifications |
 | Storage | Supabase Storage through its S3 protocol, a private bucket per environment (prod: `canvas-prod`, in the database's project) | Any S3-compatible store works (code is plain S3: presigned PUT/GET, path-style). R2 was the first choice (no egress fees) but Cloudflare billing doesn't accept Kosovo cards (2026-11-02) |
-| Auth | Lucia or Auth.js; sessions in Postgres | Google OAuth + email/password |
+| Auth | Lucia or Auth.js; sessions in Postgres | email/password, confirmed by an emailed link |
 | Deploy | No Docker. Dev: `pnpm dev` + Supabase dev resources (or local containers). Prod: PM2 (`ecosystem.config.cjs`) + Caddy on an Oracle Always Free VM, nightly `pg_dump` to R2 | €0 hosting, one public origin |
 
 ## 2. System diagram

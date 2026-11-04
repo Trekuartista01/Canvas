@@ -5,6 +5,7 @@ import { env } from "../env";
 import { sendContractEndAlerts } from "../lib/contract-end-alerts";
 import { canPeopleAction } from "../lib/permissions";
 import { computeEmployeeOfMonth } from "../lib/performance-data";
+import { lastResetLinkForTests } from "../lib/password-reset";
 import { lastSignupLinkForTests } from "../lib/signup";
 
 const eomSchema = z.object({
@@ -43,6 +44,12 @@ export function registerTestHookRoutes(app: FastifyInstance) {
   // The mock email client has no inbox: the link a sign-up would have emailed.
   app.get<{ Querystring: { email?: string } }>("/test-hooks/signup-link", async (req, reply) => {
     const path = lastSignupLinkForTests(req.query.email ?? "");
+    if (!path) return reply.code(404).send({ error: "Not found" });
+    return reply.send({ path });
+  });
+
+  app.get<{ Querystring: { email?: string } }>("/test-hooks/reset-link", async (req, reply) => {
+    const path = lastResetLinkForTests(req.query.email ?? "");
     if (!path) return reply.code(404).send({ error: "Not found" });
     return reply.send({ path });
   });

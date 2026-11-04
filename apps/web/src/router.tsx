@@ -3,7 +3,9 @@ import { rootRoute } from "./routes/__root";
 import { indexRoute } from "./routes/index";
 import { accountRoute } from "./routes/account";
 import { inviteRoute } from "./routes/invite.$inviteId";
+import { forgotPasswordRoute } from "./routes/forgot-password";
 import { loginRoute } from "./routes/login";
+import { resetPasswordRoute } from "./routes/reset-password";
 import { signupRoute } from "./routes/signup";
 import { signupConfirmRoute } from "./routes/signup.confirm";
 import { privacyRoute } from "./routes/privacy";
@@ -56,6 +58,8 @@ const routeTree = rootRoute.addChildren([
   indexRoute,
   accountRoute,
   loginRoute,
+  forgotPasswordRoute,
+  resetPasswordRoute,
   signupRoute,
   signupConfirmRoute,
   privacyRoute,

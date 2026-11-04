@@ -18,7 +18,6 @@ import { bucketReachable, ensureBucketExists } from "./lib/storage";
 import { redisConnection } from "./queues/connection";
 import { registerAiReferenceRoutes } from "./routes/ai-references";
 import { registerAttachmentRoutes } from "./routes/attachments";
-import { registerAuthRoutes } from "./routes/auth";
 import { registerAvatarRoutes } from "./routes/avatars";
 import { registerBrainRealtimeRoutes } from "./routes/brain-realtime";
 import { registerCopyGenerationRealtimeRoutes } from "./routes/copy-generation-realtime";
@@ -86,7 +85,6 @@ await app.register(fastifyTRPCPlugin, {
   trpcOptions: { router: appRouter, createContext },
 });
 
-registerAuthRoutes(app);
 registerAttachmentRoutes(app);
 registerAvatarRoutes(app);
 registerImageAssetRoutes(app);

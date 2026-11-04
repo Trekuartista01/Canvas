@@ -24,11 +24,6 @@ const envSchema = z.object({
     : z.string().default("postgres://canvas:canvas@localhost:5432/canvas"),
   REDIS_URL: isProd ? z.string().min(1) : z.string().default("redis://127.0.0.1:6379"),
   WEB_URL: isProd ? z.string().url() : z.string().default("http://localhost:5183"),
-  GOOGLE_CLIENT_ID: optionalString,
-  GOOGLE_CLIENT_SECRET: optionalString,
-  GOOGLE_REDIRECT_URI: isProd
-    ? z.string().url()
-    : z.string().default("http://localhost:3001/auth/google/callback"),
   S3_ENDPOINT: isProd ? z.string().url() : z.string().default("http://localhost:9000"),
   S3_REGION: z.string().default("us-east-1"),
   S3_BUCKET: isProd ? z.string().min(1) : z.string().default("canvas-dev"),
@@ -46,6 +41,10 @@ const envSchema = z.object({
   // credential-stuffing protection, not a bug in the app itself.
   AUTH_RATE_LIMIT_MAX: z.coerce.number().default(20),
   AUTH_EMAIL_RATE_LIMIT_MAX: z.coerce.number().default(10),
+  // Sign-up and reset emails to one address, per hour.
+  AUTH_EMAIL_SEND_MAX_PER_HOUR: z.coerce.number().default(5),
+  // Wrong passwords for one address from one IP, per hour.
+  AUTH_LOGIN_FAILURES_PER_HOUR: z.coerce.number().default(20),
   // Who may hold a Canvas account. Comma-separated; the whole domain must match.
   ALLOWED_EMAIL_DOMAINS: z.string().default("trekuartista.com"),
   SMTP_HOST: optionalString,
@@ -89,7 +88,6 @@ function assertProdNotLocalhost(parsed: z.infer<typeof envSchema>) {
     ["DATABASE_URL", parsed.DATABASE_URL],
     ["WEB_URL", parsed.WEB_URL],
     ["S3_ENDPOINT", parsed.S3_ENDPOINT],
-    ["GOOGLE_REDIRECT_URI", parsed.GOOGLE_REDIRECT_URI],
   ] as const) {
     if (/localhost|127\.0\.0\.1/i.test(value)) offenders.push(name);
   }

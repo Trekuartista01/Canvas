@@ -16,6 +16,8 @@ export const signUpTokenSchema = z.object({ token: z.string().min(1).max(200) })
 
 export const completeSignUpSchema = signUpTokenSchema.extend({ password: passwordSchema });
 
+export const requestPasswordResetSchema = z.object({ email: emailSchema });
+
 export const logInSchema = z.object({
   email: emailSchema,
   password: z.string().min(1),

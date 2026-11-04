@@ -19,7 +19,7 @@ export default defineConfig({
       // (WS invalidation) and stale cached API responses would be worse
       // than a visible loading state.
       workbox: {
-        navigateFallbackDenylist: [/^\/auth\//, /^\/uploads\//, /^\/trpc\//],
+        navigateFallbackDenylist: [/^\/uploads\//, /^\/trpc\//],
       },
       manifest: {
         name: "Canvas",
@@ -51,7 +51,6 @@ export default defineConfig({
     port: 5183,
     proxy: {
       "/trpc": "http://localhost:3001",
-      "/auth": "http://localhost:3001",
       "/uploads": "http://localhost:3001",
       "/public-forms": "http://localhost:3001",
       "/avatars": "http://localhost:3001",

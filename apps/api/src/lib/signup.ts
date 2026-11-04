@@ -12,6 +12,7 @@ import { and, eq, gt, isNull } from "drizzle-orm";
 import { hashPassword } from "../auth/password";
 import { getEmailClient } from "../email";
 import { env } from "../env";
+import { assertEmailSendRateLimit } from "./rate-limit";
 import { recordRoleRequest } from "./role-requests";
 
 const LINK_TTL_MS = 24 * 60 * 60 * 1000;
@@ -28,7 +29,7 @@ export function emailIsAllowed(email: string) {
   return isAllowedEmail(email, parseAllowedEmailDomains(env.ALLOWED_EMAIL_DOMAINS));
 }
 
-function hashToken(token: string) {
+export function hashToken(token: string) {
   return createHash("sha256").update(token).digest("hex");
 }
 
@@ -62,6 +63,7 @@ export async function requestSignUp(input: {
   requestedRole?: RequestablePeopleRole;
 }) {
   assertAllowedEmail(input.email);
+  await assertEmailSendRateLimit(input.email);
   if (process.env.NODE_ENV === "production" && !env.SMTP_HOST) {
     throw new TRPCError({
       code: "PRECONDITION_FAILED",
@@ -77,7 +79,7 @@ export async function requestSignUp(input: {
     await send(
       input.email,
       "You already have a Canvas account",
-      `Someone tried to sign up with this address, and it already has an account. If it was you, log in here: ${env.WEB_URL}/login\n\nIf it wasn't, you can ignore this email.`,
+      `Someone tried to sign up with this address, and it already has an account. If it was you, log in here: ${env.WEB_URL}/login\n\nForgot your password? Reset it here: ${env.WEB_URL}/forgot-password\n\nIf it wasn't, you can ignore this email.`,
     );
     return;
   }

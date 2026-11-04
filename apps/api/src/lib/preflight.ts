@@ -48,22 +48,6 @@ export function configFindings(env: Record<string, string | undefined>): Finding
     );
   } else out.push(ok("WEB_URL", web.origin));
 
-  const redirect = parseUrl(env.GOOGLE_REDIRECT_URI);
-  if (env.GOOGLE_CLIENT_ID) {
-    if (
-      !redirect ||
-      !web ||
-      redirect.origin !== web.origin ||
-      redirect.pathname !== "/auth/google/callback"
-    ) {
-      out.push(
-        fail("GOOGLE_REDIRECT_URI", `must be ${web?.origin ?? "<WEB_URL>"}/auth/google/callback`),
-      );
-    } else out.push(ok("Google sign-in", "configured"));
-  } else {
-    out.push(warn("Google sign-in", "GOOGLE_CLIENT_ID not set — email + password sign-in only"));
-  }
-
   const db = parseUrl(env.DATABASE_URL);
   if (!db) out.push(fail("DATABASE_URL", "missing or not a URL"));
   else if (db.port === "6543") {

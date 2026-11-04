@@ -7,6 +7,7 @@ Conventions: UUIDv7 PKs (`id`), `created_at`/`updated_at` timestamptz on all tab
 ## Core
 
 ```sql
+password_reset_tokens(id, user_id fk, token_hash uniq, expires_at, used_at) -- "forgot password", 1 hour
 signup_requests  (id, email, name, token_hash uniq, invite_id null,       -- a sign-up waiting on its emailed link;
                   requested_role null, expires_at, used_at)             -- no users row until it's opened
 users            (id, email uniq, name, avatar_url, bio null, title null, -- title is a cosmetic

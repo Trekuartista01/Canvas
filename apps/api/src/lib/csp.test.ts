@@ -50,7 +50,6 @@ describe("contentSecurityPolicy", () => {
       "https://o1.ingest.de.sentry.io",
     ]);
     expect(csp.directives["img-src"]).toContain("blob:");
-    expect(csp.directives["img-src"]).toContain("https://*.googleusercontent.com");
     expect(csp.directives["upgrade-insecure-requests"]).toEqual([]);
   });
 

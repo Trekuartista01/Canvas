@@ -1,11 +1,9 @@
 import { JUST_LOGGED_IN_KEY } from "@/components/login-summary-panel";
 import { CanvasLogo } from "@/components/canvas-logo";
 import { Button } from "@/components/ui/button";
-import { buttonVariants } from "@/components/ui/button-variants";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { cn } from "@/lib/utils";
 import { trpc } from "@/lib/trpc";
 import { createRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
@@ -13,8 +11,9 @@ import { z } from "zod";
 import { rootRoute } from "./__root";
 
 const loginSearchSchema = z.object({
-  error: z.string().optional(),
   redirect: z.string().optional(),
+  // Just came from choosing a new password.
+  reset: z.boolean().optional(),
 });
 
 export const loginRoute = createRoute({
@@ -25,7 +24,7 @@ export const loginRoute = createRoute({
 });
 
 function LoginPage() {
-  const { error: oauthError, redirect } = loginRoute.useSearch();
+  const { redirect, reset } = loginRoute.useSearch();
   const navigate = useNavigate();
   const utils = trpc.useUtils();
 
@@ -93,22 +92,25 @@ function LoginPage() {
               required
             />
           </div>
-          {(error || oauthError) && (
-            <p className="text-sm text-red-500">
-              {error ??
-                (oauthError === "email_domain"
-                  ? "Canvas is only for company email addresses. Use your work account."
-                  : "Google sign-in failed. Try again.")}
+          {reset && !error && (
+            <p className="text-sm" data-testid="password-reset-done">
+              Your password was changed. Log in with the new one.
             </p>
           )}
+          {error && <p className="text-sm text-red-500">{error}</p>}
           <Button type="submit" className="w-full" disabled={logIn.isPending}>
             {logIn.isPending ? "Logging in…" : "Log in"}
           </Button>
         </form>
 
-        <a href="/auth/google" className={cn(buttonVariants({ variant: "outline" }), "w-full")}>
-          Continue with Google
-        </a>
+        <p className="text-center text-sm">
+          <Link
+            to="/forgot-password"
+            className="text-muted-foreground hover:text-foreground underline"
+          >
+            Forgot password?
+          </Link>
+        </p>
 
         <p className="text-muted-foreground text-center text-sm">
           Don't have an account?{" "}

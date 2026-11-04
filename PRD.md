@@ -34,7 +34,7 @@ Teams whose daily work revolves around visual assets (marketing, design, content
 | Tags | Workspace-scoped |
 | List view + Kanban board view | Drag-and-drop, inline edit |
 | Search (basic) | Title + description, Postgres FTS |
-| Auth & members | Email/password + Google OAuth, roles: owner/admin/member/guest |
+| Auth & members | Email/password, roles: owner/admin/member/guest |
 | File attachments | S3-compatible storage; images get thumbnails + preview |
 
 ### Phase 2 — The Image Brain (the differentiator, built early on purpose)

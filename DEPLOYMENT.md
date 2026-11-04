@@ -146,23 +146,21 @@ nano .env        # Ctrl+O, Enter to save; Ctrl+X to exit
 
 Fill it in from this checklist (`.env.example` explains each line too):
 
-| Variable                                                              | Required    | Value / where to get it                                                                                                 |
-| --------------------------------------------------------------------- | ----------- | ----------------------------------------------------------------------------------------------------------------------- |
-| `DATABASE_URL`                                                        | yes         | Supabase Session pooler URI with your password (step 1.2)                                                               |
-| `SUPABASE_CA_CERT`                                                    | optional    | path to the downloaded certificate, e.g. `/home/ubuntu/canvas-app/prod-ca.crt` (step 1.4)                               |
-| `REDIS_URL`                                                           | yes         | the line printed by `setup-server.sh` (`cat ~/.canvas-redis-url`)                                                       |
-| `S3_ENDPOINT`                                                         | yes         | `https://<ref>.storage.supabase.co/storage/v1/s3` (step 2.2)                                                            |
-| `S3_REGION` / `S3_FORCE_PATH_STYLE`                                   | yes         | the project's region, e.g. `eu-west-3` (step 2.2) / `true`                                                              |
-| `S3_BUCKET`                                                           | yes         | `canvas-prod`                                                                                                           |
-| `S3_ACCESS_KEY_ID` / `S3_SECRET_ACCESS_KEY`                           | yes         | the Supabase Storage S3 access key (step 2.3)                                                                           |
-| `WEB_URL`                                                             | yes         | `https://canvas.<ip-with-dashes>.sslip.io` (step 5): no trailing slash                                                  |
-| `PAYROLL_ENCRYPTION_KEY`                                              | yes         | generate it on the server, step 4.4. Never invent or reuse one                                                          |
-| `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`, `SMTP_USER`, `SMTP_PASSWORD` | recommended | your mail provider's SMTP settings. Without them, reminders, invites and password emails are only logged, never sent    |
-| `EMAIL_FROM`                                                          | with SMTP   | e.g. `Canvas <you@gmail.com>`: a sender your SMTP provider allows                                                       |
-| `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET`                           | optional    | Google Cloud console → APIs & Services → Credentials (OAuth client, Web). Leave empty for email + password sign-in only |
-| `GOOGLE_REDIRECT_URI`                                                 | with Google | `<WEB_URL>/auth/google/callback` (also add it in the Google console)                                                    |
-| `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `GEMINI_API_KEY`               | optional    | AI providers. Unset = Brain/image generation use mock providers                                                         |
-| `SENTRY_DSN` / `VITE_SENTRY_DSN`                                      | optional    | Sentry project DSN (API / web). `VITE_SENTRY_DSN` must be in `.env` **before** `pnpm build`                             |
+| Variable                                                              | Required    | Value / where to get it                                                                                              |
+| --------------------------------------------------------------------- | ----------- | -------------------------------------------------------------------------------------------------------------------- |
+| `DATABASE_URL`                                                        | yes         | Supabase Session pooler URI with your password (step 1.2)                                                            |
+| `SUPABASE_CA_CERT`                                                    | optional    | path to the downloaded certificate, e.g. `/home/ubuntu/canvas-app/prod-ca.crt` (step 1.4)                            |
+| `REDIS_URL`                                                           | yes         | the line printed by `setup-server.sh` (`cat ~/.canvas-redis-url`)                                                    |
+| `S3_ENDPOINT`                                                         | yes         | `https://<ref>.storage.supabase.co/storage/v1/s3` (step 2.2)                                                         |
+| `S3_REGION` / `S3_FORCE_PATH_STYLE`                                   | yes         | the project's region, e.g. `eu-west-3` (step 2.2) / `true`                                                           |
+| `S3_BUCKET`                                                           | yes         | `canvas-prod`                                                                                                        |
+| `S3_ACCESS_KEY_ID` / `S3_SECRET_ACCESS_KEY`                           | yes         | the Supabase Storage S3 access key (step 2.3)                                                                        |
+| `WEB_URL`                                                             | yes         | `https://canvas.<ip-with-dashes>.sslip.io` (step 5): no trailing slash                                               |
+| `PAYROLL_ENCRYPTION_KEY`                                              | yes         | generate it on the server, step 4.4. Never invent or reuse one                                                       |
+| `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`, `SMTP_USER`, `SMTP_PASSWORD` | recommended | your mail provider's SMTP settings. Without them, reminders, invites and password emails are only logged, never sent |
+| `EMAIL_FROM`                                                          | with SMTP   | e.g. `Canvas <you@gmail.com>`: a sender your SMTP provider allows                                                    |
+| `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `GEMINI_API_KEY`               | optional    | AI providers. Unset = Brain/image generation use mock providers                                                      |
+| `SENTRY_DSN` / `VITE_SENTRY_DSN`                                      | optional    | Sentry project DSN (API / web). `VITE_SENTRY_DSN` must be in `.env` **before** `pnpm build`                          |
 
 Don't set these in `.env`: `NODE_ENV`, `DB_POOL_MAX` and `API_HOST` come from `ecosystem.config.cjs`. Never set `SAFE_OUTBOUND_ALLOW_PRIVATE`, `E2E_TEST_HOOKS` or `SERVE_WEB_DIST` in production (the API refuses to start with the first two).
 

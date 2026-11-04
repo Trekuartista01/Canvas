@@ -7,7 +7,7 @@
  * - connect-src: the browser PUTs uploads straight to the storage bucket
  *   (path-style `host/bucket` or virtual-hosted `bucket.host`), and reports
  *   errors to Sentry when the web build has a DSN;
- * - img-src: Google profile pictures, and blob: previews (image downscaling);
+ * - img-src: blob: previews (image downscaling);
  * - media-src: blob: (video frame extraction for clips);
  * - img-src + frame-src: P8.6 contract thumbnails, photos and PDF previews are
  *   5-minute signed links straight to the bucket.
@@ -48,13 +48,7 @@ export function contentSecurityPolicy(env: CspEnv) {
     useDefaults: true,
     directives: {
       "connect-src": ["'self'", ...storageOrigins(env), ...sentryOrigin(env.VITE_SENTRY_DSN)],
-      "img-src": [
-        "'self'",
-        "data:",
-        "blob:",
-        "https://*.googleusercontent.com",
-        ...storageOrigins(env),
-      ],
+      "img-src": ["'self'", "data:", "blob:", ...storageOrigins(env)],
       "frame-src": ["'self'", ...storageOrigins(env)],
       "media-src": ["'self'", "blob:"],
       // Only over https — on a plain-http local run it would rewrite the

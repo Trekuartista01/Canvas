@@ -1,8 +1,9 @@
 import { env } from "../env";
 import { redisConnection } from "../queues/connection";
 
-// Fixed-window limiter, 60/min by default; auth (login/signup) uses a
-// tighter per-IP (and per-email for login) budget to blunt credential stuffing.
+// Fixed-window limiter, 60/min by default. Auth (sign-up, login, forgot password)
+// has a tighter budget per IP and per email to blunt credential stuffing, plus the
+// hourly limits on emails sent and wrong passwords further down.
 export const RATE_LIMIT_MAX_REQUESTS = 60;
 export const RATE_LIMIT_WINDOW_MS = 60_000;
 
@@ -11,6 +12,7 @@ export const RATE_LIMIT_WINDOW_MS = 60_000;
 // local run isn't rate-limited by its own credential-stuffing protection.
 export const AUTH_RATE_LIMIT_MAX = env.AUTH_RATE_LIMIT_MAX;
 export const AUTH_EMAIL_RATE_LIMIT_MAX = env.AUTH_EMAIL_RATE_LIMIT_MAX;
+const HOUR_MS = 60 * 60 * 1000;
 
 // The two fully-public, session-less, state-mutating/storage-consuming
 // surfaces (form.getPublic/submitPublic, POST /public-forms/uploads) —
@@ -77,6 +79,37 @@ export async function assertAuthRateLimit(ip: string, email?: string) {
 }
 
 /**
+ * Sign-up and reset emails to one address, so nobody can flood a colleague's
+ * inbox. Counted per address whether or not it has an account, so hitting the
+ * limit says nothing about who's a user.
+ */
+export async function assertEmailSendRateLimit(email: string) {
+  const { overLimit } = await checkRateLimit(`auth:send:${email.trim().toLowerCase()}`, {
+    max: env.AUTH_EMAIL_SEND_MAX_PER_HOUR,
+    windowMs: HOUR_MS,
+  });
+  if (overLimit) throw new RateLimitError("Too many emails to this address. Try again later.");
+}
+
+// The per-minute limits still allow thousands of password guesses a day. This
+// slower one counts only wrong passwords. It's per address AND IP, so an attacker
+// elsewhere can't lock the real person out of their own account.
+const loginFailureBucket = (email: string, ip: string) =>
+  `auth:fail:${email.trim().toLowerCase()}:${ip || "unknown"}`;
+
+export async function assertLoginFailuresUnderLimit(email: string, ip: string) {
+  const key = rateLimitBucketKey(loginFailureBucket(email, ip), new Date(), HOUR_MS);
+  const count = Number((await redisConnection.get(key)) ?? 0);
+  if (count >= env.AUTH_LOGIN_FAILURES_PER_HOUR) {
+    throw new RateLimitError("Too many wrong passwords. Try again later, or reset your password.");
+  }
+}
+
+export async function recordLoginFailure(email: string, ip: string) {
+  await checkRateLimit(loginFailureBucket(email, ip), { windowMs: HOUR_MS });
+}
+
+/**
  * A single-bucket check for the public form/upload surfaces below — unlike
  * auth's ip+email dual-bucket shape, these each need one or two independent
  * buckets checked by their own callers (e.g. form.submitPublic checks both
@@ -92,8 +125,8 @@ export async function assertPublicRateLimit(bucket: string, max: number) {
 
 export class RateLimitError extends Error {
   readonly code = "TOO_MANY_REQUESTS" as const;
-  constructor() {
-    super("Too many attempts. Try again in a minute.");
+  constructor(message = "Too many attempts. Try again in a minute.") {
+    super(message);
     this.name = "RateLimitError";
   }
 }
