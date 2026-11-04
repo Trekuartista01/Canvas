@@ -1,3 +1,4 @@
+import { contractNotificationPerson, contractNotificationText } from "@/lib/contract-notification";
 import { leaveNotificationText } from "@/lib/leave-notification";
 import { trpc } from "@/lib/trpc";
 import { NOTIFICATION_VERB_LABELS } from "@canvas/shared";
@@ -63,8 +64,10 @@ export function NotificationToasts({ workspaceId }: { workspaceId: string }) {
       ...fresh.map((n) => ({
         id: n.id,
         text:
-          leaveNotificationText(n.verb, n.payloadJson, n.actorName) ??
-          `${n.actorName} ${NOTIFICATION_VERB_LABELS[n.verb] ?? "sent you an update"}`,
+          n.verb === "contract.expiring"
+            ? contractNotificationText(n.payloadJson)
+            : (leaveNotificationText(n.verb, n.payloadJson, n.actorName) ??
+              `${n.actorName} ${NOTIFICATION_VERB_LABELS[n.verb] ?? "sent you an update"}`),
         open: () => {
           markRead.mutate({ notificationId: n.id });
           if (n.verb === "leave.requested") {
@@ -75,6 +78,12 @@ export function NotificationToasts({ workspaceId }: { workspaceId: string }) {
             });
           } else if (n.verb.startsWith("leave.")) {
             void navigate({ to: "/w/$workspaceId/leave", params: { workspaceId } });
+          } else if (n.verb === "contract.expiring") {
+            void navigate({
+              to: "/w/$workspaceId/contracts",
+              params: { workspaceId },
+              search: { person: contractNotificationPerson(n.payloadJson) },
+            });
           }
         },
       })),

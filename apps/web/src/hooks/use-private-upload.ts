@@ -8,7 +8,7 @@ type Presign = {
     fileName: string;
     mime: string;
     sizeBytes: number;
-  }) => Promise<{ attachmentId: string; key: string; uploadUrl: string }>;
+  }) => Promise<{ attachmentId: string; key: string; uploadUrl: string; mime?: string }>;
 };
 type Confirm = {
   mutateAsync: (input: {
@@ -30,13 +30,16 @@ export function usePrivateUpload(workspaceId: string, presign: Presign, confirm:
   const [progress, setProgress] = useState<number | null>(null);
 
   async function upload(file: File) {
-    const mime = file.type || "application/octet-stream";
-    const { attachmentId, key, uploadUrl } = await presign.mutateAsync({
+    const reported = file.type || "application/octet-stream";
+    const presigned = await presign.mutateAsync({
       workspaceId,
       fileName: file.name,
-      mime,
+      mime: reported,
       sizeBytes: file.size,
     });
+    const { attachmentId, key, uploadUrl } = presigned;
+    // The upload URL is signed for this type, so it has to be the one sent.
+    const mime = presigned.mime ?? reported;
     setProgress(0);
     try {
       await putWithProgress(uploadUrl, file, mime, setProgress);
@@ -61,6 +64,33 @@ export function useContractUpload(workspaceId: string) {
     trpc.contract.presignUpload.useMutation(),
     trpc.contract.confirmUpload.useMutation(),
   );
+}
+
+/** P8.6: several contract files, one after another, with one progress line. */
+export function useContractFilesUpload(workspaceId: string) {
+  const { upload, progress } = useContractUpload(workspaceId);
+  const [position, setPosition] = useState<{ index: number; total: number } | null>(null);
+
+  async function uploadAll(files: File[]) {
+    const ids: string[] = [];
+    try {
+      for (const [i, file] of files.entries()) {
+        setPosition({ index: i + 1, total: files.length });
+        ids.push((await upload(file)).id);
+      }
+    } finally {
+      setPosition(null);
+    }
+    return ids;
+  }
+
+  const percent = progress ?? 0;
+  const label = position
+    ? `Uploading ${position.index} of ${position.total}: ${percent}%`
+    : progress !== null
+      ? `Uploading ${percent}%`
+      : null;
+  return { upload, uploadAll, label, percent };
 }
 
 export function useCompanyDocumentUpload(workspaceId: string) {

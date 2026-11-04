@@ -13,6 +13,7 @@ import {
 import { uuidv7 } from "uuidv7";
 import { attachments } from "./attachments";
 import { users } from "./auth";
+import { contractType } from "./people";
 import { workspaces } from "./workspaces";
 
 export const contractKind = pgEnum("contract_kind", ["contract", "annex", "amendment"]);
@@ -41,9 +42,15 @@ export const employmentContracts = pgTable(
     title: text("title").notNull(),
     startDate: date("start_date").notNull(),
     expiryDate: date("expiry_date"),
-    attachmentId: uuid("attachment_id")
-      .notNull()
-      .references(() => attachments.id),
+    // P8.6: superseded by contract_files (one contract, many files/pages).
+    // Kept, nullable and no longer written, so the down migration can
+    // restore it; 0069 copied every existing file into contract_files.
+    attachmentId: uuid("attachment_id").references(() => attachments.id),
+    // P8.6: fixed-term / open-ended, shown on the Contracts page.
+    contractType: contractType("contract_type"),
+    // P8.6: the one-working-day-before alert went out (spec §6). Cleared
+    // when the end date changes or a file is uploaded for the contract.
+    endAlertSentAt: timestamp("end_alert_sent_at", { withTimezone: true }),
     uploadedBy: uuid("uploaded_by").references(() => users.id, { onDelete: "set null" }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
@@ -52,8 +59,34 @@ export const employmentContracts = pgTable(
   (t) => [index("employment_contracts_workspace_user_idx").on(t.workspaceId, t.userId)],
 );
 
-// Idempotency ledger for the 30/7-day expiry notices. Keyed on the expiry
-// date too, so extending a contract re-arms its notices.
+// P8.6: the files of one contract (a multi-page contract is several photos),
+// in order_key order. Each is a private attachments row under hr/contracts/.
+// Replacing a file points the row at a new attachment; delete is soft.
+export const contractFiles = pgTable(
+  "contract_files",
+  {
+    id: uuid("id")
+      .primaryKey()
+      .$defaultFn(() => uuidv7()),
+    contractId: uuid("contract_id")
+      .notNull()
+      .references(() => employmentContracts.id, { onDelete: "cascade" }),
+    attachmentId: uuid("attachment_id")
+      .notNull()
+      .references(() => attachments.id),
+    orderKey: text("order_key").notNull(),
+    uploadedBy: uuid("uploaded_by").references(() => users.id, { onDelete: "set null" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    deletedAt: timestamp("deleted_at", { withTimezone: true }),
+  },
+  (t) => [
+    index("contract_files_contract_idx").on(t.contractId),
+    unique("contract_files_attachment_uniq").on(t.attachmentId),
+  ],
+);
+
+// The old M7.6 30/7-day notice ledger. P8.6 replaced those notices with one
+// alert (end_alert_sent_at); kept as history, no longer written.
 export const contractExpiryNotices = pgTable(
   "contract_expiry_notices",
   {

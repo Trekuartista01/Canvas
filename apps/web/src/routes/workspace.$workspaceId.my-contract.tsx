@@ -25,7 +25,7 @@ function MyContractPage() {
   const { workspaceId } = myContractRoute.useParams();
   const mine = trpc.contract.mine.useQuery({ workspaceId });
   const rows = useMemo(() => orderContracts<Contract>(mine.data ?? []), [mine.data]);
-  const download = trpc.contract.downloadUrl.useMutation({
+  const download = trpc.contract.fileUrl.useMutation({
     onSuccess: (r) => openSignedDownload(r.url),
   });
   const parentRef = useRef<HTMLDivElement>(null);
@@ -71,6 +71,8 @@ function MyContractPage() {
               return (
                 <div
                   key={row.id}
+                  ref={virtualizer.measureElement}
+                  data-index={item.index}
                   className="absolute right-0 left-0 pb-1.5"
                   style={{ transform: `translateY(${item.start}px)`, paddingLeft: depth * 24 }}
                 >
@@ -87,15 +89,22 @@ function MyContractPage() {
                       {row.expiryDate && ` to ${formatReportDate(row.expiryDate)}`}
                     </span>
                     <ExpiryBadge daysLeft={row.daysLeft} />
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="ml-auto"
-                      disabled={download.isPending}
-                      onClick={() => download.mutate({ contractId: row.id })}
-                    >
-                      Download
-                    </Button>
+                    <span className="ml-auto flex flex-wrap justify-end gap-1.5">
+                      {row.files.map((file) => (
+                        <Button
+                          key={file.id}
+                          size="sm"
+                          variant="outline"
+                          aria-label={`Download ${file.fileName}`}
+                          disabled={download.isPending}
+                          onClick={() =>
+                            download.mutate({ fileId: file.id, disposition: "download" })
+                          }
+                        >
+                          {row.files.length === 1 ? "Download" : file.fileName}
+                        </Button>
+                      ))}
+                    </span>
                   </div>
                 </div>
               );

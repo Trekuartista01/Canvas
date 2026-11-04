@@ -32,7 +32,7 @@ export const NOTIFICATION_VERB_LABELS: Record<string, string> = {
   "leave.rejected": "turned down your leave request",
   "leave.recorded": "recorded leave for you",
   "leave.cancelled": "cancelled your leave",
-  // M7.6 — rendered with the employee and days left from the payload.
+  // P8.6 — the bell renders the spec's sentence from the payload.
   "contract.expiring": "Contract expiring soon",
   // P8.1 — to HR: rendered with the person and new role from the payload.
   "person.role_changed": "changed roles",

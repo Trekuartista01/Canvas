@@ -6,7 +6,7 @@ import { logActivity } from "./activity";
 import { sendDailyReportReminders } from "./daily-report-reminders";
 import { sendHolidayNotices, sendHolidaysMissingNotices } from "./holiday-notices";
 import { applyLeaveCarryOver } from "./leave-carry-over";
-import { sendContractExpiryNotices } from "./contract-expiry";
+import { sendContractEndAlerts } from "./contract-end-alerts";
 import { runEmployeeOfMonth } from "./performance-data";
 import { seedMissingHolidayYears } from "./working-days";
 import { buildDigestEmail } from "./digest";
@@ -203,8 +203,8 @@ export async function runSchedulerTick() {
   await sendDailyReportReminders();
   // M7.5: unused vacation carries into the new year (once per person per year).
   await applyLeaveCarryOver();
-  // M7.6: HR hears 30 and 7 days before a contract expires.
-  await sendContractExpiryNotices();
+  // P8.6: HR hears on the last working day before a contract ends.
+  await sendContractEndAlerts();
   // M7.8: last month's Employee of the Month, once per workspace.
   await runEmployeeOfMonth();
 }

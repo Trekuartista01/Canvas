@@ -11,6 +11,7 @@ import {
 
 const DOC_FIXTURE = fileURLToPath(new URL("../fixtures/test-doc.txt", import.meta.url));
 const IMAGE_FIXTURE = fileURLToPath(new URL("../fixtures/test-image.png", import.meta.url));
+const CONTRACT_FIXTURE = fileURLToPath(new URL("../fixtures/test-contract.pdf", import.meta.url));
 const PASSWORD = "initial-pass-123";
 
 async function addStaff(page: Page, name: string) {
@@ -38,15 +39,15 @@ async function fileContract(
     expiry?: string;
   },
 ) {
+  await page.getByTestId(`contract-person-${c.person}`).click();
   await page.getByTestId("contract-add").click();
   const form = page.getByTestId("contract-form");
-  await form.getByLabel("Employee").selectOption({ label: c.person });
   if (c.kind) await form.getByLabel("Kind").selectOption(c.kind);
   if (c.parent) await form.getByLabel("Belongs to").selectOption({ label: c.parent });
   await form.getByLabel("Title").fill(c.title);
   await form.getByLabel("Start date").fill(c.start);
-  if (c.expiry) await form.getByLabel("Expiry date (optional)").fill(c.expiry);
-  await form.getByLabel("File").setInputFiles(DOC_FIXTURE);
+  if (c.expiry) await form.getByLabel("End date (optional)").fill(c.expiry);
+  await form.getByLabel("Contract files").setInputFiles(CONTRACT_FIXTURE);
   const created = page.waitForResponse((res) => res.url().includes("contract.create"));
   await form.getByTestId("contract-save").click();
   expect((await created).ok()).toBe(true);
@@ -84,8 +85,12 @@ test("M7.6 documents: HR files contracts, each employee sees only their own; com
   await fileContract(page, { person: "Tina Other", title: "Tina's contract", start: "2026-02-01" });
 
   // HR replaces the annex file — a new upload, same record.
-  const replaced = page.waitForResponse((res) => res.url().includes("contract.update"));
-  await page.getByLabel("Replace Salary annex").setInputFiles(IMAGE_FIXTURE);
+  await page.getByTestId("contract-person-Sam Staff").click();
+  const replaced = page.waitForResponse((res) => res.url().includes("contract.replaceFile"));
+  await page
+    .getByTestId("contract-row-Salary annex")
+    .getByLabel("Replace test-contract.pdf")
+    .setInputFiles(IMAGE_FIXTURE);
   expect((await replaced).ok()).toBe(true);
 
   // Company library: a category, a document, then a second version.
@@ -128,7 +133,7 @@ test("M7.6 documents: HR files contracts, each employee sees only their own; com
     .getByTestId("contract-Employment contract 2026")
     .getByRole("button", { name: "Download" })
     .click();
-  expect((await contractDownload).suggestedFilename()).toBe("test-doc.txt");
+  expect((await contractDownload).suggestedFilename()).toBe("test-contract.pdf");
 
   // The replaced annex downloads as the new file.
   const annexDownload = staff.waitForEvent("download");

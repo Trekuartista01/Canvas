@@ -484,6 +484,13 @@
       "when": 1793703073696,
       "tag": "0068_vendim_status",
       "breakpoints": true
+    },
+    {
+      "idx": 69,
+      "version": "7",
+      "when": 1793709808744,
+      "tag": "0069_contract_files",
+      "breakpoints": true
     }
   ]
 }

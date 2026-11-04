@@ -9,9 +9,12 @@ const BLURHASH_CANVAS_SIZE = 32;
 // loading. Lightbox click loads the full-res original — see Lightbox.
 export function BlurhashThumb({
   attachment,
+  src,
   onClick,
 }: {
   attachment: { id: string; blurhash: string | null; fileName: string };
+  /** A signed link, for files /uploads never serves (HR files). */
+  src?: string;
   onClick?: () => void;
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -47,7 +50,7 @@ export function BlurhashThumb({
         />
       )}
       <img
-        src={`/uploads/${attachment.id}/thumb`}
+        src={src ?? `/uploads/${attachment.id}/thumb`}
         alt={attachment.fileName}
         onLoad={() => setLoaded(true)}
         className="relative h-20 w-20 object-cover"

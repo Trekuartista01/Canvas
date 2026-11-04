@@ -2,12 +2,18 @@ import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { getSessionUser } from "../auth/session";
 import { env } from "../env";
+import { sendContractEndAlerts } from "../lib/contract-end-alerts";
 import { canPeopleAction } from "../lib/permissions";
 import { computeEmployeeOfMonth } from "../lib/performance-data";
 
 const eomSchema = z.object({
   workspaceId: z.string().uuid(),
   month: z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/),
+});
+
+const contractAlertSchema = z.object({
+  workspaceId: z.string().uuid(),
+  now: z.string().datetime(),
 });
 
 /**
@@ -31,5 +37,15 @@ export function registerTestHookRoutes(app: FastifyInstance) {
       replace: true,
     });
     return reply.send({ ok: true, userId: row?.userId ?? null, score: row?.score ?? null });
+  });
+
+  // P8.6: run the contract-ending alert as if it were `now`, for one workspace.
+  app.post("/test-hooks/contract-end-alerts", async (req, reply) => {
+    const user = await getSessionUser(req);
+    if (!user) return reply.code(401).send({ error: "Unauthorized" });
+    const parsed = contractAlertSchema.safeParse(req.body);
+    if (!parsed.success) return reply.code(400).send({ error: "Bad request" });
+    await sendContractEndAlerts(new Date(parsed.data.now), parsed.data.workspaceId);
+    return reply.send({ ok: true });
   });
 }

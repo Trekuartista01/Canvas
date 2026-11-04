@@ -1,3 +1,4 @@
+import { contractNotificationPerson, contractNotificationText } from "@/lib/contract-notification";
 import { leaveNotificationText } from "@/lib/leave-notification";
 import { NOTIFICATION_VERB_LABELS, PEOPLE_ROLE_LABELS, type PeopleRole } from "@canvas/shared";
 import { formatRelativeTime } from "@/lib/format";
@@ -69,15 +70,6 @@ function missingYear(payload: unknown): string {
   if (!payload || typeof payload !== "object") return "next year";
   const year = (payload as { year?: unknown }).year;
   return typeof year === "number" ? String(year) : "next year";
-}
-
-// M7.6 "contract.expiring": "Sam Staff — in 7 days".
-function contractLine(payload: unknown): string {
-  if (!payload || typeof payload !== "object") return "";
-  const p = payload as { employeeName?: unknown; daysLeft?: unknown };
-  const name = typeof p.employeeName === "string" ? p.employeeName : "";
-  if (typeof p.daysLeft !== "number") return name;
-  return `${name} — ${p.daysLeft === 0 ? "today" : `in ${p.daysLeft} day${p.daysLeft === 1 ? "" : "s"}`}`;
 }
 
 // P8.1 "person.role_changed": "Sam Staff is now HR/Finance Manager".
@@ -193,6 +185,7 @@ export function NotificationsBell() {
                       navigate({
                         to: "/w/$workspaceId/contracts",
                         params: { workspaceId: n.workspaceId },
+                        search: { person: contractNotificationPerson(n.payloadJson) },
                       });
                     } else if (n.verb === "leave.requested") {
                       navigate({
@@ -240,10 +233,7 @@ export function NotificationsBell() {
                       {roleChangeLine(n.payloadJson)}
                     </span>
                   ) : n.verb === "contract.expiring" ? (
-                    <span>
-                      <span className="font-medium">Contract expiring:</span>{" "}
-                      {contractLine(n.payloadJson)}
-                    </span>
+                    <span>{contractNotificationText(n.payloadJson)}</span>
                   ) : STANDALONE_VERBS.has(n.verb) ? (
                     <span className="font-medium">{NOTIFICATION_VERB_LABELS[n.verb]}</span>
                   ) : completedTitle ? (

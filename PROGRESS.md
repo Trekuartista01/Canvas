@@ -2998,3 +2998,35 @@ During the real deploy: Cloudflare billing doesn't accept Kosovo cards, so R2 ca
   - HR fills position and contract and presses Regenerate; Word becomes downloadable. The downloaded file is a real DOCX, and the download is audited.
   - The employee gets 403 on `vendimDownload`, and no `hr/vendim/` key appears in their `leave.mine`.
 - Full suite: 79/80 on the first run (`email-digest` again), then **80/80**. That run captured the server log: no failed scheduler ticks, and a full tick takes ~1.3 s at rest. So `email-digest`'s occasional 20 s timeout under parallel load is still unexplained. Next time it fails, read the captured `pw:webserver` log (`DEBUG=pw:webserver`).
+
+## 2026-11-04 P8.6: Contracts page + contract-ending alert
+
+### Done
+
+- **Migration `0069`** (down file included): `contract_files` (many files per contract, in `order_key` order), `employment_contracts.contract_type` and `end_alert_sent_at`. Every existing contract's file was copied across. `attachment_id` stays, nullable and no longer written, so the rollback can restore it.
+- **Alert (`lib/contract-end-alerts.ts`, replaces `contract-expiry.ts`):** every HR user gets a bell notification, a toast and an email on the last working day before the end date, from 08:00 Kosovo time. It catches up after downtime while the contract hasn't ended. Claiming `end_alert_sent_at` first makes it go out once. A changed end date or a new or replaced file re-arms it. Archived people get no alert. `contract_expiry_notices` stays as history and is no longer written.
+- **API:** `contract.forPerson`, `addFiles`, `replaceFile`, `deleteFile`, `fileUrl` (5-minute signed link; each one audited). HR files are never served by `/uploads`, including to the employee: My contract uses `fileUrl`.
+- **Contracts page:** a virtualized list of people, then the chosen person's documents (`?person=<id>`, used by the bell, toast and email). Drag-and-drop or click upload, preview before saving, per-file progress, thumbnails (blurhash → signed thumb), full-screen viewer, download, replace, delete with an inline confirmation, "Ending soon" badge.
+- **CSP:** `img-src` and `frame-src` now allow the storage origins. Without this, thumbnails and previews would have been blocked in production only, since the dev server sends no CSP.
+- **Upload hook:** sends the type the server signed. Windows reports HEIC with an empty type, which would otherwise fail the signature.
+
+### Decisions
+
+- HR users are alerted about their own contract too. The spec says every HR user, and a sole HR user would otherwise never hear.
+- An annex or amendment with an end date gets its own alert, as under M7.6.
+- "Uploads a new contract for that person" re-arms that contract only. A new contract has its own alert; the person's older ones aren't touched.
+- The claim is written before the alert is sent, so a crash at that moment loses one alert rather than risking a duplicate. The other scheduled notices work the same way.
+- A person's last file can't be deleted on its own: delete the document instead.
+- Replacing a file keeps the old attachment and its stored object (HR-only, for the records).
+
+### Not yet verified
+
+- **PDF preview on Supabase Storage.** Tested against the local S3 only. If Supabase sends headers that block framing, the viewer's iframe stays empty; "Open in a new tab" and Download are the fallback. Check it on `canvas-dev`.
+- **A real HEIC photo.** Allowed, and the type handling is unit-tested, but no HEIC file went through the e2e run. If the server's image library can't read it, `processImage` returns null and the file gets a plain tile. The viewer offers a download for HEIC in any case.
+- **A real alert email.** The mock client's log shows the right recipients and subject; nothing has gone through SMTP.
+
+### Verified
+
+- `pnpm check` green. `pnpm test`: API 391 + 1 skipped, shared 127, db 11, web 15.
+- `0069` applied, rolled back and re-applied on the local database.
+- Playwright: new `contract-end-alert.spec.ts` and `contracts-page.spec.ts`; `documents.spec.ts` and `hr-guards.spec.ts` updated. Full suite 81 of 82 on the first run; the one failure was `email-digest.spec.ts`, the known intermittent timeout (see P8.4/P8.5), which passed when rerun on its own.

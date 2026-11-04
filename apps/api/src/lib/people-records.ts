@@ -100,6 +100,21 @@ export async function deletePersonRecords(
 ) {
   const fileKeys: string[] = [];
   const counts = await db.transaction(async (tx) => {
+    // P8.6: every file of every contract (contract_files cascades away with
+    // the contracts, so collect them first), plus pre-P8.6 attachment_ids.
+    const contractFiles = await tx
+      .select({ attachmentId: schema.contractFiles.attachmentId })
+      .from(schema.contractFiles)
+      .innerJoin(
+        schema.employmentContracts,
+        eq(schema.employmentContracts.id, schema.contractFiles.contractId),
+      )
+      .where(
+        and(
+          eq(schema.employmentContracts.workspaceId, workspaceId),
+          eq(schema.employmentContracts.userId, userId),
+        ),
+      );
     const contracts = await tx
       .delete(schema.employmentContracts)
       .where(
@@ -137,9 +152,10 @@ export async function deletePersonRecords(
       )
       .returning({ id: schema.payrollRecords.id });
 
-    const attachmentIds = [...contracts, ...leave]
+    const attachmentIds = [...contractFiles, ...contracts, ...leave]
       .map((r) => r.attachmentId)
-      .filter((id): id is string => id !== null);
+      .filter((id): id is string => id !== null)
+      .filter((id, i, all) => all.indexOf(id) === i);
     if (attachmentIds.length > 0) {
       const files = await tx
         .delete(schema.attachments)

@@ -65,4 +65,12 @@ describe("contentSecurityPolicy", () => {
     expect(csp.directives["upgrade-insecure-requests"]).toBeNull();
     expect(csp.directives["connect-src"]).toEqual(["'self'", "http://localhost:9000"]);
   });
+
+  it("lets signed contract thumbnails, photos and PDF previews load from storage", () => {
+    const csp = contentSecurityPolicy(r2);
+    for (const origin of storageOrigins(r2)) {
+      expect(csp.directives["img-src"]).toContain(origin);
+      expect(csp.directives["frame-src"]).toContain(origin);
+    }
+  });
 });

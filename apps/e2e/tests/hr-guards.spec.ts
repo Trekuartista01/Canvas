@@ -99,7 +99,15 @@ test("HR routes: 403 for admin, owner, CEO, Operations Manager and employees; 20
       kind: "contract",
       title: "Sam's contract",
       startDate: "2026-01-01",
+      uploadedBy: hr.userId,
+    })
+    .returning();
+  const [contractFile] = await db
+    .insert(schema.contractFiles)
+    .values({
+      contractId: contract!.id,
       attachmentId: file!.id,
+      orderKey: "a0",
       uploadedBy: hr.userId,
     })
     .returning();
@@ -138,11 +146,26 @@ test("HR routes: 403 for admin, owner, CEO, Operations Manager and employees; 20
         kind: "contract",
         title: "Another",
         startDate: "2026-01-01",
-        attachmentId: file!.id,
+        attachmentIds: [file!.id],
       },
     },
     { kind: "mutation", path: "contract.update", input: { contractId: contract!.id, title: "X" } },
-    { kind: "mutation", path: "contract.downloadUrl", input: { contractId: contract!.id } },
+    {
+      kind: "mutation",
+      path: "contract.addFiles",
+      input: { contractId: contract!.id, attachmentIds: [file!.id] },
+    },
+    {
+      kind: "mutation",
+      path: "contract.replaceFile",
+      input: { fileId: contractFile!.id, attachmentId: file!.id },
+    },
+    { kind: "mutation", path: "contract.deleteFile", input: { fileId: contractFile!.id } },
+    {
+      kind: "mutation",
+      path: "contract.fileUrl",
+      input: { fileId: contractFile!.id, disposition: "download" },
+    },
     { kind: "rest", path: `/uploads/${file!.id}` },
     { kind: "mutation", path: "contract.delete", input: { contractId: contract!.id } },
     {
