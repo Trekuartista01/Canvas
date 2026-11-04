@@ -1,9 +1,7 @@
 import { db, schema } from "@canvas/db";
 import { eq } from "drizzle-orm";
 import type { FastifyRequest } from "fastify";
-
-const SESSION_TTL_MS = 1000 * 60 * 60 * 24 * 30; // 30 days
-const SESSION_RENEW_THRESHOLD_MS = 1000 * 60 * 60 * 24 * 15; // renew when <15 days left
+import { SESSION_TTL_MS, shouldRenewSession } from "./session-lifetime";
 
 export const SESSION_COOKIE_NAME = "canvas_session";
 
@@ -24,9 +22,12 @@ export async function createSession(userId: string) {
   return session!;
 }
 
-export async function validateSession(
-  sessionId: string,
-): Promise<{ session: typeof schema.sessions.$inferSelect; user: SessionUser } | null> {
+export async function validateSession(sessionId: string): Promise<{
+  session: typeof schema.sessions.$inferSelect;
+  user: SessionUser;
+  /** The expiry moved, so the browser's cookie needs to move with it. */
+  renewed: boolean;
+} | null> {
   const [row] = await db
     .select({
       session: schema.sessions,
@@ -50,7 +51,9 @@ export async function validateSession(
     return null;
   }
 
-  if (row.session.expiresAt.getTime() - Date.now() < SESSION_RENEW_THRESHOLD_MS) {
+  let renewed = false;
+  if (shouldRenewSession(row.session.expiresAt)) {
+    renewed = true;
     const newExpiresAt = new Date(Date.now() + SESSION_TTL_MS);
     await db
       .update(schema.sessions)
@@ -59,7 +62,7 @@ export async function validateSession(
     row.session.expiresAt = newExpiresAt;
   }
 
-  return row;
+  return { ...row, renewed };
 }
 
 export async function invalidateSession(sessionId: string) {

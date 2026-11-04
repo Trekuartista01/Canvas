@@ -1,4 +1,5 @@
 import type { CreateFastifyContextOptions } from "@trpc/server/adapters/fastify";
+import { setSessionCookie } from "../auth/cookies";
 import { SESSION_COOKIE_NAME, validateSession, type SessionUser } from "../auth/session";
 
 export async function createContext({ req, res }: CreateFastifyContextOptions) {
@@ -8,6 +9,8 @@ export async function createContext({ req, res }: CreateFastifyContextOptions) {
   if (sessionId) {
     const result = await validateSession(sessionId);
     user = result?.user ?? null;
+    // Keep the browser's copy in step, or it runs out while the session is in use.
+    if (result?.renewed) setSessionCookie(res, sessionId);
   }
 
   // The client's address for audit_log (lib/audit.ts).

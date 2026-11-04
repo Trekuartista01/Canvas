@@ -3243,3 +3243,14 @@ Requested after Phase 8, outside the spec.
 - `0074` applied, rolled back and re-applied locally; RLS confirmed on.
 - Playwright 92/92, with new `password-reset.spec.ts`. It covers the 5-email and 20-wrong-password limits for real. The per-minute limits aren't exercised end to end: e2e raises them to 1000 so parallel runs don't trip them.
 - Real delivery through SMTP is still untested.
+
+## 2026-11-04 Logins stay saved
+
+Requested after Phase 8, outside the spec.
+
+- **Lifetime:** a login now lasts until the person logs out, or doesn't use Canvas for a year (`auth/session-lifetime.ts`). It was 30 days. Each day of use starts the year again.
+- **Bug fixed:** the server extended a session in use, but the browser's cookie was never updated, so everyone was logged out 30 days after logging in, however often they used Canvas. `createContext` now re-sends the cookie whenever the session is renewed.
+- **What still ends a login:** logging out, resetting the password (every device), and clearing browser data. Archived people are still blocked from the workspace even with a live login.
+- **Tradeoff:** a logged-in browser stays logged in, including for HR and payroll. Anyone at an unlocked computer is that person. This matters most for HR on a shared computer; there's no idle lock.
+
+Verified: `pnpm check` green; unit tests in `session.test.ts`; new `stay-logged-in.spec.ts` (survives a restart with only saved state, renewal reaches the browser, logging out ends a saved copy, an expired session is refused). `pnpm test`: API 395 + 1 skipped, shared 166, db 11, web 15. Playwright 94/94.
