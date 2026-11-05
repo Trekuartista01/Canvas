@@ -2,6 +2,7 @@ import { RoleRequestSelect, type RoleChoice } from "@/components/role-request";
 import { Button } from "@/components/ui/button";
 import { useSession } from "@/hooks/use-session";
 import { trpc } from "@/lib/trpc";
+import { PEOPLE_ROLE_LABELS } from "@canvas/shared";
 import { createRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import { rootRoute } from "./__root";
@@ -71,7 +72,13 @@ function InvitePage() {
 
       {user && user.email === invite.data.email && (
         <div className="w-full max-w-sm space-y-4">
-          <RoleRequestSelect value={requestedRole} onChange={setRequestedRole} />
+          {invite.data.peopleRole ? (
+            <p className="text-muted-foreground text-sm" data-testid="invite-role">
+              You'll join as {PEOPLE_ROLE_LABELS[invite.data.peopleRole]}.
+            </p>
+          ) : (
+            <RoleRequestSelect value={requestedRole} onChange={setRequestedRole} />
+          )}
           <Button
             onClick={() => accept.mutate({ inviteId, ...(requestedRole ? { requestedRole } : {}) })}
             disabled={accept.isPending}

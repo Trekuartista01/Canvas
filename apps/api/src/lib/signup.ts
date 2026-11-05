@@ -13,7 +13,7 @@ import { hashPassword } from "../auth/password";
 import { getEmailClient } from "../email";
 import { env } from "../env";
 import { assertEmailSendRateLimit } from "./rate-limit";
-import { recordRoleRequest } from "./role-requests";
+import { announceInvitedRole, recordRoleRequest } from "./role-requests";
 
 const LINK_TTL_MS = 24 * 60 * 60 * 1000;
 
@@ -185,6 +185,7 @@ export async function completeSignUp(token: string, password: string) {
       userId: created.id,
       role: pendingInvite.role,
       customRoleId: pendingInvite.customRoleId,
+      peopleRole: pendingInvite.peopleRole ?? "employee",
     });
     await tx
       .update(schema.invites)
@@ -201,6 +202,16 @@ export async function completeSignUp(token: string, password: string) {
   });
 
   const requested = REQUESTABLE_PEOPLE_ROLES.find((r) => r === request.requestedRole);
-  if (invite && requested) await recordRoleRequest(invite.workspaceId, user.id, requested);
+  if (invite?.peopleRole) {
+    // Whoever invited them already chose, so there's nothing left to ask for.
+    await announceInvitedRole({
+      workspaceId: invite.workspaceId,
+      invitedBy: invite.invitedBy,
+      userId: user.id,
+      peopleRole: invite.peopleRole,
+    });
+  } else if (invite && requested) {
+    await recordRoleRequest(invite.workspaceId, user.id, requested);
+  }
   return user;
 }

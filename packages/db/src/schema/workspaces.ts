@@ -140,6 +140,9 @@ export const invites = pgTable("invites", {
   // custom role layers permission deltas on top" relationship as
   // memberships.customRoleId above.
   customRoleId: uuid("custom_role_id").references(() => customRoles.id, { onDelete: "set null" }),
+  // The people role this person gets on joining, chosen by whoever invited them
+  // (roles:assign). Null: Employee, and they may still ask for a role themselves.
+  peopleRole: peopleRole("people_role"),
   invitedBy: uuid("invited_by")
     .notNull()
     .references(() => users.id, { onDelete: "cascade" }),

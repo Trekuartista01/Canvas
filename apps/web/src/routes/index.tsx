@@ -1,4 +1,4 @@
-import { MEMBERSHIP_ROLES, type MembershipRole } from "@canvas/shared";
+import { INVITE_ROLE_CHOICES, PEOPLE_ROLE_LABELS, type MembershipRole } from "@canvas/shared";
 import { CanvasLogo } from "@/components/canvas-logo";
 import { RequireAuth } from "@/components/require-auth";
 import { Button } from "@/components/ui/button";
@@ -13,7 +13,6 @@ import { useState } from "react";
 import { rootRoute } from "./__root";
 
 type InvitableRole = Exclude<MembershipRole, "owner">;
-const INVITABLE_ROLES = MEMBERSHIP_ROLES.filter((r): r is InvitableRole => r !== "owner");
 
 const ROLE_BADGE_CLASS: Record<string, string> = {
   owner: "bg-accent-soft text-accent",
@@ -125,34 +124,70 @@ function WorkspaceRow({
   role: string;
 }) {
   const [inviteEmail, setInviteEmail] = useState("");
-  const [inviteRole, setInviteRole] = useState<InvitableRole>("member");
-  const [inviteCustomRoleId, setInviteCustomRoleId] = useState<string | null>(null);
-  const [inviteLink, setInviteLink] = useState<string | null>(null);
+  const [inviteChoice, setInviteChoice] = useState<string>("member");
+  const [sent, setSent] = useState<{ email: string; link: string } | null>(null);
   const [inviteError, setInviteError] = useState<string | null>(null);
   const canInvite = role === "owner" || role === "admin";
+  const utils = trpc.useUtils();
 
   const customRoles = trpc.role.list.useQuery({ workspaceId }, { enabled: canInvite });
+  const access = trpc.people.myAccess.useQuery({ workspaceId }, { enabled: canInvite });
+  const pending = trpc.workspace.listInvites.useQuery({ workspaceId }, { enabled: canInvite });
+  const canAssignRoles = access.data?.actions.includes("roles:assign") ?? false;
+  const choices = INVITE_ROLE_CHOICES.filter(
+    (choice) => canAssignRoles || !("peopleRole" in choice),
+  );
+  const selectedChoice = choices.find((choice) => choice.value === inviteChoice);
+  const selectedCustomRole = inviteChoice.startsWith(CUSTOM_ROLE_PREFIX)
+    ? customRoles.data?.find((r) => r.id === inviteChoice.slice(CUSTOM_ROLE_PREFIX.length))
+    : undefined;
 
   const invite = trpc.workspace.invite.useMutation({
     onSuccess: (data) => {
-      setInviteLink(`${window.location.origin}/invite/${data.id}`);
+      setSent({ email: data.email, link: data.link });
       setInviteEmail("");
-      setInviteCustomRoleId(null);
+      setInviteChoice("member");
+      void utils.workspace.listInvites.invalidate({ workspaceId });
+    },
+    onError: (err) => setInviteError(err.message),
+  });
+  const cancelInvite = trpc.workspace.cancelInvite.useMutation({
+    onSuccess: () => {
+      setSent(null);
+      void utils.workspace.listInvites.invalidate({ workspaceId });
     },
     onError: (err) => setInviteError(err.message),
   });
 
-  function handleRoleChange(value: string) {
-    if (value.startsWith(CUSTOM_ROLE_PREFIX)) {
-      const customRoleId = value.slice(CUSTOM_ROLE_PREFIX.length);
-      const customRole = customRoles.data?.find((r) => r.id === customRoleId);
-      if (!customRole) return;
-      setInviteRole(customRole.baseRole as InvitableRole);
-      setInviteCustomRoleId(customRoleId);
-    } else {
-      setInviteRole(value as InvitableRole);
-      setInviteCustomRoleId(null);
+  function submitInvite() {
+    setInviteError(null);
+    setSent(null);
+    if (selectedCustomRole) {
+      invite.mutate({
+        workspaceId,
+        email: inviteEmail,
+        role: selectedCustomRole.baseRole as InvitableRole,
+        customRoleId: selectedCustomRole.id,
+      });
+    } else if (selectedChoice) {
+      invite.mutate({
+        workspaceId,
+        email: inviteEmail,
+        role: selectedChoice.role,
+        ...("peopleRole" in selectedChoice ? { peopleRole: selectedChoice.peopleRole } : {}),
+      });
     }
+  }
+
+  function pendingRoleLabel(row: {
+    role: string;
+    customRoleId: string | null;
+    peopleRole: keyof typeof PEOPLE_ROLE_LABELS | null;
+  }) {
+    if (row.peopleRole) return PEOPLE_ROLE_LABELS[row.peopleRole];
+    const custom = customRoles.data?.find((r) => r.id === row.customRoleId);
+    if (custom) return custom.name;
+    return INVITE_ROLE_CHOICES.find((c) => c.value === row.role)?.label ?? row.role;
   }
 
   return (
@@ -182,36 +217,31 @@ function WorkspaceRow({
 
       {canInvite && (
         <form
-          className="flex gap-2"
+          className="flex flex-wrap gap-2"
           onSubmit={(e) => {
             e.preventDefault();
-            setInviteError(null);
-            setInviteLink(null);
-            invite.mutate({
-              workspaceId,
-              email: inviteEmail,
-              role: inviteRole,
-              customRoleId: inviteCustomRoleId ?? undefined,
-            });
+            submitInvite();
           }}
         >
           <Input
             type="email"
+            aria-label="Invite email"
             placeholder="teammate@example.com"
+            className="min-w-48 flex-1"
             value={inviteEmail}
             onChange={(e) => setInviteEmail(e.target.value)}
             required
           />
           <select
-            value={inviteCustomRoleId ? `${CUSTOM_ROLE_PREFIX}${inviteCustomRoleId}` : inviteRole}
+            value={inviteChoice}
             aria-label="Invite role"
-            onChange={(e) => handleRoleChange(e.target.value)}
+            onChange={(e) => setInviteChoice(e.target.value)}
             className="border-border bg-background h-9 rounded-md border px-2 text-sm"
           >
             <optgroup label="Role">
-              {INVITABLE_ROLES.map((r) => (
-                <option key={r} value={r}>
-                  {r}
+              {choices.map((choice) => (
+                <option key={choice.value} value={choice.value}>
+                  {choice.label}
                 </option>
               ))}
             </optgroup>
@@ -228,13 +258,49 @@ function WorkspaceRow({
           <Button type="submit" size="sm" disabled={invite.isPending}>
             Invite
           </Button>
+          {selectedChoice && (
+            <p className="text-muted-foreground w-full text-xs">{selectedChoice.description}</p>
+          )}
         </form>
       )}
-      {inviteError && <p className="text-xs text-red-500">{inviteError}</p>}
-      {inviteLink && (
-        <p className="text-muted-foreground break-all text-xs">
-          Invite link: <span className="text-foreground">{inviteLink}</span>
+      {inviteError && (
+        <p className="text-xs text-red-500" role="alert">
+          {inviteError}
         </p>
+      )}
+      {sent && (
+        <div className="space-y-1 text-xs" role="status">
+          <p>We've emailed the invite to {sent.email}.</p>
+          <p className="text-muted-foreground break-all">
+            Invite link: <span className="text-foreground">{sent.link}</span>
+          </p>
+          <p className="text-muted-foreground">
+            If it doesn't arrive, send them this link yourself.
+          </p>
+        </div>
+      )}
+      {canInvite && (pending.data?.length ?? 0) > 0 && (
+        <div className="space-y-1" data-testid="pending-invites">
+          <p className="text-muted-foreground text-xs font-medium">Waiting to join</p>
+          <ul className="space-y-1">
+            {pending.data?.map((row) => (
+              <li key={row.id} className="flex items-center justify-between gap-2 text-xs">
+                <span className="min-w-0 truncate">
+                  {row.email} · {pendingRoleLabel(row)}
+                </span>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  disabled={cancelInvite.isPending}
+                  onClick={() => cancelInvite.mutate({ workspaceId, inviteId: row.id })}
+                >
+                  Cancel invite
+                </Button>
+              </li>
+            ))}
+          </ul>
+        </div>
       )}
     </div>
   );

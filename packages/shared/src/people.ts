@@ -160,3 +160,58 @@ export const CONTRACT_TYPE_LABELS: Record<ContractType, string> = {
 };
 export const PAY_CURRENCIES = ["EUR", "USD", "CHF", "GBP", "ALL"] as const;
 export type PayCurrency = (typeof PAY_CURRENCIES)[number];
+
+/**
+ * What the person inviting can choose. `role` is the workspace access and
+ * `peopleRole` the job role applied on joining; without one they join as
+ * Employee and may still ask for a role themselves. Anything but Employee and
+ * Guest needs roles:assign.
+ */
+export const INVITE_ROLE_CHOICES = [
+  {
+    value: "member",
+    label: "Employee",
+    description: "Their own tasks, leave and daily reports.",
+    role: "member",
+  },
+  {
+    value: "operations_manager",
+    label: PEOPLE_ROLE_LABELS.operations_manager,
+    description: "Runs the team's tasks, clients and boards.",
+    role: "member",
+    peopleRole: "operations_manager",
+  },
+  {
+    value: "ceo",
+    label: PEOPLE_ROLE_LABELS.ceo,
+    description: "Sees the team's work, clients and boards.",
+    role: "member",
+    peopleRole: "ceo",
+  },
+  {
+    value: "hr_finance",
+    label: PEOPLE_ROLE_LABELS.hr_finance,
+    description: "Staff records, leave approvals, payroll and contracts.",
+    role: "member",
+    peopleRole: "hr_finance",
+  },
+  {
+    value: "admin",
+    label: PEOPLE_ROLE_LABELS.admin,
+    description: "Runs the workspace and assigns roles. No access to HR data.",
+    role: "admin",
+    peopleRole: "admin",
+  },
+  {
+    value: "guest",
+    label: "Guest",
+    description: "Limited access to what's shared with them.",
+    role: "guest",
+  },
+] as const satisfies readonly {
+  value: string;
+  label: string;
+  description: string;
+  role: Exclude<MembershipRole, "owner">;
+  peopleRole?: Exclude<PeopleRole, "employee">;
+}[];

@@ -1,0 +1,1 @@
+ALTER TABLE "invites" ADD COLUMN "people_role" "people_role";

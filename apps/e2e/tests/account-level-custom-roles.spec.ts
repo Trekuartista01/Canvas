@@ -57,7 +57,7 @@ test("a custom role created in one workspace is usable in every other workspace 
   const bobEmail = `bob-role-share-${Date.now()}@example.com`;
   await studioBRow.getByPlaceholder("teammate@example.com").fill(bobEmail);
   await studioBRow.getByLabel("Invite role").selectOption({ label: "Video Editor" });
-  await studioBRow.getByRole("button", { name: "Invite" }).click();
+  await studioBRow.getByRole("button", { name: "Invite", exact: true }).click();
   const link = studioBRow.locator("p", { hasText: "Invite link:" }).locator("span");
   await expect(link).toBeVisible();
   const inviteLink = await link.textContent();

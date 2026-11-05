@@ -6,6 +6,7 @@ import {
 import { EmployeeProfileFields } from "@/components/employee-profile-fields";
 import { ConfidentialPanel } from "@/components/person-confidential";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useSession } from "@/hooks/use-session";
 import { Avatar } from "@/lib/avatar";
@@ -107,6 +108,7 @@ function PersonProfilePage() {
 }
 
 function ProfileTab({ workspaceId, profile: p }: { workspaceId: string; profile: Profile }) {
+  const { user } = useSession();
   return (
     <>
       <dl className="grid gap-x-6 gap-y-3 text-sm sm:grid-cols-2" data-testid="person-details">
@@ -140,7 +142,115 @@ function ProfileTab({ workspaceId, profile: p }: { workspaceId: string; profile:
           <ArchiveEditor workspaceId={workspaceId} profile={p} />
         </>
       )}
+      {user?.id === p.userId && (
+        <>
+          {!p.canManage && <MyDetailsEditor workspaceId={workspaceId} profile={p} />}
+          <ResetMyPassword email={p.email} />
+        </>
+      )}
     </>
+  );
+}
+
+/** Someone's own position, department and birthday. HR has the full editor instead. */
+function MyDetailsEditor({ workspaceId, profile }: { workspaceId: string; profile: Profile }) {
+  const invalidate = useInvalidatePerson();
+  const [jobTitle, setJobTitle] = useState(profile.jobTitle ?? "");
+  const [department, setDepartment] = useState(profile.department ?? "");
+  const [dateOfBirth, setDateOfBirth] = useState(profile.personal?.dateOfBirth ?? "");
+  const update = trpc.people.updateMyProfile.useMutation({ onSuccess: invalidate });
+
+  return (
+    <form
+      onSubmit={(e) => {
+        e.preventDefault();
+        update.mutate({ workspaceId, jobTitle, department, dateOfBirth });
+      }}
+      className="border-border space-y-3 rounded-md border p-4"
+      data-testid="my-details-editor"
+    >
+      <div>
+        <h2 className="text-sm font-semibold">My details</h2>
+        <p className="text-muted-foreground text-xs">
+          Everyone can see your position and department. Only you and HR can see your birthday.
+        </p>
+      </div>
+      <div className="grid gap-3 sm:grid-cols-3">
+        <div className="space-y-1">
+          <Label htmlFor="my-position" className="text-xs">
+            Position
+          </Label>
+          <Input id="my-position" value={jobTitle} onChange={(e) => setJobTitle(e.target.value)} />
+        </div>
+        <div className="space-y-1">
+          <Label htmlFor="my-department" className="text-xs">
+            Department
+          </Label>
+          <Input
+            id="my-department"
+            value={department}
+            onChange={(e) => setDepartment(e.target.value)}
+          />
+        </div>
+        <div className="space-y-1">
+          <Label htmlFor="my-birthday" className="text-xs">
+            Birthday
+          </Label>
+          <Input
+            id="my-birthday"
+            type="date"
+            value={dateOfBirth}
+            onChange={(e) => setDateOfBirth(e.target.value)}
+          />
+        </div>
+      </div>
+      {update.error && (
+        <p className="text-sm text-red-600 dark:text-red-400" role="alert">
+          {update.error.message}
+        </p>
+      )}
+      <div className="flex items-center gap-2">
+        <Button type="submit" size="sm" disabled={update.isPending}>
+          {update.isPending ? "Saving…" : "Save my details"}
+        </Button>
+        {update.isSuccess && !update.isPending && (
+          <span className="text-muted-foreground text-xs">Saved</span>
+        )}
+      </div>
+    </form>
+  );
+}
+
+/** Emails the same link as "Forgot password", to their own address. */
+function ResetMyPassword({ email }: { email: string }) {
+  const reset = trpc.auth.requestPasswordReset.useMutation();
+  return (
+    <div className="border-border space-y-2 rounded-md border p-4" data-testid="reset-my-password">
+      <h2 className="text-sm font-semibold">Password</h2>
+      <p className="text-muted-foreground text-xs">
+        We'll email {email} a link to choose a new password. Changing it logs you out everywhere.
+      </p>
+      {reset.error && (
+        <p className="text-sm text-red-600 dark:text-red-400" role="alert">
+          {reset.error.message}
+        </p>
+      )}
+      {reset.isSuccess ? (
+        <p className="text-sm" role="status">
+          Check your email for the link. It works for 1 hour, and may land in Junk.
+        </p>
+      ) : (
+        <Button
+          type="button"
+          size="sm"
+          variant="outline"
+          disabled={reset.isPending}
+          onClick={() => reset.mutate({ email })}
+        >
+          {reset.isPending ? "Sending…" : "Email me a reset link"}
+        </Button>
+      )}
+    </div>
   );
 }
 

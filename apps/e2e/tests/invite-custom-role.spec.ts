@@ -34,7 +34,7 @@ test("inviting someone lets you pick a custom role directly, and it's applied on
   const bobEmail = `bob-invited-staff-${Date.now()}@example.com`;
   await page.getByPlaceholder("teammate@example.com").fill(bobEmail);
   await inviteRoleSelect.selectOption({ label: "Staff" });
-  await page.getByRole("button", { name: "Invite" }).click();
+  await page.getByRole("button", { name: "Invite", exact: true }).click();
   const link = page.locator("p", { hasText: "Invite link:" }).locator("span");
   await expect(link).toBeVisible();
   const inviteLink = await link.textContent();

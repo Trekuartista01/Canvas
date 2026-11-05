@@ -16,6 +16,7 @@ import {
   setPeopleRoleSchema,
   updateConfidentialSchema,
   updateEmployeeProfileSchema,
+  updateMyProfileSchema,
   WORKSPACE_ACTIONS,
   workspaceScopedSchema,
   wouldCreateReportingCycle,
@@ -410,6 +411,27 @@ export const peopleRouter = router({
         payload: { fields: Object.keys(values) },
       });
       return { userId: input.userId };
+    }),
+
+  // Position, department and birthday, on your own profile only: no target
+  // user in the input, so it can't reach anyone else's. The birthday stays
+  // confidential, like the rest of `personal` above.
+  updateMyProfile: protectedProcedure
+    .input(updateMyProfileSchema)
+    .mutation(async ({ ctx, input }) => {
+      await requireActiveMember(ctx.user, input.workspaceId);
+      const membership = await requireTargetMembership(input.workspaceId, ctx.user.id);
+      const values = pickProfileFields(input);
+      await upsertProfile(membership.id, values);
+      await logActivity(
+        input.workspaceId,
+        ctx.user.id,
+        "person",
+        ctx.user.id,
+        "person.profile_updated",
+        { fields: Object.keys(values) },
+      );
+      return { userId: ctx.user.id };
     }),
 
   // Admin only (roles:assign). Admin can never make themselves HR, and every

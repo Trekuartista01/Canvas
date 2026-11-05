@@ -1,4 +1,4 @@
-import { REQUESTABLE_PEOPLE_ROLES } from "../people";
+import { PEOPLE_ROLES, REQUESTABLE_PEOPLE_ROLES } from "../people";
 import { z } from "zod";
 import { emailSchema } from "./auth";
 import { MEMBERSHIP_ROLES } from "../roles";
@@ -12,6 +12,13 @@ export const inviteMemberSchema = z.object({
   email: emailSchema,
   role: z.enum(MEMBERSHIP_ROLES).exclude(["owner"]),
   customRoleId: z.string().uuid().optional(),
+  // Applied on joining. Needs roles:assign. Employee is what everyone gets anyway.
+  peopleRole: z.enum(PEOPLE_ROLES).exclude(["employee"]).optional(),
+});
+
+export const cancelInviteSchema = z.object({
+  workspaceId: z.string().uuid(),
+  inviteId: z.string().uuid(),
 });
 
 export const acceptInviteSchema = z.object({

@@ -3287,3 +3287,15 @@ Requested after Phase 8, outside the spec. The user has about 20 staff and contr
 ### Noticed, not changed
 
 - **`getSessionUser` renews a session without updating the cookie** (`auth/session.ts`, used by plain routes such as file downloads). If one of those is the day's first request, the browser's cookie isn't extended that day. A later day's request normally fixes it, so the effect should be small.
+
+## 2026-11-05 Office PC live; invites choose a role; people edit their own details
+
+- **Production is on the office laptop**: WSL distro `Ubuntu-24.04`, port 3101, Redis on 6380, Tailscale Funnel at `canvas.tail028b3d.ts.net`. Not yet proven: `deploy/office-pc-startup.ps1` (startup task) surviving a real restart. `DEPLOYMENT.md` still describes the Oracle path.
+- **Microsoft 365 silently drops some email with `*.ts.net` links**, with no Junk or user quarantine. `EMAIL_LINK_URL` (empty = `WEB_URL`) makes emails link to `canvas.trekuartista.com`, a Netlify redirect (`deploy/link-redirect`) that keeps the path and query. `WEB_URL` stays the Funnel address. Not fully explained: one test email with the new link and test wording was also dropped, while the same link with sign-up wording arrived.
+- **Invites**: the inviter picks Employee, Operations Manager, CEO, HR/Finance Manager, Admin, Guest or a custom role (`INVITE_ROLE_CHOICES`). A job role needs `roles:assign`, applies on joining, and is audited and announced to HR with the inviter as actor (`announceInvitedRole`). `invites.people_role` is new (0075). Employee sends no role, so they can still ask for one (`recordRoleRequest`).
+- Invites are now emailed, and the link is still shown as a fallback. New: pending list, `workspace.cancelInvite` (sets `expiresAt` to now; invites have no soft delete), refusal for existing members and yourself, and a new invite replaces the older one for that address.
+- **My details**: `people.updateMyProfile` lets anyone set their own position, department and birthday (no target user in the input). The birthday stays confidential (HR and self). HR keeps the full editor.
+- **Password**: the profile button sends the same email link as "Forgot password". There is still no change-password form.
+- e2e: `invite-with-role`, `my-profile`. The pending list isn't virtualized (newest 50 only; few at any time).
+- A `pnpm dev` already on ports 3001/5183 makes Playwright reuse it without the test settings: nearly every test then fails at sign-up. Stop it first.
+- TODO: restart test; restore test; remove temporary sudo; `DEPLOYMENT.md` office path; `phase7.smoke.ts` rework; confirm the other email wordings arrive (password reset, invite, leave).

@@ -101,7 +101,9 @@ function SignupPage() {
                 required
               />
             </div>
-            {inviteId && <RoleRequestSelect value={requestedRole} onChange={setRequestedRole} />}
+            {inviteId && !invite.data?.peopleRole && (
+              <RoleRequestSelect value={requestedRole} onChange={setRequestedRole} />
+            )}
             {error && (
               <p className="text-sm text-red-500" role="alert">
                 {error}
