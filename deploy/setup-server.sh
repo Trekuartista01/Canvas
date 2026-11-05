@@ -8,8 +8,15 @@
 # Installs: timezone Europe/Belgrade, Node 22 LTS + pnpm (corepack) + PM2,
 # Redis (localhost only, with a password), Caddy, postgresql-client-17
 # (pg_dump for the nightly backup), and opens ports 80/443 in the VM firewall.
+#
+# On the office PC (WSL, public address from Tailscale Funnel) skip Caddy and the
+# firewall, and keep Redis off the development port:
+#
+#   OFFICE_PC=1 REDIS_PORT=6380 bash deploy/setup-server.sh
 set -euo pipefail
 
+OFFICE_PC="${OFFICE_PC:-}"
+REDIS_PORT="${REDIS_PORT:-6379}"
 REPO="$(cd "$(dirname "$0")/.." && pwd)"
 have_systemd() { [ -d /run/systemd/system ]; }
 say() { printf '\n\033[1m== %s\033[0m\n' "$*"; }
@@ -64,10 +71,11 @@ if ! as_root grep -q "Canvas production Redis settings" "$REDIS_CONF"; then
   REDIS_PASSWORD="$(openssl rand -hex 24)"
   sed "s/CHANGE_ME_TO_A_LONG_RANDOM_HEX_STRING/${REDIS_PASSWORD}/" "$REPO/deploy/redis-canvas.conf" \
     | as_root tee -a "$REDIS_CONF" >/dev/null
-  echo "redis://:${REDIS_PASSWORD}@127.0.0.1:6379" > "$HOME/.canvas-redis-url"
+  echo "port ${REDIS_PORT}" | as_root tee -a "$REDIS_CONF" >/dev/null
+  echo "redis://:${REDIS_PASSWORD}@127.0.0.1:${REDIS_PORT}" > "$HOME/.canvas-redis-url"
   chmod 600 "$HOME/.canvas-redis-url"
   echo "Generated a Redis password. Put this line in .env (it's also saved in ~/.canvas-redis-url):"
-  echo "  REDIS_URL=redis://:${REDIS_PASSWORD}@127.0.0.1:6379"
+  echo "  REDIS_URL=redis://:${REDIS_PASSWORD}@127.0.0.1:${REDIS_PORT}"
 else
   echo "Already configured. REDIS_URL is in ~/.canvas-redis-url"
 fi
@@ -77,7 +85,9 @@ if have_systemd; then
 fi
 
 say "Caddy (HTTPS)"
-if ! command -v caddy >/dev/null; then
+if [ -n "$OFFICE_PC" ]; then
+  echo "Office PC: Tailscale Funnel provides HTTPS — skipped."
+elif ! command -v caddy >/dev/null; then
   curl -1sLf https://dl.cloudsmith.io/public/caddy/stable/gpg.key \
     | as_root gpg --dearmor --yes -o /usr/share/keyrings/caddy-stable-archive-keyring.gpg
   curl -1sLf https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt \
@@ -85,7 +95,7 @@ if ! command -v caddy >/dev/null; then
   as_root apt-get update -qq
   as_root apt-get install -y -qq caddy >/dev/null
 fi
-caddy version
+[ -n "$OFFICE_PC" ] || caddy version
 
 say "PostgreSQL 17 client (pg_dump/pg_restore for backups)"
 if ! command -v pg_dump >/dev/null || [ "$(pg_dump --version | grep -oE '[0-9]+' | head -1)" -lt 17 ]; then
@@ -96,7 +106,9 @@ fi
 pg_dump --version
 
 say "Firewall: open 80/443 (Oracle's Ubuntu image only allows SSH by default)"
-if as_root iptables -L INPUT -n >/dev/null 2>&1; then
+if [ -n "$OFFICE_PC" ]; then
+  echo "Office PC: nothing listens publicly — skipped."
+elif as_root iptables -L INPUT -n >/dev/null 2>&1; then
   for port in 80 443; do
     if ! as_root iptables -C INPUT -p tcp --dport "$port" -m state --state NEW -j ACCEPT 2>/dev/null; then
       # Insert before Oracle's final REJECT rule.
