@@ -30,6 +30,8 @@ test("logins stay saved: across a browser restart, renewed by use, until logging
   await reopened.goto("/");
   await expect(reopened.getByText(email)).toBeVisible();
   await expect(reopened).not.toHaveURL(/login/);
+  // It shares this session, so its background requests could use up the renewal below.
+  await reopened.goto("about:blank");
 
   // Someone using Canvas near the end of their time gets it extended, both on
   // the server and in the browser. Before this, the browser's copy ran out.
@@ -56,7 +58,7 @@ test("logins stay saved: across a browser restart, renewed by use, until logging
   // Logging out ends it, including for a saved copy of the cookie.
   await page.getByRole("button", { name: "Log out" }).click();
   await expect(page).toHaveURL(/login/);
-  await reopened.reload();
+  await reopened.goto("/");
   await expect(reopened).toHaveURL(/login/);
   expect(await db.query.sessions.findFirst({ where: eq(schema.sessions.id, session!.id) })).toBe(
     undefined,

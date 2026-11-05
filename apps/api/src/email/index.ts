@@ -7,7 +7,9 @@ let client: EmailClient | undefined;
 
 export function getEmailClient(): EmailClient {
   if (!client) {
-    client = env.SMTP_HOST ? new SmtpEmailClient() : new MockEmailClient();
+    // Tests never send real email, even with a real key in a developer's .env.
+    const isTestRun = env.E2E_TEST_HOOKS || Boolean(process.env.VITEST);
+    client = env.SMTP_HOST && !isTestRun ? new SmtpEmailClient() : new MockEmailClient();
   }
   return client;
 }

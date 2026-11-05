@@ -101,7 +101,10 @@ function ClientsPage() {
   });
 
   return (
-    <div className="mx-auto flex h-full max-w-6xl flex-col gap-4 p-4 sm:p-6" data-testid="clients-page">
+    <div
+      className="mx-auto flex h-full max-w-6xl flex-col gap-4 p-4 sm:p-6"
+      data-testid="clients-page"
+    >
       <div className="flex flex-wrap items-center gap-2">
         <span className="bg-accent-soft text-accent flex h-9 w-9 items-center justify-center rounded-md">
           <Building2 className="h-5 w-5" aria-hidden />

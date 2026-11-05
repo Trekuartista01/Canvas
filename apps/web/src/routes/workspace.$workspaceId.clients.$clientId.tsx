@@ -109,12 +109,7 @@ function ClientFolderPage() {
         </Button>
       </div>
 
-      {editing && (
-        <EditClient
-          client={client}
-          onDone={() => setEditing(false)}
-        />
-      )}
+      {editing && <EditClient client={client} onDone={() => setEditing(false)} />}
 
       {rows.length === 0 ? (
         <p className="text-muted-foreground text-sm">No cards are linked to this client yet.</p>
@@ -284,9 +279,7 @@ function EditClient({ client, onDone }: { client: Folder["client"]; onDone: () =
           type="button"
           className="text-muted-foreground ml-auto text-xs hover:text-red-600"
           disabled={archive.isPending}
-          onClick={() =>
-            archive.mutate({ clientId: client.id, archived: !client.archivedAt })
-          }
+          onClick={() => archive.mutate({ clientId: client.id, archived: !client.archivedAt })}
           data-testid="client-archive"
         >
           {client.archivedAt ? "Restore client" : "Archive client"}

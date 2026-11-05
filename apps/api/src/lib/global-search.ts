@@ -249,14 +249,15 @@ async function searchClients(workspaceId: string, query: string) {
  * provider, so there is no AI index for confidential data to leak from.
  */
 export async function globalSearch(user: SessionUser, workspaceId: string, query: string) {
-  const [canDirectory, canManageStaff, canContracts, canPayroll, canLeave, canClients] = await Promise.all([
-    canPeopleAction(user, workspaceId, "people:viewDirectory"),
-    canPeopleAction(user, workspaceId, "people:manageStaff"),
-    canPeopleAction(user, workspaceId, "contract:manage"),
-    canPeopleAction(user, workspaceId, "payroll:view"),
-    canPeopleAction(user, workspaceId, "leave:approve"),
-    canPeopleAction(user, workspaceId, "clients:manage"),
-  ]);
+  const [canDirectory, canManageStaff, canContracts, canPayroll, canLeave, canClients] =
+    await Promise.all([
+      canPeopleAction(user, workspaceId, "people:viewDirectory"),
+      canPeopleAction(user, workspaceId, "people:manageStaff"),
+      canPeopleAction(user, workspaceId, "contract:manage"),
+      canPeopleAction(user, workspaceId, "payroll:view"),
+      canPeopleAction(user, workspaceId, "leave:approve"),
+      canPeopleAction(user, workspaceId, "clients:manage"),
+    ]);
 
   const [people, tasks] = await Promise.all([
     canDirectory ? searchPeople(workspaceId, query, canManageStaff) : [],

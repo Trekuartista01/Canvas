@@ -13,7 +13,11 @@ import { TRPCError } from "@trpc/server";
 import { and, asc, count, eq, inArray, isNull, notInArray, sql } from "drizzle-orm";
 import { logActivity } from "../../lib/activity";
 import { assertCanPeople } from "../../lib/permissions";
-import { PRIVATE_PREFIXES, SIGNED_URL_TTL_SECONDS, presignPrivateUpload } from "../../lib/private-upload";
+import {
+  PRIVATE_PREFIXES,
+  SIGNED_URL_TTL_SECONDS,
+  presignPrivateUpload,
+} from "../../lib/private-upload";
 import { publish } from "../../lib/realtime";
 import { deleteObject, getPresignedUrl, headObject } from "../../lib/storage";
 import { protectedProcedure, router } from "../trpc";
@@ -38,7 +42,8 @@ async function assertNameFree(workspaceId: string, name: string, exceptId?: stri
       ),
     )
     .limit(1);
-  if (taken) throw new TRPCError({ code: "CONFLICT", message: "There's already a client with that name" });
+  if (taken)
+    throw new TRPCError({ code: "CONFLICT", message: "There's already a client with that name" });
 }
 
 function cleanAliases(name: string, aliases: string[]) {
@@ -218,33 +223,37 @@ export const clientRouter = router({
     return { id: client.id };
   }),
 
-  setArchived: protectedProcedure.input(setClientArchivedSchema).mutation(async ({ ctx, input }) => {
-    const client = await requireClient(input.clientId);
-    await assertCanPeople(ctx.user, client.workspaceId, "clients:manage");
-    if (!input.archived) await assertNameFree(client.workspaceId, client.name, client.id);
-    await db
-      .update(schema.clients)
-      .set({ archivedAt: input.archived ? new Date() : null, updatedAt: new Date() })
-      .where(eq(schema.clients.id, client.id));
-    await logActivity(
-      client.workspaceId,
-      ctx.user.id,
-      "client",
-      client.id,
-      input.archived ? "client.archived" : "client.restored",
-      { name: client.name },
-    );
-    await announce(client.workspaceId, client.id, "updated");
-    return { id: client.id };
-  }),
+  setArchived: protectedProcedure
+    .input(setClientArchivedSchema)
+    .mutation(async ({ ctx, input }) => {
+      const client = await requireClient(input.clientId);
+      await assertCanPeople(ctx.user, client.workspaceId, "clients:manage");
+      if (!input.archived) await assertNameFree(client.workspaceId, client.name, client.id);
+      await db
+        .update(schema.clients)
+        .set({ archivedAt: input.archived ? new Date() : null, updatedAt: new Date() })
+        .where(eq(schema.clients.id, client.id));
+      await logActivity(
+        client.workspaceId,
+        ctx.user.id,
+        "client",
+        client.id,
+        input.archived ? "client.archived" : "client.restored",
+        { name: client.name },
+      );
+      await announce(client.workspaceId, client.id, "updated");
+      return { id: client.id };
+    }),
 
-  presignLogo: protectedProcedure.input(presignClientLogoSchema).mutation(async ({ ctx, input }) => {
-    const client = await requireClient(input.clientId);
-    await assertCanPeople(ctx.user, client.workspaceId, "clients:manage");
-    return presignPrivateUpload(PRIVATE_PREFIXES.clientLogo, {
-      workspaceId: client.workspaceId,
-      fileName: input.fileName,
-      mime: input.mime,
-    });
-  }),
+  presignLogo: protectedProcedure
+    .input(presignClientLogoSchema)
+    .mutation(async ({ ctx, input }) => {
+      const client = await requireClient(input.clientId);
+      await assertCanPeople(ctx.user, client.workspaceId, "clients:manage");
+      return presignPrivateUpload(PRIVATE_PREFIXES.clientLogo, {
+        workspaceId: client.workspaceId,
+        fileName: input.fileName,
+        mime: input.mime,
+      });
+    }),
 });

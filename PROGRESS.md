@@ -3254,3 +3254,36 @@ Requested after Phase 8, outside the spec.
 - **Tradeoff:** a logged-in browser stays logged in, including for HR and payroll. Anyone at an unlocked computer is that person. This matters most for HR on a shared computer; there's no idle lock.
 
 Verified: `pnpm check` green; unit tests in `session.test.ts`; new `stay-logged-in.spec.ts` (survives a restart with only saved state, renewal reaches the browser, logging out ends a saved copy, an expired session is refused). `pnpm test`: API 395 + 1 skipped, shared 166, db 11, web 15. Playwright 94/94.
+
+## 2026-11-05 Email through Resend
+
+Requested after Phase 8, outside the spec. The user has about 20 staff and controls the `trekuartista.com` DNS, so Resend is simpler than the Microsoft 365 route, which needed IT. A Microsoft Graph sender was started and dropped before being committed.
+
+### Done
+
+- **No new sender:** Canvas already sends through SMTP, and Resend accepts SMTP. Production settings are in `DEPLOYMENT.md`, sending from `canvas@notify.trekuartista.com`.
+- **Bug fixed (`lib/env-flag.ts`):** `z.coerce.boolean()` read the text `false` as true. `SMTP_SECURE=false` would have broken sending on port 587 while `pnpm preflight` passed, and `SAFE_OUTBOUND_ALLOW_PRIVATE=false` from `.env.example` turned the SSRF guard off. All five on/off settings now read correctly, and a typo stops the app at startup.
+- **Tests can't send real email:** unit and e2e runs always use the mock, even with a real key in `.env`. This matters because e2e runs digests every 3 seconds against made-up people.
+- **Formatting:** five files from P8.8–P8.10 failed `prettier --check`; whitespace only.
+
+### Decisions
+
+- **Resend's free plan** (100 emails a day, 3,000 a month) should cover about 20 staff. That's an estimate; actual volume hasn't been measured.
+- **No copies or inbox to manage:** replies to the sending address aren't handled.
+
+### Known gaps
+
+- **Resend's key is in the local `.env` for now,** so `pnpm dev` sends real email, including to test accounts in the local database. Move it to the production `.env` once the laptop is set up.
+- **Delivery to Outlook isn't proven.** Resend accepted a test email to its own test address. Whether mail reaches staff inboxes or Junk is still to test.
+- **Resend handles the email contents,** including reset links and leave notifications, and keeps logs for 30 days on the free plan. Keep payroll details out of emails.
+- **No DMARC record on `trekuartista.com` yet.** Add one if mail lands in Junk.
+
+### Verified
+
+- `pnpm check` green. `pnpm test`: API 403 + 1 skipped, shared 166, db 11, web 15.
+- Playwright 94/94. `stay-logged-in.spec.ts` failed in two full runs and passed alone: the spec's second browser shares the session, and its background requests could use up the renewal the spec was waiting on. It now leaves that page first.
+- Resend accepted an email sent through `SmtpEmailClient` with the real settings, to Resend's own test address.
+
+### Noticed, not changed
+
+- **`getSessionUser` renews a session without updating the cookie** (`auth/session.ts`, used by plain routes such as file downloads). If one of those is the day's first request, the browser's cookie isn't extended that day. A later day's request normally fixes it, so the effect should be small.

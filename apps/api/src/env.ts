@@ -1,5 +1,6 @@
 import "./load-env";
 import { z } from "zod";
+import { envFlag } from "./lib/env-flag";
 
 const isProd = process.env.NODE_ENV === "production";
 
@@ -18,7 +19,7 @@ const envSchema = z.object({
   API_HOST: z.string().default("0.0.0.0"),
   // Serve apps/web/dist from the API outside production too — for running
   // the built app locally (the production smoke test) without NODE_ENV=production.
-  SERVE_WEB_DIST: z.coerce.boolean().default(false),
+  SERVE_WEB_DIST: envFlag(false),
   DATABASE_URL: isProd
     ? z.string().min(1)
     : z.string().default("postgres://canvas:canvas@localhost:5432/canvas"),
@@ -29,7 +30,7 @@ const envSchema = z.object({
   S3_BUCKET: isProd ? z.string().min(1) : z.string().default("canvas-dev"),
   S3_ACCESS_KEY_ID: isProd ? z.string().min(1) : z.string().default("canvas"),
   S3_SECRET_ACCESS_KEY: isProd ? z.string().min(1) : z.string().default("canvas12345"),
-  S3_FORCE_PATH_STYLE: z.coerce.boolean().default(true),
+  S3_FORCE_PATH_STYLE: envFlag(true),
   ANTHROPIC_API_KEY: optionalString,
   OPENAI_API_KEY: optionalString,
   GEMINI_API_KEY: optionalString,
@@ -49,7 +50,7 @@ const envSchema = z.object({
   ALLOWED_EMAIL_DOMAINS: z.string().default("trekuartista.com"),
   SMTP_HOST: optionalString,
   SMTP_PORT: z.coerce.number().default(587),
-  SMTP_SECURE: z.coerce.boolean().default(false),
+  SMTP_SECURE: envFlag(false),
   SMTP_USER: optionalString,
   SMTP_PASSWORD: optionalString,
   EMAIL_FROM: z.string().default("Canvas <notifications@canvas.local>"),
@@ -61,10 +62,10 @@ const envSchema = z.object({
   // also blocks the local mock HTTP server the Slack e2e spec
   // stands in for a real receiver with. Set only by the e2e webServer env
   // (never a real deployment — see assertProdNotLocalhost below).
-  SAFE_OUTBOUND_ALLOW_PRIVATE: z.coerce.boolean().default(false),
+  SAFE_OUTBOUND_ALLOW_PRIVATE: envFlag(false),
   // M7.8: registers /test-hooks/* (routes/test-hooks.ts) so e2e can run a
   // monthly scheduler job on demand. Set only by the e2e webServer env.
-  E2E_TEST_HOOKS: z.coerce.boolean().default(false),
+  E2E_TEST_HOOKS: envFlag(false),
   // M7.7: AES-256-GCM key for payroll ID-card numbers and IBANs — 32 random
   // bytes, base64 (`openssl rand -base64 32`). The dev default is public, so
   // production refuses it (assertProdNotLocalhost). Losing the key makes

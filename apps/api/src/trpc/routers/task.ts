@@ -725,7 +725,8 @@ export const taskRouter = router({
         ),
         columns: { id: true },
       });
-      if (!client) throw new TRPCError({ code: "BAD_REQUEST", message: "That client isn't available" });
+      if (!client)
+        throw new TRPCError({ code: "BAD_REQUEST", message: "That client isn't available" });
       if (!(await canPeopleAction(ctx.user, workspaceId, "clients:manage"))) {
         const mentioned = await detectClients(workspaceId, cardText(task));
         if (!mentioned.some((m) => m.id === client.id)) {
@@ -741,7 +742,12 @@ export const taskRouter = router({
       taskId: task.id,
       clientId: input.clientId,
     });
-    await publish(workspaceId, { entity: "task", id: task.id, listId: task.listId, kind: "updated" });
+    await publish(workspaceId, {
+      entity: "task",
+      id: task.id,
+      listId: task.listId,
+      kind: "updated",
+    });
     return { id: task.id };
   }),
 
