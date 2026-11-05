@@ -105,7 +105,7 @@ export async function sendContractEndAlerts(now = new Date(), workspaceId?: stri
       [
         message,
         "",
-        `${env.WEB_URL}/w/${contract.workspaceId}/contracts?person=${contract.userId}`,
+        `${env.EMAIL_LINK_URL}/w/${contract.workspaceId}/contracts?person=${contract.userId}`,
       ].join("\n"),
     );
   }

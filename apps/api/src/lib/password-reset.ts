@@ -45,7 +45,7 @@ async function sendResetEmail(email: string) {
   await sendEmail({
     to: email,
     subject: "Reset your Canvas password",
-    text: `Hi ${user.name},\n\nOpen this link to choose a new password. It works for 1 hour.\n\n${env.WEB_URL}${path}\n\nIf you didn't ask for this, you can ignore this email: your password hasn't changed.`,
+    text: `Hi ${user.name},\n\nOpen this link to choose a new password. It works for 1 hour.\n\n${env.EMAIL_LINK_URL}${path}\n\nIf you didn't ask for this, you can ignore this email: your password hasn't changed.`,
   });
   if (env.E2E_TEST_HOOKS) linksForTests.set(email.toLowerCase(), path);
   // Local development has no real inbox unless SMTP is set up.
@@ -124,6 +124,6 @@ export async function completePasswordReset(token: string, password: string) {
   await sendEmail({
     to: email,
     subject: "Your Canvas password was changed",
-    text: `Your Canvas password was just changed, and every device was signed out.\n\nIf this wasn't you, reset it now: ${env.WEB_URL}/forgot-password`,
+    text: `Your Canvas password was just changed, and every device was signed out.\n\nIf this wasn't you, reset it now: ${env.EMAIL_LINK_URL}/forgot-password`,
   });
 }

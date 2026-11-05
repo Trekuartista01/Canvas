@@ -100,7 +100,7 @@ export async function sendDailyReportReminders(now = new Date()) {
         text: [
           "You haven't submitted your daily report for today yet.",
           "",
-          `Write it here: ${env.WEB_URL}/w/${person.workspaceId}/daily-report`,
+          `Write it here: ${env.EMAIL_LINK_URL}/w/${person.workspaceId}/daily-report`,
           "",
           "You can edit it until midnight.",
         ].join("\n"),

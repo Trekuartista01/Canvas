@@ -190,7 +190,7 @@ async function sendDueDigests() {
 
     if (unread.length === 0) continue;
 
-    const { subject, text } = buildDigestEmail(unread, env.WEB_URL);
+    const { subject, text } = buildDigestEmail(unread, env.EMAIL_LINK_URL);
     await emailClient.send({ to: user.email, subject, text });
   }
 }

@@ -84,7 +84,7 @@ async function checkLeave(workspaceId: string, userId: string, input: LeaveInput
 }
 
 function approvalsLink(workspaceId: string, requestId: string) {
-  return `${env.WEB_URL}/w/${workspaceId}/leave-approvals?request=${requestId}`;
+  return `${env.EMAIL_LINK_URL}/w/${workspaceId}/leave-approvals?request=${requestId}`;
 }
 
 async function requireLeaveRequest(id: string) {
@@ -335,7 +335,7 @@ Open the request: ${approvalsLink(input.workspaceId, request.id)}`,
       void emailUsers(
         [request.userId],
         approved ? "Your leave was approved" : "Your leave request was not approved",
-        `${text}\n\n${env.WEB_URL}/w/${request.workspaceId}/leave`,
+        `${text}\n\n${env.EMAIL_LINK_URL}/w/${request.workspaceId}/leave`,
       );
     }
     if (needsVendim(updated)) await enqueueVendim(updated.id);

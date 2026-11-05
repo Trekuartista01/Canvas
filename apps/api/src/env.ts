@@ -25,6 +25,13 @@ const envSchema = z.object({
     : z.string().default("postgres://canvas:canvas@localhost:5432/canvas"),
   REDIS_URL: isProd ? z.string().min(1) : z.string().default("redis://127.0.0.1:6379"),
   WEB_URL: isProd ? z.string().url() : z.string().default("http://localhost:5183"),
+  // The address links in emails use, when it differs from WEB_URL. Microsoft 365
+  // silently drops email linking to the office PC's *.ts.net address, so production
+  // links go through a redirect on the company domain. Empty = WEB_URL.
+  EMAIL_LINK_URL: z.preprocess(
+    (value) => (value === "" ? undefined : value),
+    z.string().url().optional(),
+  ),
   S3_ENDPOINT: isProd ? z.string().url() : z.string().default("http://localhost:9000"),
   S3_REGION: z.string().default("us-east-1"),
   S3_BUCKET: isProd ? z.string().min(1) : z.string().default("canvas-dev"),
@@ -111,5 +118,9 @@ function assertProdNotLocalhost(parsed: z.infer<typeof envSchema>) {
   }
 }
 
-export const env = envSchema.parse(process.env);
-assertProdNotLocalhost(env);
+const parsedEnv = envSchema.parse(process.env);
+assertProdNotLocalhost(parsedEnv);
+export const env = {
+  ...parsedEnv,
+  EMAIL_LINK_URL: parsedEnv.EMAIL_LINK_URL ?? parsedEnv.WEB_URL,
+};

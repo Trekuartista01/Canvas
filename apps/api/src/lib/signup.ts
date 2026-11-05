@@ -79,7 +79,7 @@ export async function requestSignUp(input: {
     await send(
       input.email,
       "You already have a Canvas account",
-      `Someone tried to sign up with this address, and it already has an account. If it was you, log in here: ${env.WEB_URL}/login\n\nForgot your password? Reset it here: ${env.WEB_URL}/forgot-password\n\nIf it wasn't, you can ignore this email.`,
+      `Someone tried to sign up with this address, and it already has an account. If it was you, log in here: ${env.EMAIL_LINK_URL}/login\n\nForgot your password? Reset it here: ${env.EMAIL_LINK_URL}/forgot-password\n\nIf it wasn't, you can ignore this email.`,
     );
     return;
   }
@@ -107,7 +107,7 @@ export async function requestSignUp(input: {
   await send(
     input.email,
     "Confirm your email to join Canvas",
-    `Hi ${input.name},\n\nOpen this link to confirm your email and choose a password. It works for 24 hours.\n\n${env.WEB_URL}${path}\n\nIf you didn't ask for this, you can ignore this email.`,
+    `Hi ${input.name},\n\nOpen this link to confirm your email and choose a password. It works for 24 hours.\n\n${env.EMAIL_LINK_URL}${path}\n\nIf you didn't ask for this, you can ignore this email.`,
   );
   if (env.E2E_TEST_HOOKS) linksForTests.set(input.email.toLowerCase(), path);
   // Local development has no real inbox unless SMTP is set up.
