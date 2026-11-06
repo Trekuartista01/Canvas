@@ -3322,3 +3322,7 @@ Requested after Phase 8, outside the spec. The user has about 20 staff and contr
 - **Work section removed from the panel, the user's explicit choice**: subtasks, dependencies, reminders, time tracking, checklists, attachments, clips, generation, tags, custom fields. API, data and the standalone section components remain. Timesheet gets no new hours from the panel; images can't be attached to a task; proof photos still work; Generate stays in the sidebar.
 - **21 e2e tests are `test.skip`ped** because they drive that section, including the Phase-2 smoke (`iterative-edit`), which CLAUDE.md says must stay green. Open decision for the user: change that rule or bring attach back. `task-panel.spec` deleted; `work-open.ts` now does nothing.
 - **Visual hierarchy**: tokens (darker page, white cards), larger h1/h2, cards with shadow on section surfaces, stronger sidebar active item, board columns coloured by status, segmented view switcher. The `#` is gone from list titles.
+
+## 2026-11-06 Add people on a board
+
+- The board toolbar's "Members" link is now an "Add people" button with the board's avatars. The panel searches everyone in the workspace by name or email, one click adds, and it stays open. Same `boards:manageAll` permission and API as before; the added person isn't notified.

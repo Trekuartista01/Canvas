@@ -195,7 +195,8 @@ test("P8.9 boards: switcher on top, default lists, cards drag and stay, lists ma
   // Ops adds Sam from the Members panel; the board appears, and he can work.
   await page.getByTestId("board-members-open").click();
   const panel = page.getByTestId("board-members");
-  await panel.getByLabel("Add a member").selectOption({ label: "Sam Staff" });
+  await panel.getByLabel("Search people to add").fill("sam");
+  await panel.getByRole("button", { name: "Add Sam Staff" }).click();
   await expect(panel.getByRole("button", { name: "Remove Sam Staff" })).toBeVisible();
   await panel.getByRole("button", { name: "Close" }).click();
 

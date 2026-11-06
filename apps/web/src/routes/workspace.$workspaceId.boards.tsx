@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useModalA11y } from "@/hooks/use-modal-a11y";
 import { useMyAccess } from "@/hooks/use-my-access";
+import { Avatar } from "@/lib/avatar";
 import { trpc } from "@/lib/trpc";
 import {
   BOARD_DUE_FILTERS,
@@ -42,6 +43,8 @@ import {
   Paperclip,
   Plus,
   SquareKanban,
+  UserPlus,
+  X,
 } from "lucide-react";
 import { useMemo, useRef, useState } from "react";
 import { z } from "zod";
@@ -498,14 +501,7 @@ function BoardView({
                 Rename board
               </button>
             )}
-            <button
-              type="button"
-              className="text-muted-foreground hover:text-foreground"
-              onClick={() => setShowMembers(true)}
-              data-testid="board-members-open"
-            >
-              Members
-            </button>
+            <BoardPeopleButton spaceId={space.id} onOpen={() => setShowMembers(true)} />
             {confirmingArchive ? (
               <>
                 <span>Archive this board and its cards?</span>
@@ -936,6 +932,32 @@ function CardFront({ card, today, onOpen }: { card: Card; today: string; onOpen:
   );
 }
 
+/** Who's on this board at a glance, and the way to add someone. */
+function BoardPeopleButton({ spaceId, onOpen }: { spaceId: string; onOpen: () => void }) {
+  const onBoard = trpc.hierarchy.members.list.useQuery({ spaceId });
+  const people = onBoard.data ?? [];
+  return (
+    <span className="flex items-center gap-2">
+      {people.length > 0 && (
+        <span className="flex -space-x-1.5" aria-hidden>
+          {people.slice(0, 5).map((m) => (
+            <Avatar
+              key={m.userId}
+              name={m.name}
+              avatarUrl={m.avatarUrl}
+              className="ring-background h-6 w-6 text-[10px] ring-2"
+            />
+          ))}
+        </span>
+      )}
+      <Button size="sm" onClick={onOpen} data-testid="board-members-open">
+        <UserPlus className="h-4 w-4" aria-hidden />
+        Add people
+      </Button>
+    </span>
+  );
+}
+
 function BoardMembers({
   workspaceId,
   space,
@@ -953,8 +975,14 @@ function BoardMembers({
   const invalidate = () => utils.hierarchy.members.list.invalidate(input);
   const add = trpc.hierarchy.members.add.useMutation({ onSuccess: invalidate });
   const remove = trpc.hierarchy.members.remove.useMutation({ onSuccess: invalidate });
+  const [search, setSearch] = useState("");
   const ids = new Set((onBoard.data ?? []).map((m) => m.userId));
-  const others = (everyone.data ?? []).filter((m) => !ids.has(m.userId));
+  const q = search.trim().toLowerCase();
+  const others = (everyone.data ?? []).filter(
+    (m) =>
+      !ids.has(m.userId) &&
+      (!q || m.name.toLowerCase().includes(q) || m.email.toLowerCase().includes(q)),
+  );
   const error = add.error ?? remove.error;
 
   return (
@@ -964,58 +992,81 @@ function BoardMembers({
         onKeyDown={onKeyDown}
         role="dialog"
         aria-modal="true"
-        aria-label={`Members of ${space.name}`}
+        aria-label={`People on ${space.name}`}
         tabIndex={-1}
         data-testid="board-members"
-        className="border-border bg-background flex max-h-[80vh] w-full max-w-md flex-col gap-3 rounded-lg border p-5 shadow-xl outline-none"
+        className="border-border bg-card flex max-h-[85vh] w-full max-w-md flex-col gap-4 rounded-xl border p-5 shadow-xl outline-none"
       >
         <div className="flex items-center">
-          <h2 className="mr-auto font-semibold">Members of {space.name}</h2>
+          <h2 className="mr-auto text-lg font-bold tracking-tight">People on {space.name}</h2>
           <button type="button" aria-label="Close" onClick={onClose}>
-            ✕
+            <X className="h-4 w-4" aria-hidden />
           </button>
         </div>
-        <p className="text-muted-foreground text-xs">
-          Operations Manager, CEOs and Admin reach every board. Everyone else sees only the boards
-          they're on.
-        </p>
-        <select
-          aria-label="Add a member"
-          value=""
-          disabled={add.isPending}
-          onChange={(e) =>
-            e.target.value && add.mutate({ spaceId: space.id, userId: e.target.value })
-          }
-          className="border-border bg-background h-9 rounded-md border px-2 text-sm"
-        >
-          <option value="">Add a member…</option>
-          {others.map((m) => (
-            <option key={m.userId} value={m.userId}>
-              {m.name}
-            </option>
-          ))}
-        </select>
+
         {error && (
           <p className="text-xs text-red-600 dark:text-red-400" role="alert">
             {error.message}
           </p>
         )}
-        <ul className="divide-border min-h-0 flex-1 divide-y overflow-y-auto text-sm">
-          {(onBoard.data ?? []).map((m) => (
-            <li key={m.userId} className="flex items-center py-1.5">
-              <span className="mr-auto">{m.name}</span>
-              <button
-                type="button"
-                aria-label={`Remove ${m.name}`}
-                className="text-muted-foreground text-xs hover:text-red-600"
-                disabled={remove.isPending}
-                onClick={() => remove.mutate({ spaceId: space.id, userId: m.userId })}
-              >
-                Remove
-              </button>
-            </li>
-          ))}
-        </ul>
+
+        <div className="flex min-h-0 flex-1 flex-col gap-2">
+          <Input
+            autoFocus
+            value={search}
+            placeholder="Search everyone in the workspace"
+            aria-label="Search people to add"
+            onChange={(e) => setSearch(e.target.value)}
+            className="h-9 text-sm"
+          />
+          <ul className="max-h-56 min-h-0 overflow-y-auto" data-testid="board-people-to-add">
+            {others.map((m) => (
+              <li key={m.userId} className="flex items-center gap-2.5 py-1.5 text-sm">
+                <Avatar name={m.name} avatarUrl={m.avatarUrl} className="h-7 w-7" />
+                <span className="mr-auto min-w-0 truncate font-medium">{m.name}</span>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  aria-label={`Add ${m.name}`}
+                  disabled={add.isPending}
+                  onClick={() => add.mutate({ spaceId: space.id, userId: m.userId })}
+                >
+                  Add
+                </Button>
+              </li>
+            ))}
+            {others.length === 0 && (
+              <li className="text-muted-foreground py-2 text-sm">
+                {q ? "Nobody matches." : "Everyone is already on this board."}
+              </li>
+            )}
+          </ul>
+        </div>
+
+        <div className="border-border flex min-h-0 flex-col gap-1 border-t pt-3">
+          <h3 className="text-sm font-semibold">On this board ({onBoard.data?.length ?? 0})</h3>
+          <ul className="max-h-44 min-h-0 overflow-y-auto text-sm">
+            {(onBoard.data ?? []).map((m) => (
+              <li key={m.userId} className="flex items-center gap-2.5 py-1.5">
+                <Avatar name={m.name} avatarUrl={m.avatarUrl} className="h-7 w-7" />
+                <span className="mr-auto min-w-0 truncate">{m.name}</span>
+                <button
+                  type="button"
+                  aria-label={`Remove ${m.name}`}
+                  className="text-muted-foreground text-xs hover:text-red-600"
+                  disabled={remove.isPending}
+                  onClick={() => remove.mutate({ spaceId: space.id, userId: m.userId })}
+                >
+                  Remove
+                </button>
+              </li>
+            ))}
+          </ul>
+          <p className="text-muted-foreground text-xs">
+            Operations Manager, CEOs and Admin reach every board. Everyone else sees only the boards
+            they&apos;re on.
+          </p>
+        </div>
       </div>
     </div>
   );
