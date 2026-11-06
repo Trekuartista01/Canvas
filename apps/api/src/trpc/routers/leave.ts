@@ -13,6 +13,7 @@ import {
   recordLeaveSchema,
   requestLeaveSchema,
   setDefaultVacationDaysSchema,
+  setVacationTenureRulesSchema,
   setLeaveBalanceSchema,
   leaveMessages,
   vendimDownloadSchema,
@@ -616,7 +617,11 @@ Open the request: ${approvalsLink(input.workspaceId, request.id)}`,
   balances: protectedProcedure.input(leaveBalanceSchema).query(async ({ ctx, input }) => {
     await assertCanPeople(ctx.user, input.workspaceId, "leave:recordForOthers");
     const members = await db
-      .select({ userId: schema.users.id, name: schema.users.name })
+      .select({
+        userId: schema.users.id,
+        name: schema.users.name,
+        employmentStartDate: schema.employeeProfiles.employmentStartDate,
+      })
       .from(schema.memberships)
       .innerJoin(schema.users, eq(schema.users.id, schema.memberships.userId))
       .leftJoin(
@@ -639,7 +644,11 @@ Open the request: ${approvalsLink(input.workspaceId, request.id)}`,
         };
       }),
     );
-    return { defaultVacationDays: workspace?.defaultVacationDays ?? 20, rows };
+    return {
+      defaultVacationDays: workspace?.defaultVacationDays ?? 20,
+      tenureRules: workspace?.vacationTenureRules ?? [],
+      rows,
+    };
   }),
 
   setBalance: protectedProcedure.input(setLeaveBalanceSchema).mutation(async ({ ctx, input }) => {
@@ -699,6 +708,27 @@ Open the request: ${approvalsLink(input.workspaceId, request.id)}`,
       );
       await publishLeave(input.workspaceId, input.workspaceId, "updated");
       return { days: input.days };
+    }),
+
+  setVacationTenureRules: protectedProcedure
+    .input(setVacationTenureRulesSchema)
+    .mutation(async ({ ctx, input }) => {
+      await assertCanPeople(ctx.user, input.workspaceId, "leave:recordForOthers");
+      const rules = [...input.rules].sort((a, b) => a.years - b.years);
+      await db
+        .update(schema.workspaces)
+        .set({ vacationTenureRules: rules })
+        .where(eq(schema.workspaces.id, input.workspaceId));
+      await logActivity(
+        input.workspaceId,
+        ctx.user.id,
+        "workspace",
+        input.workspaceId,
+        "workspace.vacation_tenure_rules_changed",
+        { rules },
+      );
+      await publishLeave(input.workspaceId, input.workspaceId, "updated");
+      return { rules };
     }),
 
   // Supporting document (doctor's note), uploaded straight to storage like

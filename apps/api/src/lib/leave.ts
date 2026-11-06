@@ -1,4 +1,5 @@
 import { db, schema } from "@canvas/db";
+import { DEFAULT_VACATION_DAYS, vacationDaysForService } from "@canvas/shared";
 import { TRPCError } from "@trpc/server";
 import { and, eq, inArray } from "drizzle-orm";
 import { can, type PeopleAction } from "../auth/can";
@@ -38,16 +39,33 @@ export async function findBalanceRow(workspaceId: string, userId: string, year: 
   });
 }
 
-async function defaultVacationDays(workspaceId: string) {
-  const workspace = await db.query.workspaces.findFirst({
-    where: eq(schema.workspaces.id, workspaceId),
+/** What `userId` gets for `year` with no number of their own: their time here decides. */
+async function vacationDaysWithoutOverride(workspaceId: string, userId: string, year: number) {
+  const [workspace, person] = await Promise.all([
+    db.query.workspaces.findFirst({ where: eq(schema.workspaces.id, workspaceId) }),
+    db
+      .select({ employmentStartDate: schema.employeeProfiles.employmentStartDate })
+      .from(schema.memberships)
+      .innerJoin(
+        schema.employeeProfiles,
+        eq(schema.employeeProfiles.membershipId, schema.memberships.id),
+      )
+      .where(
+        and(eq(schema.memberships.workspaceId, workspaceId), eq(schema.memberships.userId, userId)),
+      )
+      .limit(1),
+  ]);
+  return vacationDaysForService({
+    defaultDays: workspace?.defaultVacationDays ?? DEFAULT_VACATION_DAYS,
+    rules: workspace?.vacationTenureRules ?? [],
+    employmentStartDate: person[0]?.employmentStartDate ?? null,
+    year,
   });
-  return workspace?.defaultVacationDays ?? 20;
 }
 
 /**
  * The member's vacation balance for `year`. No balance row yet means the
- * workspace default and nothing carried over (the rollover job hasn't run
+ * days for their time here and nothing carried over (the rollover job hasn't run
  * for them, or they're new).
  */
 export async function getVacationBalance(
@@ -58,7 +76,7 @@ export async function getVacationBalance(
 ) {
   const [row, fallback, all] = await Promise.all([
     findBalanceRow(workspaceId, userId, year),
-    defaultVacationDays(workspaceId),
+    vacationDaysWithoutOverride(workspaceId, userId, year),
     requests ?? loadLeaveRequests(workspaceId, userId),
   ]);
   return computeVacationBalance({

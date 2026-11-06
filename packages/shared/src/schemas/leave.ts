@@ -75,6 +75,16 @@ export const setLeaveBalanceSchema = z.object({
 
 export const setDefaultVacationDaysSchema = z.object({ workspaceId, days });
 
+export const setVacationTenureRulesSchema = z.object({
+  workspaceId,
+  rules: z
+    .array(z.object({ years: z.number().min(0).max(60), days }))
+    .max(20)
+    .refine((rules) => new Set(rules.map((r) => r.years)).size === rules.length, {
+      message: "Each number of years can only have one rule",
+    }),
+});
+
 export const presignLeaveDocumentSchema = z.object({
   workspaceId,
   fileName: z.string().trim().min(1).max(300),

@@ -1,0 +1,1 @@
+ALTER TABLE "workspaces" ADD COLUMN "vacation_tenure_rules" jsonb DEFAULT '[]'::jsonb NOT NULL;

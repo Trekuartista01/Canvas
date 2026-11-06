@@ -44,6 +44,12 @@ export const workspaces = pgTable("workspaces", {
   defaultVacationDays: numeric("default_vacation_days", { precision: 5, scale: 1, mode: "number" })
     .notNull()
     .default(20),
+  // HR's rules for more days with more years of service; a per-employee
+  // override still wins, and with no rule reached it's the default above.
+  vacationTenureRules: jsonb("vacation_tenure_rules")
+    .$type<{ years: number; days: number }[]>()
+    .notNull()
+    .default([]),
   // M7.4: set once the Kosovo fixed-date holidays have been seeded, so a
   // calendar HR has emptied on purpose is never re-seeded.
   holidaysSeededAt: timestamp("holidays_seeded_at", { withTimezone: true }),

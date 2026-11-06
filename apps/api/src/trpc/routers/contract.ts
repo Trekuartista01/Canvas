@@ -2,6 +2,7 @@ import { db, schema } from "@canvas/db";
 import {
   MAX_CONTRACT_FILE_BYTES,
   addContractFilesSchema,
+  contractAlertDay,
   confirmDocumentSchema,
   contractFileIdSchema,
   contractFileMime,
@@ -32,6 +33,7 @@ import {
   signedDownloadUrl,
 } from "../../lib/private-upload";
 import { getPresignedUrl } from "../../lib/storage";
+import { loadHolidayCalendar } from "../../lib/working-days";
 import { protectedProcedure, router } from "../trpc";
 
 const contractColumns = {
@@ -212,7 +214,12 @@ export const contractRouter = router({
       entity: "contract",
       ip: ctx.ip,
     });
-    return withFiles(rows, { withThumbs: false });
+    const calendar = await loadHolidayCalendar(input.workspaceId);
+    const contracts = await withFiles(rows, { withThumbs: false });
+    return contracts.map((c) => ({
+      ...c,
+      endAlertDay: c.expiryDate ? contractAlertDay(c.expiryDate, calendar) : null,
+    }));
   }),
 
   // HR: one person's contracts, with signed thumbnails.

@@ -9,6 +9,7 @@ import {
   daysUntil,
   isContractAlertDue,
   isContractEndingSoon,
+  personContractStatus,
 } from "./documents";
 import { officialHolidays } from "./holidays";
 import { holidayCalendar } from "./working-days";
@@ -137,5 +138,44 @@ describe("contractMessages", () => {
     expect(contractMessages.ending({ name: "Olsi Sopi", endDate: "2026-11-03" })).toBe(
       "Kontrata e Olsi Sopi përfundon më 03.11.2026. / Olsi Sopi's contract ends on 03.11.2026.",
     );
+  });
+});
+
+describe("personContractStatus", () => {
+  const contract = (expiryDate: string | null, endAlertDay: string | null = null) => ({
+    kind: "contract" as const,
+    expiryDate,
+    endAlertDay,
+  });
+
+  it("has no status without a contract", () => {
+    expect(personContractStatus("2026-11-02", []).status).toBe("none");
+    expect(
+      personContractStatus("2026-11-02", [{ kind: "annex", expiryDate: null, endAlertDay: null }])
+        .status,
+    ).toBe("none");
+  });
+  it("is valid with no end date, even beside an old contract that ended", () => {
+    expect(
+      personContractStatus("2026-11-02", [contract(null), contract("2025-01-31", "2025-01-30")])
+        .status,
+    ).toBe("valid");
+  });
+  it("turns on the alert day and stays after the end date", () => {
+    const doc = [contract("2026-11-03", "2026-11-02")];
+    expect(personContractStatus("2026-11-01", doc).status).toBe("valid");
+    expect(personContractStatus("2026-11-02", doc)).toEqual({
+      status: "ending",
+      endDate: "2026-11-03",
+    });
+    expect(personContractStatus("2026-12-25", doc).status).toBe("ending");
+  });
+  it("goes back to valid once a later contract is filed", () => {
+    expect(
+      personContractStatus("2026-11-02", [
+        contract("2026-11-03", "2026-11-02"),
+        contract("2027-11-03", "2027-11-02"),
+      ]).status,
+    ).toBe("valid");
   });
 });

@@ -98,6 +98,32 @@ export function isContractEndingSoon(today: string, endDate: string | null): boo
   return left >= 0 && left <= CONTRACT_ENDING_SOON_DAYS;
 }
 
+export type ContractStatus = "none" | "valid" | "ending";
+
+/**
+ * The colour of a person's name on the Contracts page. Their latest end date
+ * decides, so a renewal turns them back to valid: "ending" starts on the day
+ * HR is alerted and stays after the contract has ended. A contract with no
+ * end date is valid; an annex with no end date says nothing either way.
+ */
+export function personContractStatus(
+  today: string,
+  documents: { kind: ContractKind; expiryDate: string | null; endAlertDay: string | null }[],
+): { status: ContractStatus; endDate: string | null } {
+  if (documents.some((d) => d.kind === "contract" && !d.expiryDate)) {
+    return { status: "valid", endDate: null };
+  }
+  let latest: (typeof documents)[number] | null = null;
+  for (const d of documents) {
+    if (d.expiryDate && (!latest || d.expiryDate > latest.expiryDate!)) latest = d;
+  }
+  if (!latest) return { status: "none", endDate: null };
+  return {
+    status: latest.endAlertDay && today >= latest.endAlertDay ? "ending" : "valid",
+    endDate: latest.expiryDate,
+  };
+}
+
 /** The daily alert job runs from 08:00 Kosovo time. */
 export const CONTRACT_ALERT_TIME = "08:00:00";
 

@@ -8,7 +8,14 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { trpc } from "@/lib/trpc";
-import { formatDmy, LEAVE_TYPE_LABELS, todayReportDate } from "@canvas/shared";
+import {
+  formatDmy,
+  formatServiceMonths,
+  LEAVE_TYPE_LABELS,
+  serviceMonths,
+  todayReportDate,
+  type VacationTenureRule,
+} from "@canvas/shared";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { createRoute } from "@tanstack/react-router";
 import type { inferRouterOutputs } from "@trpc/server";
@@ -451,6 +458,104 @@ function RecordLeave({ workspaceId }: { workspaceId: string }) {
   );
 }
 
+/** How long someone has been here, for HR to check a rule against. */
+function serviceLabel(employmentStartDate: string | null) {
+  if (!employmentStartDate) return "No start date";
+  const months = serviceMonths(employmentStartDate, todayReportDate(new Date()));
+  return months < 0 ? "Not started" : formatServiceMonths(months);
+}
+
+function TenureRules({ workspaceId, rules }: { workspaceId: string; rules: VacationTenureRule[] }) {
+  const utils = trpc.useUtils();
+  const save = trpc.leave.setVacationTenureRules.useMutation({
+    onSuccess: () => utils.leave.invalidate(),
+  });
+  const [draft, setDraft] = useState(() =>
+    rules.map((r) => ({ years: String(r.years), days: String(r.days) })),
+  );
+  const change = (index: number, field: "years" | "days", value: string) =>
+    setDraft(draft.map((r, i) => (i === index ? { ...r, [field]: value } : r)));
+  const filled = draft.every((r) => r.years.trim() !== "" && r.days.trim() !== "");
+
+  return (
+    <section
+      className="border-border shrink-0 space-y-2 rounded-md border p-3 text-sm"
+      data-testid="tenure-rules"
+    >
+      <h2 className="font-semibold">Days by time at the company</h2>
+      <p className="text-muted-foreground text-xs">
+        Time is counted at the end of the chosen year, from the employment start date on each
+        person&apos;s profile. Below every rule, or with no start date, a person gets the default. A
+        number typed for one person in the table still comes first.
+      </p>
+      {draft.map((rule, i) => (
+        <div key={i} className="flex flex-wrap items-center gap-2 text-xs">
+          After
+          <Input
+            type="number"
+            min={0}
+            max={60}
+            step="0.5"
+            aria-label={`Rule ${i + 1} years`}
+            value={rule.years}
+            onChange={(e) => change(i, "years", e.target.value)}
+            className="h-8 w-20"
+          />
+          years:
+          <Input
+            type="number"
+            min={0}
+            max={366}
+            step="0.5"
+            aria-label={`Rule ${i + 1} days`}
+            value={rule.days}
+            onChange={(e) => change(i, "days", e.target.value)}
+            className="h-8 w-20"
+          />
+          days a year
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={() => setDraft(draft.filter((_, index) => index !== i))}
+          >
+            Remove
+          </Button>
+        </div>
+      ))}
+      <div className="flex items-center gap-2">
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={() => setDraft([...draft, { years: "", days: "" }])}
+        >
+          Add rule
+        </Button>
+        <Button
+          type="button"
+          size="sm"
+          disabled={!filled || save.isPending}
+          data-testid="tenure-rules-save"
+          onClick={() =>
+            save.mutate({
+              workspaceId,
+              rules: draft.map((r) => ({ years: Number(r.years), days: Number(r.days) })),
+            })
+          }
+        >
+          Save rules
+        </Button>
+      </div>
+      {save.error && (
+        <p className="text-sm text-red-600 dark:text-red-400" role="alert">
+          {save.error.message}
+        </p>
+      )}
+    </section>
+  );
+}
+
 function Balances({ workspaceId, year: initialYear }: { workspaceId: string; year: number }) {
   const utils = trpc.useUtils();
   const [year, setYear] = useState(initialYear);
@@ -510,8 +615,15 @@ function Balances({ workspaceId, year: initialYear }: { workspaceId: string; yea
         </label>
       </div>
 
-      <div className="text-muted-foreground grid grid-cols-[1fr_6rem_6rem_4rem_4rem_5rem] gap-2 px-3 text-[11px] font-medium">
+      <TenureRules
+        key={JSON.stringify(balances.data?.tenureRules ?? [])}
+        workspaceId={workspaceId}
+        rules={balances.data?.tenureRules ?? []}
+      />
+
+      <div className="text-muted-foreground grid grid-cols-[1fr_5rem_6rem_6rem_4rem_4rem_5rem] gap-2 px-3 text-[11px] font-medium">
         <span>Person</span>
+        <span>Time here</span>
         <span>Entitlement</span>
         <span>Carried over</span>
         <span>Used</span>
@@ -530,14 +642,17 @@ function Balances({ workspaceId, year: initialYear }: { workspaceId: string; yea
             return (
               <div
                 key={`${r.userId}-${year}`}
-                className="border-border absolute right-0 left-0 grid grid-cols-[1fr_6rem_6rem_4rem_4rem_5rem] items-center gap-2 border-b px-3 py-1.5 text-sm"
+                className="border-border absolute right-0 left-0 grid grid-cols-[1fr_5rem_6rem_6rem_4rem_4rem_5rem] items-center gap-2 border-b px-3 py-1.5 text-sm"
                 style={{ transform: `translateY(${item.start}px)` }}
               >
                 <span className="truncate font-medium">{r.name}</span>
+                <span className="text-muted-foreground text-xs">
+                  {serviceLabel(r.employmentStartDate)}
+                </span>
                 <Input
                   type="number"
                   aria-label={`Entitlement for ${r.name}`}
-                  placeholder={String(balances.data?.defaultVacationDays ?? 20)}
+                  placeholder={String(r.balance.entitlement)}
                   defaultValue={r.entitlementOverride ?? ""}
                   onBlur={(e) =>
                     e.target.value !== String(r.entitlementOverride ?? "") &&

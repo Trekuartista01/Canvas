@@ -19,7 +19,9 @@ import {
   formatDmy,
   isContractEndingSoon,
   isPreviewableImage,
+  personContractStatus,
   todayReportDate,
+  type ContractStatus,
   type ContractKind,
   type ContractType,
 } from "@canvas/shared";
@@ -60,7 +62,15 @@ interface Person {
   archived: boolean;
   contracts: number;
   endingSoon: boolean;
+  status: ContractStatus;
+  endDate: string | null;
 }
+
+const STATUS_NAME_CLASS: Record<ContractStatus, string> = {
+  none: "",
+  valid: "text-green-700 dark:text-green-400",
+  ending: "text-red-600 dark:text-red-400",
+};
 
 function EndingSoonBadge() {
   return (
@@ -84,6 +94,7 @@ function ContractsPage() {
   const people = useMemo(() => {
     const today = todayReportDate(new Date());
     const byId = new Map<string, Person>();
+    const documents = new Map<string, NonNullable<typeof list.data>>();
     for (const m of members.data ?? []) {
       byId.set(m.userId, {
         userId: m.userId,
@@ -91,6 +102,8 @@ function ContractsPage() {
         archived: false,
         contracts: 0,
         endingSoon: false,
+        status: "none",
+        endDate: null,
       });
     }
     // Someone with contracts who isn't an active member is archived: their
@@ -102,10 +115,18 @@ function ContractsPage() {
         archived: true,
         contracts: 0,
         endingSoon: false,
+        status: "none" as const,
+        endDate: null,
       };
       person.contracts += 1;
       person.endingSoon ||= isContractEndingSoon(today, c.expiryDate);
       byId.set(c.userId, person);
+      documents.set(c.userId, [...(documents.get(c.userId) ?? []), c]);
+    }
+    for (const [userId, docs] of documents) {
+      const person = byId.get(userId)!;
+      // Archived people get no alert, so no colour either.
+      if (!person.archived) Object.assign(person, personContractStatus(today, docs));
     }
     return [...byId.values()].sort((a, b) => a.name.localeCompare(b.name));
   }, [members.data, list.data]);
@@ -180,18 +201,26 @@ function ContractsPage() {
                       type="button"
                       aria-current={p.userId === selected ? "true" : undefined}
                       data-testid={`contract-person-${p.name}`}
+                      data-contract-status={p.status}
                       onClick={() => open(p.userId)}
                       className={`border-border hover:bg-muted flex h-12 w-full items-center gap-2 rounded-md border px-3 text-left text-sm ${
                         p.userId === selected ? "bg-muted" : ""
                       }`}
                     >
                       <span className="min-w-0 flex-1">
-                        <span className="block truncate font-medium">{p.name}</span>
+                        <span
+                          className={`block truncate font-medium ${STATUS_NAME_CLASS[p.status]}`}
+                        >
+                          {p.name}
+                        </span>
                         <span className="text-muted-foreground block text-[11px]">
                           {p.archived ? "Archived · " : ""}
                           {p.contracts === 0
                             ? "No contract filed"
                             : `${p.contracts} document${p.contracts === 1 ? "" : "s"}`}
+                          {p.status === "ending" && p.endDate
+                            ? ` · ends ${formatDmy(p.endDate)}`
+                            : ""}
                         </span>
                       </span>
                       {p.endingSoon && <EndingSoonBadge />}

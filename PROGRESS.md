@@ -3308,3 +3308,9 @@ Requested after Phase 8, outside the spec. The user has about 20 staff and contr
 - "Title" is gone from Account, and `auth.updateProfile` no longer takes it. The `users.title` column stays, with whatever was already stored; nothing else reads it.
 - Shared components moved to `components/my-profile.tsx`.
 - `account-deletion.spec` scoped its text checks: the workspace name now also appears in the profile card heading.
+
+## 2026-11-06 Contract name colours; annual leave by time at the company
+
+- **Contracts page names**: green = current contract (including no end date), red from the alert day (last working day before the end) and after it, none = no contract or archived. The latest end date decides, so a renewal goes back to green. Red starts at midnight of the alert day, while the email goes at 08:00. The amber "Ending soon" label (30 days) stays. `personContractStatus` in shared; `contract.list` now returns `endAlertDay`.
+- **Tenure rules**: `workspaces.vacation_tenure_rules` (0076), edited under Leave approvals → Balances. Entitlement = a person's typed number, else the highest rule reached by 31 Dec of that year from `employment_start_date`, else the default. No rules are seeded: the user's/HR's policy decides the numbers. A typed number still lasts one year only.
+- e2e: `vacation-tenure`, colour checks in `contracts-page`.

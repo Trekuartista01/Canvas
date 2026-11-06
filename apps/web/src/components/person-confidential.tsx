@@ -247,8 +247,8 @@ function Allowances({
     >
       <h2 className="text-sm font-semibold">Annual leave allowance</h2>
       <p className="text-muted-foreground text-xs">
-        Working days per year. Empty = the workspace default. Balance = allowed + carried over −
-        approved − pending.
+        Working days per year. Empty = the days for their time here. Balance = allowed + carried
+        over − approved − pending.
       </p>
       <table className="w-full text-sm">
         <thead className="text-muted-foreground text-left text-xs">

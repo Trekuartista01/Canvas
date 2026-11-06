@@ -158,6 +158,19 @@ test("P8.6 Contracts page: drag-and-drop with preview, signed viewing, replace a
   expect((await fileGone).ok()).toBe(true);
   await expect(third).toHaveCount(0);
 
+  // The name's colour: green while valid, red from the alert day, green after a renewal.
+  await expect(samRow).toHaveAttribute("data-contract-status", "valid");
+  await expect(hr.getByTestId("contract-person-Tina Other")).toHaveAttribute(
+    "data-contract-status",
+    "none",
+  );
+  const tomorrow = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+  await card.getByRole("button", { name: "Edit" }).click();
+  await card.getByLabel("End date").fill(tomorrow);
+  await save(hr, "contract-edit-save", "contract.update");
+  await expect(samRow).toHaveAttribute("data-contract-status", "ending");
+  await expect(samRow).toContainText(`ends ${tomorrow.split("-").reverse().join(".")}`);
+
   // Editing the end date moves it out of "Ending soon".
   await card.getByRole("button", { name: "Edit" }).click();
   await card.getByLabel("End date").fill("2031-03-01");
@@ -165,6 +178,7 @@ test("P8.6 Contracts page: drag-and-drop with preview, signed viewing, replace a
   await expect(card.getByTestId("contract-end")).toHaveText("01.03.2031");
   await expect(card).not.toContainText("Ending soon");
   await expect(samRow).not.toContainText("Ending soon");
+  await expect(samRow).toHaveAttribute("data-contract-status", "valid");
 
   // Everything that mattered is in the audit log.
   const audit = await db
