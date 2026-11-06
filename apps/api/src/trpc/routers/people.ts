@@ -413,9 +413,9 @@ export const peopleRouter = router({
       return { userId: input.userId };
     }),
 
-  // Position, department and birthday, on your own profile only: no target
-  // user in the input, so it can't reach anyone else's. The birthday stays
-  // confidential, like the rest of `personal` above.
+  // Your own details, and only yours: no target user in the input, so it can't
+  // reach anyone else's. `personal` stays confidential (see `profile`), and
+  // changes to it are audited like HR's (spec §1).
   updateMyProfile: protectedProcedure
     .input(updateMyProfileSchema)
     .mutation(async ({ ctx, input }) => {
@@ -431,6 +431,15 @@ export const peopleRouter = router({
         "person.profile_updated",
         { fields: Object.keys(values) },
       );
+      await writeAudit({
+        workspaceId: input.workspaceId,
+        actorId: ctx.user.id,
+        action: "person.profile_updated",
+        entity: "person",
+        entityId: ctx.user.id,
+        ip: ctx.ip,
+        payload: { fields: Object.keys(values) },
+      });
       return { userId: ctx.user.id };
     }),
 

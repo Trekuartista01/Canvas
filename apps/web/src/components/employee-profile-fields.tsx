@@ -1,3 +1,4 @@
+import { DepartmentSelect } from "@/components/department-select";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import type { EmployeeProfileDraft } from "./employee-profile-draft";
@@ -34,12 +35,20 @@ export function EmployeeProfileFields({
           <Label htmlFor={`${idPrefix}-${key}`} className="text-xs">
             {label}
           </Label>
-          <Input
-            id={`${idPrefix}-${key}`}
-            type={type ?? "text"}
-            value={draft[key]}
-            onChange={(e) => onChange({ ...draft, [key]: e.target.value })}
-          />
+          {key === "department" ? (
+            <DepartmentSelect
+              id={`${idPrefix}-${key}`}
+              value={draft[key]}
+              onChange={(department) => onChange({ ...draft, department })}
+            />
+          ) : (
+            <Input
+              id={`${idPrefix}-${key}`}
+              type={type ?? "text"}
+              value={draft[key]}
+              onChange={(e) => onChange({ ...draft, [key]: e.target.value })}
+            />
+          )}
         </div>
       ))}
     </div>

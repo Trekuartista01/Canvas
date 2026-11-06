@@ -215,3 +215,13 @@ export const INVITE_ROLE_CHOICES = [
   role: Exclude<MembershipRole, "owner">;
   peopleRole?: Exclude<PeopleRole, "employee">;
 }[];
+
+/** The company's departments, offered wherever a person's department is set. */
+export const DEPARTMENTS = [
+  "Design",
+  "Motion",
+  "Development",
+  "HR/Finance",
+  "CEO",
+  "Operations",
+] as const;

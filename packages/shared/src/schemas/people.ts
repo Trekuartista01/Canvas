@@ -60,7 +60,7 @@ export const updateEmployeeProfileSchema = employeeProfileFieldsSchema.extend({
 
 // What anyone can set on their own profile; the rest of it is HR's to keep.
 export const updateMyProfileSchema = employeeProfileFieldsSchema
-  .pick({ jobTitle: true, department: true, dateOfBirth: true })
+  .omit({ employmentStartDate: true })
   .extend({ workspaceId });
 
 export const setPeopleRoleSchema = z.object({ workspaceId, userId, peopleRole: peopleRoleEnum });

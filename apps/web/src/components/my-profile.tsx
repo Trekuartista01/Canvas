@@ -1,4 +1,5 @@
 import type { AppRouter } from "@canvas/api";
+import { DepartmentSelect } from "@/components/department-select";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -26,7 +27,7 @@ export function Detail({ label, value }: { label: string; value: string | null }
   );
 }
 
-/** Someone's own position, department and birthday in one workspace. */
+/** The details someone keeps up to date themselves, in one workspace. */
 export function MyDetailsEditor({
   workspaceId,
   profile,
@@ -40,6 +41,14 @@ export function MyDetailsEditor({
   const [jobTitle, setJobTitle] = useState(profile.jobTitle ?? "");
   const [department, setDepartment] = useState(profile.department ?? "");
   const [dateOfBirth, setDateOfBirth] = useState(profile.personal?.dateOfBirth ?? "");
+  const [phone, setPhone] = useState(profile.personal?.phone ?? "");
+  const [address, setAddress] = useState(profile.personal?.address ?? "");
+  const [emergencyContactName, setEmergencyContactName] = useState(
+    profile.personal?.emergencyContactName ?? "",
+  );
+  const [emergencyContactPhone, setEmergencyContactPhone] = useState(
+    profile.personal?.emergencyContactPhone ?? "",
+  );
   const update = trpc.people.updateMyProfile.useMutation({
     onSuccess: () =>
       Promise.all([
@@ -53,7 +62,16 @@ export function MyDetailsEditor({
     <form
       onSubmit={(e) => {
         e.preventDefault();
-        update.mutate({ workspaceId, jobTitle, department, dateOfBirth });
+        update.mutate({
+          workspaceId,
+          jobTitle,
+          department,
+          dateOfBirth,
+          phone,
+          address,
+          emergencyContactName,
+          emergencyContactPhone,
+        });
       }}
       className="border-border space-y-3 rounded-md border p-4"
       data-testid="my-details-editor"
@@ -61,7 +79,7 @@ export function MyDetailsEditor({
       <div>
         <h2 className="text-sm font-semibold">My details</h2>
         <p className="text-muted-foreground text-xs">
-          Everyone can see your position and department. Only you and HR can see your birthday.
+          Everyone can see your position and department. Only you and HR can see the rest.
         </p>
       </div>
       <div className="grid gap-3 sm:grid-cols-2">
@@ -79,10 +97,10 @@ export function MyDetailsEditor({
           <Label htmlFor={`${fieldId}-department`} className="text-xs">
             Department
           </Label>
-          <Input
+          <DepartmentSelect
             id={`${fieldId}-department`}
             value={department}
-            onChange={(e) => setDepartment(e.target.value)}
+            onChange={setDepartment}
           />
         </div>
         <div className="space-y-1">
@@ -94,6 +112,48 @@ export function MyDetailsEditor({
             type="date"
             value={dateOfBirth}
             onChange={(e) => setDateOfBirth(e.target.value)}
+          />
+        </div>
+        <div className="space-y-1">
+          <Label htmlFor={`${fieldId}-phone`} className="text-xs">
+            Phone
+          </Label>
+          <Input
+            id={`${fieldId}-phone`}
+            type="tel"
+            value={phone}
+            onChange={(e) => setPhone(e.target.value)}
+          />
+        </div>
+        <div className="space-y-1 sm:col-span-2">
+          <Label htmlFor={`${fieldId}-address`} className="text-xs">
+            Address
+          </Label>
+          <Input
+            id={`${fieldId}-address`}
+            value={address}
+            onChange={(e) => setAddress(e.target.value)}
+          />
+        </div>
+        <div className="space-y-1">
+          <Label htmlFor={`${fieldId}-emergency-name`} className="text-xs">
+            Emergency contact name
+          </Label>
+          <Input
+            id={`${fieldId}-emergency-name`}
+            value={emergencyContactName}
+            onChange={(e) => setEmergencyContactName(e.target.value)}
+          />
+        </div>
+        <div className="space-y-1">
+          <Label htmlFor={`${fieldId}-emergency-phone`} className="text-xs">
+            Emergency contact phone
+          </Label>
+          <Input
+            id={`${fieldId}-emergency-phone`}
+            type="tel"
+            value={emergencyContactPhone}
+            onChange={(e) => setEmergencyContactPhone(e.target.value)}
           />
         </div>
       </div>

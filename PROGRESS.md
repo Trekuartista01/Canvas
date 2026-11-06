@@ -3302,8 +3302,9 @@ Requested after Phase 8, outside the spec. The user has about 20 staff and contr
 
 ## 2026-11-06 Profiles in Account
 
-- `/account` now has a "Your profile in <workspace>" card per workspace: Role, Reports to, Employment start, Phone, Address and Emergency contact to read; position, department and birthday to change. The password reset button is there too. These details belong to a membership, so someone in two workspaces has a set for each.
-- Everyone gets the editor on Account, including HR and owners, who only have the HR editor on the person page. Phone, address and emergency contact stay HR's to change (the spec lists address and phone as confidential fields).
-- Shared components moved to `components/my-profile.tsx`. No API or schema change.
-- `users.title` ("Title" on Account) is shown nowhere else, and now sits next to Position. Left in place.
+- `/account` now has a "Your profile in <workspace>" card per workspace: Role, Reports to and Employment start to read; position, department, birthday, phone, address and emergency contact to change. The password reset button is there too. These details belong to a membership, so someone in two workspaces has a set for each.
+- Everyone gets the editor on Account, including HR and owners, who only have the HR editor on the person page. The user chose to let people change their own phone, address and emergency contact; `updateMyProfile` now writes an audit row, since those are confidential HR data (spec §1). Employment start stays HR's.
+- **Departments**: `DEPARTMENTS` in `packages/shared/src/people.ts` is offered as a dropdown in the self editor and HR's forms. The server still stores free text: a department saved before the list stays selectable and isn't lost on save.
+- "Title" is gone from Account, and `auth.updateProfile` no longer takes it. The `users.title` column stays, with whatever was already stored; nothing else reads it.
+- Shared components moved to `components/my-profile.tsx`.
 - `account-deletion.spec` scoped its text checks: the workspace name now also appears in the profile card heading.

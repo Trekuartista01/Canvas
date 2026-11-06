@@ -150,7 +150,6 @@ export const authRouter = router({
       .set({
         name: input.name,
         bio: input.bio || null,
-        title: input.title || null,
         updatedAt: new Date(),
       })
       .where(eq(schema.users.id, ctx.user.id))

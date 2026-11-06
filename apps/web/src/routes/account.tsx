@@ -42,7 +42,6 @@ function AccountPage() {
 
   const [name, setName] = useState(user?.name ?? "");
   const [bio, setBio] = useState(user?.bio ?? "");
-  const [title, setTitle] = useState(user?.title ?? "");
   const [saved, setSaved] = useState(false);
   const updateProfile = trpc.auth.updateProfile.useMutation({
     onSuccess: async () => {
@@ -54,8 +53,7 @@ function AccountPage() {
   useEffect(() => {
     setName(user?.name ?? "");
     setBio(user?.bio ?? "");
-    setTitle(user?.title ?? "");
-  }, [user?.name, user?.bio, user?.title]);
+  }, [user?.name, user?.bio]);
 
   const avatarInputRef = useRef<HTMLInputElement>(null);
   const [avatarUploading, setAvatarUploading] = useState(false);
@@ -137,7 +135,7 @@ function AccountPage() {
           onSubmit={(e) => {
             e.preventDefault();
             setSaved(false);
-            updateProfile.mutate({ name, bio, title });
+            updateProfile.mutate({ name, bio });
           }}
         >
           <div className="space-y-1">
@@ -150,21 +148,6 @@ function AccountPage() {
               onChange={(e) => setName(e.target.value)}
               data-testid="profile-name-input"
             />
-          </div>
-          <div className="space-y-1">
-            <label htmlFor="profile-title" className="text-xs font-medium">
-              Title
-            </label>
-            <Input
-              id="profile-title"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              placeholder="e.g. Product Designer"
-              data-testid="profile-title-input"
-            />
-            <p className="text-muted-foreground text-xs">
-              Shown on your profile — separate from your role in each workspace.
-            </p>
           </div>
           <div className="space-y-1">
             <label htmlFor="profile-bio" className="text-xs font-medium">
@@ -330,16 +313,6 @@ function WorkProfile({
             <Detail label="Role" value={PEOPLE_ROLE_LABELS[p.peopleRole]} />
             <Detail label="Reports to" value={p.managerName} />
             <Detail label="Employment start" value={formatDate(p.employmentStartDate)} />
-            <Detail label="Phone" value={p.personal?.phone ?? null} />
-            <Detail label="Address" value={p.personal?.address ?? null} />
-            <Detail
-              label="Emergency contact"
-              value={
-                [p.personal?.emergencyContactName, p.personal?.emergencyContactPhone]
-                  .filter(Boolean)
-                  .join(" · ") || null
-              }
-            />
           </dl>
           <MyDetailsEditor workspaceId={workspaceId} profile={p} />
         </>

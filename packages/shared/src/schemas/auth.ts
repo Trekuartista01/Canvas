@@ -36,7 +36,6 @@ export const deleteAccountSchema = z.object({
 export const updateProfileSchema = z.object({
   name: z.string().trim().min(1).max(100),
   bio: z.string().trim().max(500),
-  title: z.string().trim().max(100),
 });
 
 export type SignUpInput = z.infer<typeof signUpSchema>;

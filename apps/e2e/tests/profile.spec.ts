@@ -4,7 +4,7 @@ import { createWorkspaceAndOpen, signUp } from "./helpers";
 
 const IMAGE_FIXTURE = fileURLToPath(new URL("../fixtures/test-image.png", import.meta.url));
 
-test("profile: edit name/bio/title, upload an avatar, and see it render in the workspace", async ({
+test("profile: edit name/bio, upload an avatar, and see it render in the workspace", async ({
   page,
 }) => {
   test.setTimeout(60_000);
@@ -15,7 +15,6 @@ test("profile: edit name/bio/title, upload an avatar, and see it render in the w
   await page.goto("/account");
   await page.getByTestId("profile-name-input").fill("Ada Renamed");
   await page.getByTestId("profile-bio-input").fill("Building things.");
-  await page.getByTestId("profile-title-input").fill("Product Designer");
   const saved = page.waitForResponse((res) => res.url().includes("auth.updateProfile"));
   await page.getByTestId("profile-save").click();
   await saved;
