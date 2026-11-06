@@ -67,7 +67,7 @@ export function TaskHighlightRow({
       </button>
       {task.priority && (
         <span
-          className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium capitalize ${PRIORITY_TONE[task.priority] ?? PRIORITY_TONE.normal}`}
+          className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-medium capitalize ${PRIORITY_TONE[task.priority] ?? PRIORITY_TONE.normal}`}
         >
           {task.priority}
         </span>

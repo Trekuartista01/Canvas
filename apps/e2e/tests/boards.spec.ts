@@ -16,7 +16,7 @@ async function dragTo(page: Page, from: Locator, to: Locator) {
 
 async function addCard(page: Page, list: string, title: string) {
   const column = page.getByTestId(`board-list-${list}`);
-  await column.getByRole("button", { name: "+ Add a card" }).click();
+  await column.getByTestId("add-task").click();
   await page.getByPlaceholder("Task title").fill(title);
   await page.keyboard.press("Enter");
   await expect(column.getByTestId(`board-card-${title}`)).toBeVisible();
@@ -90,7 +90,12 @@ test("P8.9 boards: switcher on top, default lists, cards drag and stay, lists ma
   expect(moved).toEqual({ kind: "open", list: "Review" });
 
   // Order within a list persists too.
-  await addCard(page, "Review", "Second in review");
+  await addCard(page, "To Do", "Second in review");
+  await dragTo(
+    page,
+    page.getByTestId("board-card-Second in review"),
+    page.getByTestId("board-list-Review"),
+  );
   await dragTo(
     page,
     page.getByTestId("board-card-Second in review"),
@@ -241,6 +246,7 @@ test("P8.9 boards: switcher on top, default lists, cards drag and stay, lists ma
     .getByRole("button", { name: "Story posts" })
     .click();
   await expect(page).toHaveURL(/card=/);
+  await page.getByTestId("task-more").locator("summary").click();
   const movePanel = page.getByTestId("card-move");
   await movePanel.getByLabel("List").selectOption({ label: "In Progress" });
   await page.keyboard.press("Escape");
@@ -251,6 +257,7 @@ test("P8.9 boards: switcher on top, default lists, cards drag and stay, lists ma
     .getByTestId("board-card-Story posts")
     .getByRole("button", { name: "Story posts" })
     .click();
+  await page.getByTestId("task-more").locator("summary").click();
   await movePanel.getByRole("button", { name: "Archive card" }).click();
   await movePanel.getByRole("button", { name: "Yes, archive" }).click();
   await expect(page.getByTestId("board-card-Story posts")).toHaveCount(0);

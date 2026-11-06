@@ -13,7 +13,7 @@ interface ClientRef {
 function Chip({ client, label }: { client: ClientRef; label?: string }) {
   return (
     <span
-      className="rounded-full px-2 py-0.5 text-xs font-medium"
+      className="rounded-full px-3.5 py-1.5 text-base font-semibold"
       style={{ backgroundColor: `${client.color}26`, color: client.color }}
       data-testid="card-client-chip"
     >
@@ -84,7 +84,7 @@ export function ClientField({
       <div
         ref={fieldRef}
         tabIndex={-1}
-        className="flex flex-wrap items-center gap-2 text-xs outline-none"
+        className="flex min-h-10 flex-wrap items-center gap-2 text-sm outline-none"
         data-testid="card-client"
       >
         {client ? (
@@ -101,7 +101,7 @@ export function ClientField({
             </button>
           </>
         ) : suggestions.length === 0 ? (
-          <span className="text-muted-foreground">None</span>
+          <span className="text-muted-foreground">No client yet</span>
         ) : null}
 
         {suggestions.length > 0 && (
@@ -111,7 +111,7 @@ export function ClientField({
               <button
                 key={s.id}
                 type="button"
-                className="border-border hover:bg-muted rounded-full border px-2 py-0.5"
+                className="border-border hover:bg-muted rounded-full border px-3 py-1 font-medium"
                 disabled={set.isPending}
                 onClick={() => set.mutate({ taskId, clientId: s.id })}
               >
@@ -124,7 +124,7 @@ export function ClientField({
         {canManage && (
           <button
             type="button"
-            className="text-muted-foreground hover:text-foreground underline"
+            className="border-border hover:bg-muted h-9 rounded-md border px-3 text-sm font-medium"
             onClick={() => setPicking(!picking)}
           >
             {picking ? "Close" : client ? "Change" : "Choose"}
@@ -133,7 +133,7 @@ export function ClientField({
       </div>
 
       {picking && (
-        <div className="mt-2 max-w-xs space-y-1" data-testid="card-client-picker">
+        <div className="mt-2 max-w-sm space-y-1" data-testid="card-client-picker">
           <Input
             autoFocus
             value={search}
@@ -141,14 +141,14 @@ export function ClientField({
             aria-label="Search clients"
             maxLength={120}
             onChange={(e) => setSearch(e.target.value)}
-            className="h-7 text-xs"
+            className="h-9 text-sm"
           />
-          <ul className="border-border max-h-40 overflow-y-auto rounded border text-xs">
+          <ul className="border-border max-h-48 overflow-y-auto rounded-md border text-sm">
             {matches.map((o) => (
               <li key={o.id}>
                 <button
                   type="button"
-                  className="hover:bg-muted block w-full px-2 py-1 text-left"
+                  className="hover:bg-muted block w-full px-3 py-2 text-left"
                   onClick={() => set.mutate({ taskId, clientId: o.id })}
                 >
                   {o.name}
@@ -159,7 +159,7 @@ export function ClientField({
               <li>
                 <button
                   type="button"
-                  className="hover:bg-muted text-accent block w-full px-2 py-1 text-left"
+                  className="hover:bg-muted text-accent block w-full px-3 py-2 text-left"
                   disabled={create.isPending}
                   onClick={() => create.mutate({ workspaceId, name: search.trim(), aliases: [] })}
                 >

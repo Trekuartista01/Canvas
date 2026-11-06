@@ -105,7 +105,7 @@ function Stat({
 }) {
   return (
     <div className="border-border rounded-md border p-2">
-      <p className="text-muted-foreground text-[11px]">{label}</p>
+      <p className="text-muted-foreground text-[12px]">{label}</p>
       <p className={strong ? "text-lg font-semibold" : "text-lg"} data-testid={testId}>
         {value ?? "–"}
       </p>

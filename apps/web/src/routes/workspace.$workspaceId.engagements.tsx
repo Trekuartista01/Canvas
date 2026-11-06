@@ -147,7 +147,7 @@ function EngagementCard({ workspaceId, card }: { workspaceId: string; card: Card
           )}
         </div>
         <span
-          className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-medium ${status.className}`}
+          className={`shrink-0 rounded-full px-2 py-0.5 text-[12px] font-medium ${status.className}`}
           data-testid="engagement-status"
         >
           {status.label}

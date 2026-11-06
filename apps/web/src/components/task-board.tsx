@@ -234,7 +234,7 @@ function StatusColumn({
         />
         <span className="flex-1 truncate text-sm font-semibold">{status.name}</span>
         <span
-          className="rounded-full px-1.5 py-0.5 text-[10px] font-semibold"
+          className="rounded-full px-1.5 py-0.5 text-[11px] font-semibold"
           style={{ backgroundColor: `${status.color}26`, color: status.color }}
         >
           {tasks.length}

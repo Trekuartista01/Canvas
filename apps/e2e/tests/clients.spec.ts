@@ -28,7 +28,7 @@ async function requestAs(browser: Browser, member: SeededMember) {
 
 async function addCard(page: Page, list: string, title: string) {
   const column = page.getByTestId(`board-list-${list}`);
-  await column.getByRole("button", { name: "+ Add a card" }).click();
+  await column.getByTestId("add-task").click();
   await page.getByPlaceholder("Task title").fill(title);
   await page.keyboard.press("Enter");
   await expect(column.getByTestId(`board-card-${title}`)).toBeVisible();

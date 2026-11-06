@@ -164,7 +164,7 @@ export function ReferenceAttachZone({
           <Paperclip className="h-3.5 w-3.5" aria-hidden />
           {uploading ? "Uploading…" : "Attach reference"}
         </button>
-        <span className="text-muted-foreground text-[10px]">or drag & drop</span>
+        <span className="text-muted-foreground text-[11px]">or drag & drop</span>
       </div>
 
       {error && <p className="px-2 pb-2 text-xs text-red-500">{error}</p>}

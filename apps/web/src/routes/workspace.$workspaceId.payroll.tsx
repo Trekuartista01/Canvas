@@ -147,7 +147,7 @@ function PayrollTable({
             : totals.map((t) => formatMoney(t.total, t.currency)).join(" + ")}
         </span>
       </div>
-      <div className={`${GRID} text-muted-foreground px-3 text-[11px] font-medium`}>
+      <div className={`${GRID} text-muted-foreground px-3 text-[12px] font-medium`}>
         <span>Employee</span>
         <span>Net salary</span>
         <span>Bank</span>

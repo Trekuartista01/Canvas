@@ -15,7 +15,7 @@ export function VersionCompare({
           <button
             type="button"
             onClick={onClear}
-            className="text-muted-foreground hover:text-foreground text-[11px]"
+            className="text-muted-foreground hover:text-foreground text-[12px]"
             data-testid="version-compare-clear"
           >
             Clear
@@ -30,7 +30,7 @@ export function VersionCompare({
             data-testid="version-compare-left"
             className="border-border bg-muted aspect-square w-full rounded-md border object-contain"
           />
-          <figcaption className="text-muted-foreground text-[11px]">Selected</figcaption>
+          <figcaption className="text-muted-foreground text-[12px]">Selected</figcaption>
         </figure>
         <figure className="space-y-1">
           <img
@@ -39,7 +39,7 @@ export function VersionCompare({
             data-testid="version-compare-right"
             className="border-border bg-muted aspect-square w-full rounded-md border object-contain"
           />
-          <figcaption className="text-muted-foreground text-[11px]">Compare</figcaption>
+          <figcaption className="text-muted-foreground text-[12px]">Compare</figcaption>
         </figure>
       </div>
     </div>

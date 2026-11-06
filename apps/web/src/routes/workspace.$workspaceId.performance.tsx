@@ -120,7 +120,7 @@ function TeamTable({
   });
   return (
     <section className="flex min-h-0 flex-col gap-1" aria-label="Team performance">
-      <div className={`${GRID} text-muted-foreground px-3 text-[11px] font-medium`}>
+      <div className={`${GRID} text-muted-foreground px-3 text-[12px] font-medium`}>
         <span>Employee</span>
         <span>Total</span>
         <span>On time</span>

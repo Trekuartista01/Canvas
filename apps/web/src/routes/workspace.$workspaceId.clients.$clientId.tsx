@@ -145,7 +145,7 @@ function ClientFolderPage() {
                         </span>
                       )}
                       <span
-                        className="rounded-full px-2 py-0.5 text-[11px]"
+                        className="rounded-full px-2 py-0.5 text-[12px]"
                         style={{
                           backgroundColor: `${row.task.statusColor}26`,
                           color: row.task.statusColor,

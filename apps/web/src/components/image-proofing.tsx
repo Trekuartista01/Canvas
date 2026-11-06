@@ -170,7 +170,7 @@ export function ImageProofing({
                 aria-label="Delete pin comment"
                 title="Delete pin comment"
                 onClick={() => removeComment.mutate({ commentId: pin.comment.id })}
-                className="text-muted-foreground hover:text-foreground text-[11px]"
+                className="text-muted-foreground hover:text-foreground text-[12px]"
               >
                 Delete
               </button>

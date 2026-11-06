@@ -110,7 +110,7 @@ function WorkspaceShell() {
           <div className="min-w-0 flex-1">
             <Link
               to="/"
-              className="text-muted-foreground hover:text-foreground flex items-center gap-0.5 text-[10px] tracking-wide uppercase"
+              className="text-muted-foreground hover:text-foreground flex items-center gap-0.5 text-[11px] tracking-wide uppercase"
             >
               <ChevronLeft className="h-3 w-3" aria-hidden />
               All workspaces

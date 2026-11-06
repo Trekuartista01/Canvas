@@ -89,7 +89,7 @@ export function TaskCalendarView({
         {WEEKDAY_LABELS.map((label) => (
           <div
             key={label}
-            className="bg-muted text-muted-foreground px-2 py-1 text-center text-[11px] font-medium"
+            className="bg-muted text-muted-foreground px-2 py-1 text-center text-[12px] font-medium"
           >
             {label}
           </div>
@@ -114,7 +114,7 @@ export function TaskCalendarView({
                 cell.inMonth ? "" : "opacity-40"
               } ${isToday ? "ring-primary ring-inset ring-1" : ""}`}
             >
-              <p className="text-muted-foreground mb-1 text-[11px]">{cell.day}</p>
+              <p className="text-muted-foreground mb-1 text-[12px]">{cell.day}</p>
               <div className="space-y-0.5">
                 {dayTasks.map((task) => (
                   <button
@@ -127,7 +127,7 @@ export function TaskCalendarView({
                       e.dataTransfer.effectAllowed = "move";
                     }}
                     onClick={() => onOpenTask(task.id)}
-                    className="bg-muted hover:bg-muted/80 line-clamp-2 w-full rounded px-1 py-0.5 text-left text-[11px]"
+                    className="bg-muted hover:bg-muted/80 line-clamp-2 w-full rounded px-1 py-0.5 text-left text-[12px]"
                   >
                     {task.dueDate && task.dueTime && (
                       <span className="text-muted-foreground mr-1">

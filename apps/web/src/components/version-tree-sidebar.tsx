@@ -48,7 +48,7 @@ export function VersionTreeSidebar({
                 onSelect={() => onSelect(node.id)}
               />
               <div className="min-w-0 flex-1 space-y-1 pt-1">
-                <p className="text-muted-foreground truncate text-[11px]">
+                <p className="text-muted-foreground truncate text-[12px]">
                   {node.source}
                   {isCurrent ? " · current" : ""}
                 </p>
@@ -57,7 +57,7 @@ export function VersionTreeSidebar({
                   data-testid={`version-compare-toggle-${node.id}`}
                   aria-pressed={isCompare}
                   onClick={() => onToggleCompare(node.id)}
-                  className={`text-[11px] underline-offset-2 hover:underline ${
+                  className={`text-[12px] underline-offset-2 hover:underline ${
                     isCompare ? "text-foreground" : "text-muted-foreground"
                   }`}
                 >

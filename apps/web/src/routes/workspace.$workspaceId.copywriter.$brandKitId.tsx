@@ -418,7 +418,7 @@ function CopywriterWorkspacePage() {
                     }`}
                   >
                     <div className="text-xs font-semibold">{LENGTH_LABELS[l].label}</div>
-                    <div className="text-[10px] opacity-70">{LENGTH_LABELS[l].hint}</div>
+                    <div className="text-[11px] opacity-70">{LENGTH_LABELS[l].hint}</div>
                   </button>
                 ))}
               </div>
@@ -574,7 +574,7 @@ function CopywriterWorkspacePage() {
                     </div>
                   </div>
                   {savedIdx === idx && savedDestination && (
-                    <p className="text-muted-foreground text-[11px]">
+                    <p className="text-muted-foreground text-[12px]">
                       Saved to Library → Copy / {savedDestination}
                     </p>
                   )}
@@ -583,7 +583,7 @@ function CopywriterWorkspacePage() {
                     <div className="space-y-2">
                       {v.design_copy && (
                         <div className="bg-muted rounded-md p-3">
-                          <p className="text-muted-foreground mb-1 text-[10px] uppercase">
+                          <p className="text-muted-foreground mb-1 text-[11px] uppercase">
                             On the design
                           </p>
                           <p className="text-base font-semibold">{v.design_copy}</p>
@@ -591,7 +591,7 @@ function CopywriterWorkspacePage() {
                       )}
                       {v.caption && (
                         <div className="bg-muted rounded-md p-3">
-                          <p className="text-muted-foreground mb-1 text-[10px] uppercase">
+                          <p className="text-muted-foreground mb-1 text-[11px] uppercase">
                             Caption
                           </p>
                           <p className="text-sm whitespace-pre-wrap">{v.caption}</p>
@@ -617,7 +617,7 @@ function CopywriterWorkspacePage() {
                             type="button"
                             disabled={refiningIdx !== null}
                             onClick={() => void handleRefine(idx, p)}
-                            className="border-border rounded-full border px-2.5 py-1 text-[11px] disabled:opacity-30"
+                            className="border-border rounded-full border px-2.5 py-1 text-[12px] disabled:opacity-30"
                           >
                             {p}
                           </button>
@@ -629,7 +629,7 @@ function CopywriterWorkspacePage() {
                             setRefineOpenIdx(refineOpenIdx === idx ? null : idx);
                             setRefineText("");
                           }}
-                          className={`rounded-full border px-2.5 py-1 text-[11px] disabled:opacity-30 ${
+                          className={`rounded-full border px-2.5 py-1 text-[12px] disabled:opacity-30 ${
                             refineOpenIdx === idx
                               ? "bg-accent text-accent-foreground border-accent"
                               : "border-border"

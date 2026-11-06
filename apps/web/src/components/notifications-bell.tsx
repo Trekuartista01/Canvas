@@ -138,7 +138,7 @@ export function NotificationsBell() {
       >
         🔔
         {unreadCount > 0 && (
-          <span className="bg-primary text-primary-foreground absolute -top-1.5 -right-2 rounded-full px-1 text-[10px] leading-tight">
+          <span className="bg-primary text-primary-foreground absolute -top-1.5 -right-2 rounded-full px-1 text-[11px] leading-tight">
             {unreadCount}
           </span>
         )}

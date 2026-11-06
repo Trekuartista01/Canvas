@@ -93,7 +93,7 @@ export function AttachmentsSection({ taskId }: { taskId: string }) {
                   aria-pressed={a.isProof}
                   title={a.isProof ? "Unmark as proof" : "Mark as proof"}
                   onClick={() => setProof.mutate({ attachmentId: a.id, isProof: !a.isProof })}
-                  className={`bg-background/90 absolute top-1 left-1 rounded-full px-1.5 text-[10px] ${
+                  className={`bg-background/90 absolute top-1 left-1 rounded-full px-1.5 text-[11px] ${
                     a.isProof
                       ? "text-status-good inline"
                       : "text-muted-foreground hidden group-hover:inline"

@@ -287,7 +287,7 @@ export function GenerationPanel({
           >
             <p className="text-xs font-medium">A few details before we generate</p>
             <div>
-              <label htmlFor="gen-use" className="mb-1 block text-[11px] font-medium">
+              <label htmlFor="gen-use" className="mb-1 block text-[12px] font-medium">
                 Where will this be used?
               </label>
               <input
@@ -300,7 +300,7 @@ export function GenerationPanel({
               />
             </div>
             <div>
-              <label htmlFor="gen-must" className="mb-1 block text-[11px] font-medium">
+              <label htmlFor="gen-must" className="mb-1 block text-[12px] font-medium">
                 What must appear?
               </label>
               <input
@@ -313,7 +313,7 @@ export function GenerationPanel({
               />
             </div>
             <div>
-              <label htmlFor="gen-avoid" className="mb-1 block text-[11px] font-medium">
+              <label htmlFor="gen-avoid" className="mb-1 block text-[12px] font-medium">
                 Anything to avoid? (optional)
               </label>
               <input

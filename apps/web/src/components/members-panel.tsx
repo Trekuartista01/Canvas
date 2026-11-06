@@ -99,7 +99,7 @@ export function MembersPanel({ workspaceId }: { workspaceId: string }) {
             ) : (
               <span className="flex shrink-0 items-center gap-1.5 text-xs">
                 {m.peopleRole !== "employee" && (
-                  <span className="bg-accent-soft text-accent rounded-full px-1.5 py-0.5 text-[10px] font-medium">
+                  <span className="bg-accent-soft text-accent rounded-full px-1.5 py-0.5 text-[11px] font-medium">
                     {PEOPLE_ROLE_LABELS[m.peopleRole]}
                   </span>
                 )}

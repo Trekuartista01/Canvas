@@ -80,7 +80,7 @@ export function LeaveMonthCalendar({
               }`}
               data-testid={`${testId}-${cell.date}`}
             >
-              <p className="text-muted-foreground text-[11px]">{cell.day}</p>
+              <p className="text-muted-foreground text-[12px]">{cell.day}</p>
               {off.map((l) => (
                 <p
                   key={l.id}

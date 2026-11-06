@@ -253,7 +253,7 @@ export function TaskGanttView({
                   <div
                     key={d.date}
                     style={{ width: DAY_WIDTH }}
-                    className={`text-muted-foreground flex shrink-0 items-center justify-center border-r border-border/50 text-[10px] ${
+                    className={`text-muted-foreground flex shrink-0 items-center justify-center border-r border-border/50 text-[11px] ${
                       d.isWeekend ? "bg-muted/70" : ""
                     }`}
                   >
@@ -332,7 +332,7 @@ export function TaskGanttView({
                         className="bg-primary/80 h-full shrink-0 rounded"
                         aria-hidden
                       />
-                      <span className="text-foreground bg-background/80 rounded px-1 text-[10px] whitespace-nowrap">
+                      <span className="text-foreground bg-background/80 rounded px-1 text-[11px] whitespace-nowrap">
                         {task.title}
                       </span>
                     </button>

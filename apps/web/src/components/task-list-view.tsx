@@ -270,7 +270,7 @@ export function TaskListView({
                     />
                     {status?.name ?? "—"}{" "}
                     <span
-                      className="rounded-full px-1.5 py-0.5 text-[10px]"
+                      className="rounded-full px-1.5 py-0.5 text-[11px]"
                       style={{
                         backgroundColor: `${status?.color ?? "#94a3b8"}26`,
                         color: status?.color,

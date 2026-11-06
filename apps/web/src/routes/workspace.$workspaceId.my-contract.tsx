@@ -80,7 +80,7 @@ function MyContractPage() {
                     className="border-border flex flex-wrap items-center gap-x-3 gap-y-1 rounded-md border px-3 py-2 text-sm"
                     data-testid={`contract-${row.title}`}
                   >
-                    <span className="bg-muted rounded-full px-2 py-0.5 text-[11px]">
+                    <span className="bg-muted rounded-full px-2 py-0.5 text-[12px]">
                       {CONTRACT_KIND_LABELS[row.kind]}
                     </span>
                     <span className="font-medium">{row.title}</span>

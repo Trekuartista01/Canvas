@@ -124,7 +124,7 @@ function LeaveApprovalsPage() {
             {TAB_LABELS[t]}
             {t === "pending" && pendingCount > 0 && (
               <span
-                className="bg-accent text-accent-foreground ml-1 rounded-full px-1.5 text-[10px] font-semibold"
+                className="bg-accent text-accent-foreground ml-1 rounded-full px-1.5 text-[11px] font-semibold"
                 data-testid="leave-pending-count"
               >
                 {pendingCount}
@@ -219,7 +219,7 @@ function RequestCard({ request: r, highlighted }: { request: TeamRow; highlighte
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
         <span className="font-semibold">{r.userName}</span>
         {r.own && (
-          <span className="bg-muted text-muted-foreground rounded-full px-2 py-0.5 text-[10px]">
+          <span className="bg-muted text-muted-foreground rounded-full px-2 py-0.5 text-[11px]">
             Your request
           </span>
         )}
@@ -230,7 +230,7 @@ function RequestCard({ request: r, highlighted }: { request: TeamRow; highlighte
         </span>
         <LeaveStatusBadge status={r.status} />
         {r.selfApproved && (
-          <span className="rounded-full bg-amber-500/15 px-2 py-0.5 text-[10px] text-amber-700 dark:text-amber-400">
+          <span className="rounded-full bg-amber-500/15 px-2 py-0.5 text-[11px] text-amber-700 dark:text-amber-400">
             Self-approved
           </span>
         )}
@@ -624,7 +624,7 @@ function Balances({ workspaceId, year: initialYear }: { workspaceId: string; yea
         rules={balances.data?.tenureRules ?? []}
       />
 
-      <div className="text-muted-foreground grid grid-cols-[1fr_5rem_6rem_6rem_4rem_4rem_5rem] gap-2 px-3 text-[11px] font-medium">
+      <div className="text-muted-foreground grid grid-cols-[1fr_5rem_6rem_6rem_4rem_4rem_5rem] gap-2 px-3 text-[12px] font-medium">
         <span>Person</span>
         <span>Time here</span>
         <span>Entitlement</span>

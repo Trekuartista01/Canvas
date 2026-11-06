@@ -201,7 +201,7 @@ function WorkspaceRow({
         </div>
         <div className="flex shrink-0 items-center gap-3">
           <span
-            className={`rounded-full px-2 py-0.5 text-[10px] font-semibold tracking-wide uppercase ${ROLE_BADGE_CLASS[role] ?? "bg-muted text-muted-foreground"}`}
+            className={`rounded-full px-2 py-0.5 text-[11px] font-semibold tracking-wide uppercase ${ROLE_BADGE_CLASS[role] ?? "bg-muted text-muted-foreground"}`}
           >
             {role}
           </span>

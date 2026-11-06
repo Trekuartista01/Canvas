@@ -165,7 +165,7 @@ function BackupSection({ workspaceId }: { workspaceId: string }) {
               <li key={step}>{step}</li>
             ))}
           </ol>
-          <p className="bg-muted rounded-md p-2 font-mono text-[11px]">
+          <p className="bg-muted rounded-md p-2 font-mono text-[12px]">
             {guidance.data.restoreHint}
           </p>
         </>

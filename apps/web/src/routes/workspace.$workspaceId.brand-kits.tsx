@@ -126,7 +126,7 @@ function BrandKitsSection({ workspaceId }: { workspaceId: string }) {
                 <div className="flex items-center gap-2">
                   <p className="truncate font-medium">{kit.name}</p>
                   {kit.isDefault && (
-                    <span className="bg-accent-soft text-accent flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium">
+                    <span className="bg-accent-soft text-accent flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium">
                       <Star className="h-2.5 w-2.5" aria-hidden />
                       Default
                     </span>

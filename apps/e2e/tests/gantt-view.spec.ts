@@ -22,11 +22,13 @@ test("M3.3 gantt: dated tasks render bars, dependency draws an arrow", async ({ 
   const m = String(now.getMonth() + 1).padStart(2, "0");
 
   await page.getByRole("button", { name: "Design" }).click();
+  await page.getByTestId("task-more").locator("summary").click();
   await page.getByLabel("Start date").fill(`${y}-${m}-05`);
   await page.getByTestId("task-due-date").fill(`${y}-${m}-08`);
   await page.getByRole("button", { name: "Close", exact: true }).click();
 
   await page.getByRole("button", { name: "Build" }).click();
+  await page.getByTestId("task-more").locator("summary").click();
   await page.getByLabel("Start date").fill(`${y}-${m}-09`);
   await page.getByTestId("task-due-date").fill(`${y}-${m}-14`);
   await page.getByRole("button", { name: "Close", exact: true }).click();

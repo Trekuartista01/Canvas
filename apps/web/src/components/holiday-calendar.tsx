@@ -244,17 +244,17 @@ export function HolidayCalendar({ workspaceId, manage }: { workspaceId: string; 
                       </span>
                     </span>
                     {h.isObservedSubstitute && (
-                      <span className="bg-muted text-muted-foreground rounded-full px-2 py-0.5 text-[10px]">
+                      <span className="bg-muted text-muted-foreground rounded-full px-2 py-0.5 text-[11px]">
                         Substitute
                       </span>
                     )}
                     {h.onWeekend && (
-                      <span className="bg-muted text-muted-foreground rounded-full px-2 py-0.5 text-[10px]">
+                      <span className="bg-muted text-muted-foreground rounded-full px-2 py-0.5 text-[11px]">
                         Weekend
                       </span>
                     )}
                     {h.needsConfirmation && (
-                      <span className="rounded-full bg-amber-500/15 px-2 py-0.5 text-[10px] text-amber-700 dark:text-amber-400">
+                      <span className="rounded-full bg-amber-500/15 px-2 py-0.5 text-[11px] text-amber-700 dark:text-amber-400">
                         Confirm date
                       </span>
                     )}

@@ -1,7 +1,7 @@
 export function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <label className="block space-y-1">
-      <span className="text-muted-foreground text-xs font-medium">{label}</span>
+      <span className="text-muted-foreground text-sm font-medium">{label}</span>
       {children}
     </label>
   );
@@ -14,7 +14,7 @@ export function Field({ label, children }: { label: string; children: React.Reac
 export function Section({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div className="block space-y-1">
-      <span className="text-muted-foreground text-xs font-medium">{label}</span>
+      <span className="text-muted-foreground text-sm font-medium">{label}</span>
       {children}
     </div>
   );

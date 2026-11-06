@@ -198,7 +198,7 @@ export function WorkspaceNav({ workspaceId }: { workspaceId: string }) {
     <nav className="flex flex-col gap-4">
       {visibleGroups.map((group) => (
         <div key={group.label}>
-          <p className="text-muted-foreground px-2 pb-1 text-[10px] font-semibold tracking-wide uppercase">
+          <p className="text-muted-foreground px-2 pb-1 text-[11px] font-semibold tracking-wide uppercase">
             {group.label}
           </p>
           <div className="flex flex-col gap-0.5">

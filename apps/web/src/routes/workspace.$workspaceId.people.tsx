@@ -142,11 +142,11 @@ function PeopleDirectoryPage() {
                   <span className="text-muted-foreground hidden shrink-0 text-xs sm:block">
                     {person.managerName ? `Reports to ${person.managerName}` : ""}
                   </span>
-                  <span className="bg-muted shrink-0 rounded-full px-2 py-0.5 text-[11px]">
+                  <span className="bg-muted shrink-0 rounded-full px-2 py-0.5 text-[12px]">
                     {PEOPLE_ROLE_LABELS[person.peopleRole]}
                   </span>
                   {person.status === "inactive" && (
-                    <span className="shrink-0 rounded-full bg-red-500/10 px-2 py-0.5 text-[11px] text-red-600 dark:text-red-400">
+                    <span className="shrink-0 rounded-full bg-red-500/10 px-2 py-0.5 text-[12px] text-red-600 dark:text-red-400">
                       Archived
                     </span>
                   )}

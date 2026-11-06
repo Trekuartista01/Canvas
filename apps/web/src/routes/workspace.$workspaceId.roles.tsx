@@ -133,7 +133,7 @@ function TogglePill({
 
   return (
     <label
-      className={`border-border text-muted-foreground relative inline-flex cursor-pointer items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-medium transition-colors ${activeClass}`}
+      className={`border-border text-muted-foreground relative inline-flex cursor-pointer items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-medium transition-colors ${activeClass}`}
     >
       {label}
       <input
@@ -261,12 +261,12 @@ function CustomRolesSection({ workspaceId }: { workspaceId: string }) {
                   </div>
                   <div className="flex shrink-0 items-center gap-1.5">
                     {grantCount > 0 && (
-                      <span className="bg-status-good/15 text-status-good rounded-full px-2 py-0.5 text-[10px] font-medium">
+                      <span className="bg-status-good/15 text-status-good rounded-full px-2 py-0.5 text-[11px] font-medium">
                         +{grantCount}
                       </span>
                     )}
                     {revokeCount > 0 && (
-                      <span className="bg-status-critical/15 text-status-critical rounded-full px-2 py-0.5 text-[10px] font-medium">
+                      <span className="bg-status-critical/15 text-status-critical rounded-full px-2 py-0.5 text-[11px] font-medium">
                         −{revokeCount}
                       </span>
                     )}
@@ -458,7 +458,7 @@ function SpaceOverridesSection({ workspaceId }: { workspaceId: string }) {
                     </div>
                     <div className="flex shrink-0 items-center gap-2">
                       <span
-                        className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${
+                        className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${
                           o.allow
                             ? "bg-status-good/15 text-status-good"
                             : "bg-status-critical/15 text-status-critical"

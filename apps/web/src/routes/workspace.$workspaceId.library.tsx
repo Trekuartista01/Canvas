@@ -489,7 +489,7 @@ function LibraryPage() {
                         />
                       </div>
                     )}
-                    <span className="text-muted-foreground w-28 truncate text-[11px]">
+                    <span className="text-muted-foreground w-28 truncate text-[12px]">
                       {asset.altText ??
                         (asset.origin === "generation" ? "Generated image" : "Uploaded image")}
                     </span>
@@ -547,7 +547,7 @@ function CopyItemCard({ item, onSelect }: { item: LibraryCopyItem; onSelect: () 
         {item.label}
       </span>
       <span className="text-muted-foreground line-clamp-2">{preview}</span>
-      <span className="text-muted-foreground text-[11px]">
+      <span className="text-muted-foreground text-[12px]">
         {item.copyType} · {item.length} · {item.language}
       </span>
     </button>
@@ -736,7 +736,7 @@ function LibraryDetailPanel({
           {(asset.tagsJson?.length ?? 0) > 0 && (
             <div className="flex flex-wrap gap-1">
               {asset.tagsJson?.map((tag) => (
-                <span key={tag} className="bg-muted rounded-full px-2 py-0.5 text-[11px]">
+                <span key={tag} className="bg-muted rounded-full px-2 py-0.5 text-[12px]">
                   {tag}
                 </span>
               ))}

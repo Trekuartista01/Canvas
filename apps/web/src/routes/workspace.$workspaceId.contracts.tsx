@@ -74,7 +74,7 @@ const STATUS_NAME_CLASS: Record<ContractStatus, string> = {
 
 function EndingSoonBadge() {
   return (
-    <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-medium text-amber-800 dark:bg-amber-950 dark:text-amber-200">
+    <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[12px] font-medium text-amber-800 dark:bg-amber-950 dark:text-amber-200">
       Ending soon
     </span>
   );
@@ -213,7 +213,7 @@ function ContractsPage() {
                         >
                           {p.name}
                         </span>
-                        <span className="text-muted-foreground block text-[11px]">
+                        <span className="text-muted-foreground block text-[12px]">
                           {p.archived ? "Archived · " : ""}
                           {p.contracts === 0
                             ? "No contract filed"
@@ -382,7 +382,7 @@ function ContractCard({
       data-testid={`contract-row-${c.title}`}
     >
       <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-        <span className="bg-muted rounded-full px-2 py-0.5 text-[11px]">
+        <span className="bg-muted rounded-full px-2 py-0.5 text-[12px]">
           {CONTRACT_KIND_LABELS[c.kind]}
         </span>
         <span className="font-medium">{c.title}</span>
@@ -549,7 +549,7 @@ function FileTile({
   const uploaded = formatDmy(todayReportDate(new Date(file.createdAt)));
 
   return (
-    <li className="w-44 space-y-1 text-[11px]" data-testid={`contract-file-${file.fileName}`}>
+    <li className="w-44 space-y-1 text-[12px]" data-testid={`contract-file-${file.fileName}`}>
       {file.thumbUrl && isPreviewableImage(file.mime) ? (
         <BlurhashThumb
           attachment={{ id: file.id, blurhash: file.blurhash, fileName: file.fileName }}

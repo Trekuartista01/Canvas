@@ -23,6 +23,7 @@ test("open a task's detail panel and edit priority, dates, description, and assi
   await expect(page.getByLabel("Priority")).toHaveValue("high");
 
   // dates — fill() on a native date input accepts an ISO value directly
+  await page.getByTestId("task-more").locator("summary").click();
   await page.getByLabel("Start date").fill("2026-07-01");
   await page.getByLabel("Due date").fill("2026-07-15");
 
@@ -48,6 +49,7 @@ test("open a task's detail panel and edit priority, dates, description, and assi
   await page.getByRole("button", { name: "Draft brand guidelines" }).click();
 
   await expect(page.getByLabel("Priority")).toHaveValue("high");
+  await page.getByTestId("task-more").locator("summary").click();
   await expect(page.getByLabel("Start date")).toHaveValue("2026-07-01");
   await expect(page.getByLabel("Due date")).toHaveValue("2026-07-15");
   await expect(page.getByLabel("Description")).toContainText("Keep it under 20 pages.");

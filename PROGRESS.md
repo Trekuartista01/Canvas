@@ -3326,3 +3326,10 @@ Requested after Phase 8, outside the spec. The user has about 20 staff and contr
 ## 2026-11-06 Add people on a board
 
 - The board toolbar's "Members" link is now an "Add people" button with the board's avatars. The panel searches everyone in the workspace by name or email, one click adds, and it stays open. Same `boards:manageAll` permission and API as before; the added person isn't notified.
+
+## 2026-11-06 Simpler boards and task details
+
+- Boards: one "Add a task" button, on the To Do column only (else the first column), with title and "Assign to" (`task.create` already adds the assignee to the board and notifies them). The other columns have no add.
+- Board tabs are larger with a fill colour hashed from the board id (`boardColor`; spaces have no colour column). Column names are larger with a status tint.
+- Task panel: Client first and larger. Start date, Repeats, proof, Milestone, Collaborators, move/archive sit under "More options" (`task-more`).
+- Text: `--text-xs` and `--text-sm` raised in the theme, `text-[10px]/[11px]` raised a pixel. Spacing is unchanged, so fixed-height virtual rows keep their size.

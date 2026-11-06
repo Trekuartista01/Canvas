@@ -341,7 +341,7 @@ export function BrainChatPanel({
                     className="min-w-0 flex-1 text-left"
                   >
                     <p className="truncate">{c.preview}</p>
-                    <p className="text-muted-foreground text-[11px]">
+                    <p className="text-muted-foreground text-[12px]">
                       {c.isActive && c.id === conversationId ? "Current · " : ""}
                       {new Date(c.createdAt).toLocaleString()}
                     </p>
@@ -411,7 +411,7 @@ export function BrainChatPanel({
                       : "border-border bg-card mr-6 rounded-md border px-3 py-2 text-sm"
                   }
                 >
-                  <p className="text-muted-foreground mb-1 flex items-center gap-1 text-[10px] font-semibold tracking-wide uppercase">
+                  <p className="text-muted-foreground mb-1 flex items-center gap-1 text-[11px] font-semibold tracking-wide uppercase">
                     {m.role !== "user" && <Sparkles className="h-2.5 w-2.5" aria-hidden />}
                     {m.role === "user" ? "You" : "Brain"}
                   </p>
@@ -443,7 +443,7 @@ export function BrainChatPanel({
                 data-testid="brain-message-user-pending"
                 className="bg-accent-soft ml-6 rounded-md px-3 py-2 text-sm opacity-80"
               >
-                <p className="text-muted-foreground mb-1 text-[10px] font-semibold tracking-wide uppercase">
+                <p className="text-muted-foreground mb-1 text-[11px] font-semibold tracking-wide uppercase">
                   You
                 </p>
                 <p className="whitespace-pre-wrap">{pendingUserText}</p>
@@ -455,7 +455,7 @@ export function BrainChatPanel({
                 data-testid="brain-message-assistant-streaming"
                 className="border-border bg-card mr-6 rounded-md border px-3 py-2 text-sm"
               >
-                <p className="text-muted-foreground mb-1 flex items-center gap-1 text-[10px] font-semibold tracking-wide uppercase">
+                <p className="text-muted-foreground mb-1 flex items-center gap-1 text-[11px] font-semibold tracking-wide uppercase">
                   <Sparkles className="h-2.5 w-2.5" aria-hidden />
                   Brain
                 </p>

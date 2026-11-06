@@ -1,5 +1,4 @@
 import type { AppRouter } from "@canvas/api";
-import { NewTaskInlineForm } from "@/components/new-task-inline-form";
 import { TaskDetailPanel } from "@/components/task-detail-panel";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -13,6 +12,7 @@ import {
   BOARD_TABS_SHOWN,
   filterBoardCards,
   formatDmy,
+  columnForStatusKind,
   columnStatusKind,
   isCardOverdue,
   todayReportDate,
@@ -211,9 +211,14 @@ function BoardSwitcher({
             role="tab"
             aria-selected={space.id === activeId}
             onClick={() => onSelect(space.id)}
-            className={`max-w-48 truncate rounded-md px-3 py-1.5 text-sm ${
-              space.id === activeId ? "bg-muted font-semibold" : "hover:bg-muted/60"
+            className={`max-w-60 truncate rounded-lg px-4 py-2 text-base font-semibold transition-opacity hover:opacity-85 ${
+              space.id === activeId ? "text-white shadow-sm" : ""
             }`}
+            style={
+              space.id === activeId
+                ? { backgroundColor: boardColor(space.id) }
+                : { backgroundColor: `${boardColor(space.id)}22`, color: boardColor(space.id) }
+            }
           >
             {space.name}
           </button>
@@ -256,6 +261,15 @@ function BoardSwitcher({
       )}
     </div>
   );
+}
+
+/** Each board keeps one colour, picked from its id. All are readable with white text. */
+const BOARD_COLORS = ["#2563eb", "#7c3aed", "#c2410c", "#0f766e", "#be123c", "#4d7c0f", "#a21caf"];
+
+function boardColor(id: string) {
+  let hash = 0;
+  for (const char of id) hash = (hash * 31 + char.charCodeAt(0)) % 9973;
+  return BOARD_COLORS[hash % BOARD_COLORS.length]!;
 }
 
 function BoardView({
@@ -407,6 +421,8 @@ function BoardView({
   }
 
   const filtered = Boolean(assigneeId || tagId || clientId || due);
+  // The To Do column, or the first one on a board without one.
+  const addTaskListId = (columnForStatusKind(lists, "open") ?? lists[0])?.id;
   const archived = board.data?.archivedLists ?? [];
 
   return (
@@ -558,6 +574,7 @@ function BoardView({
               cards={cardsByList.get(list.id) ?? []}
               today={today}
               canManage={canManage}
+              canAddTask={list.id === addTaskListId}
               onChanged={invalidate}
               onOpenCard={onOpenCard}
             />
@@ -637,6 +654,7 @@ function ListColumn({
   today,
   canManage,
   onChanged,
+  canAddTask,
   onOpenCard,
 }: {
   workspaceId: string;
@@ -649,6 +667,8 @@ function ListColumn({
   cards: Card[];
   today: string;
   canManage: boolean;
+  /** New tasks start in one place: the To Do column. */
+  canAddTask: boolean;
   onChanged: () => void;
   onOpenCard: (id: string) => void;
 }) {
@@ -718,7 +738,12 @@ function ListColumn({
             to="/w/$workspaceId/l/$listId"
             params={{ workspaceId, listId: list.id }}
             title={`Open ${list.name} as a list, calendar, table or timeline`}
-            className="min-w-0 flex-1 truncate text-sm font-semibold hover:underline"
+            className="mr-auto min-w-0 truncate rounded-md px-2 py-0.5 text-base font-bold hover:underline"
+            style={
+              COLUMN_COLOR[columnStatusKind(list.name) ?? ""]
+                ? { backgroundColor: `${COLUMN_COLOR[columnStatusKind(list.name) ?? ""]}2e` }
+                : undefined
+            }
           >
             {list.name}
           </Link>
@@ -796,22 +821,99 @@ function ListColumn({
         </div>
       </SortableContext>
 
-      {addingCard ? (
-        <NewTaskInlineForm
-          isPending={createCard.isPending}
-          onCancel={() => setAddingCard(false)}
-          onSubmit={(title) => createCard.mutate({ listId: list.id, title })}
-        />
-      ) : (
-        <button
-          type="button"
-          onClick={() => setAddingCard(true)}
-          className="text-muted-foreground hover:text-foreground text-left text-xs"
-        >
-          + Add a card
-        </button>
-      )}
+      {canAddTask &&
+        (addingCard ? (
+          <AddTaskForm
+            workspaceId={workspaceId}
+            isPending={createCard.isPending}
+            error={createCard.error?.message}
+            onCancel={() => setAddingCard(false)}
+            onSubmit={(title, assigneeId) =>
+              createCard.mutate({
+                listId: list.id,
+                title,
+                ...(assigneeId ? { assigneeIds: [assigneeId] } : {}),
+              })
+            }
+          />
+        ) : (
+          <Button
+            size="lg"
+            className="w-full shrink-0 px-4 text-sm"
+            onClick={() => setAddingCard(true)}
+            data-testid="add-task"
+          >
+            <Plus className="h-4 w-4" aria-hidden />
+            Add a task
+          </Button>
+        ))}
     </section>
+  );
+}
+
+function AddTaskForm({
+  workspaceId,
+  isPending,
+  error,
+  onSubmit,
+  onCancel,
+}: {
+  workspaceId: string;
+  isPending: boolean;
+  error?: string;
+  onSubmit: (title: string, assigneeId: string) => void;
+  onCancel: () => void;
+}) {
+  const members = trpc.workspace.members.useQuery({ workspaceId });
+  const [title, setTitle] = useState("");
+  const [assigneeId, setAssigneeId] = useState("");
+  return (
+    <form
+      className="border-border bg-card shrink-0 space-y-2 rounded-lg border p-3 shadow-sm"
+      data-testid="add-task-form"
+      onSubmit={(e) => {
+        e.preventDefault();
+        if (title.trim()) onSubmit(title.trim(), assigneeId);
+      }}
+      onKeyDown={(e) => {
+        if (e.key === "Escape") onCancel();
+      }}
+    >
+      <Input
+        autoFocus
+        value={title}
+        placeholder="Task title"
+        aria-label="Task title"
+        onChange={(e) => setTitle(e.target.value)}
+        className="h-10 text-sm"
+      />
+      <select
+        aria-label="Assign to"
+        value={assigneeId}
+        onChange={(e) => setAssigneeId(e.target.value)}
+        className="border-border bg-background h-10 w-full rounded-md border px-2 text-sm"
+      >
+        <option value="">Assign to…</option>
+        {(members.data ?? []).map((m) => (
+          <option key={m.userId} value={m.userId}>
+            {m.name}
+          </option>
+        ))}
+      </select>
+      {error && (
+        <p className="text-sm text-red-600 dark:text-red-400" role="alert">
+          {error}
+        </p>
+      )}
+      <div className="flex gap-2">
+        <Button type="submit" className="flex-1" disabled={isPending || !title.trim()}>
+          Add task
+        </Button>
+        <Button type="button" variant="ghost" onClick={onCancel}>
+          Cancel
+        </Button>
+      </div>
+    </form>
   );
 }
 
@@ -843,7 +945,7 @@ function CardFront({ card, today, onOpen }: { card: Card; today: string; onOpen:
     >
       {card.client && (
         <span
-          className="inline-block max-w-full truncate rounded-full px-1.5 py-0.5 text-[10px] font-medium"
+          className="inline-block max-w-full truncate rounded-full px-1.5 py-0.5 text-[11px] font-medium"
           style={{ backgroundColor: `${card.client.color}26`, color: card.client.color }}
           data-testid="card-client-front"
         >
@@ -855,7 +957,7 @@ function CardFront({ card, today, onOpen }: { card: Card; today: string; onOpen:
           {card.tags.map((tag) => (
             <li
               key={tag.id}
-              className="rounded px-1.5 py-0.5 text-[10px] font-medium"
+              className="rounded px-1.5 py-0.5 text-[11px] font-medium"
               style={{ backgroundColor: `${tag.color}26`, color: tag.color }}
             >
               {tag.name}
@@ -876,7 +978,7 @@ function CardFront({ card, today, onOpen }: { card: Card; today: string; onOpen:
         card.comments > 0 ||
         card.attachments > 0 ||
         card.assignees.length > 0) && (
-        <div className="text-muted-foreground flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px]">
+        <div className="text-muted-foreground flex flex-wrap items-center gap-x-2 gap-y-1 text-[12px]">
           {card.dueDate && (
             <span
               className={overdue ? "font-medium text-red-600 dark:text-red-400" : ""}
@@ -945,7 +1047,7 @@ function BoardPeopleButton({ spaceId, onOpen }: { spaceId: string; onOpen: () =>
               key={m.userId}
               name={m.name}
               avatarUrl={m.avatarUrl}
-              className="ring-background h-6 w-6 text-[10px] ring-2"
+              className="ring-background h-6 w-6 text-[11px] ring-2"
             />
           ))}
         </span>

@@ -368,6 +368,13 @@ export function TaskDetailPanel({
 
               <PanelSection icon={SlidersHorizontal} title="Details">
                 <div className="border-border bg-card space-y-4 rounded-xl border p-4 shadow-sm">
+                  <ClientField
+                    workspaceId={workspaceId}
+                    taskId={taskId}
+                    client={task.data.client}
+                    detected={!task.data.clientSetManually}
+                    suggestions={task.data.clientSuggestions}
+                  />
                   <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
                     <Field label="Priority">
                       <select
@@ -391,17 +398,6 @@ export function TaskDetailPanel({
                       </select>
                     </Field>
 
-                    <Field label="Start date">
-                      <Input
-                        type="date"
-                        value={task.data.startDate ?? ""}
-                        onChange={(e) =>
-                          update.mutate({ taskId, startDate: e.target.value || null })
-                        }
-                        className="h-9 text-sm"
-                      />
-                    </Field>
-
                     <Field label="Due date">
                       <Input
                         type="date"
@@ -423,55 +419,6 @@ export function TaskDetailPanel({
                         className="h-9 text-sm"
                       />
                     </Field>
-
-                    <Field label="Repeats">
-                      <select
-                        data-testid="task-recurrence"
-                        value={
-                          task.data.recurrenceRule?.rrule
-                            ? recurrencePresetFromRule(task.data.recurrenceRule.rrule)
-                            : ""
-                        }
-                        onChange={(e) => {
-                          const value = e.target.value;
-                          if (!value) clearRecurrence.mutate({ taskId });
-                          else setRecurrence.mutate({ taskId, preset: value as RecurrencePreset });
-                        }}
-                        className={SELECT_CLASS}
-                      >
-                        <option value="">Never</option>
-                        {RECURRENCE_PRESETS.map((p) => (
-                          <option key={p} value={p}>
-                            {RECURRENCE_PRESET_LABELS[p]}
-                          </option>
-                        ))}
-                      </select>
-                    </Field>
-
-                    <div className="space-y-2 self-end text-sm">
-                      <label className="flex items-center gap-2">
-                        <input
-                          type="checkbox"
-                          data-testid="task-requires-proof"
-                          checked={task.data.requiresProof}
-                          onChange={(e) =>
-                            update.mutate({ taskId, requiresProof: e.target.checked })
-                          }
-                          className="h-4 w-4"
-                        />
-                        Requires proof photo
-                      </label>
-                      <label className="flex items-center gap-2">
-                        <input
-                          type="checkbox"
-                          data-testid="task-is-milestone"
-                          checked={task.data.isMilestone}
-                          onChange={(e) => update.mutate({ taskId, isMilestone: e.target.checked })}
-                          className="h-4 w-4"
-                        />
-                        Milestone
-                      </label>
-                    </div>
                   </div>
 
                   <div className="border-border space-y-4 border-t pt-4">
@@ -522,24 +469,83 @@ export function TaskDetailPanel({
                         onChanged={invalidate}
                       />
                     </Field>
-
-                    <CollaboratorsField taskId={taskId} members={members.data ?? []} />
-
-                    <ClientField
-                      workspaceId={workspaceId}
-                      taskId={taskId}
-                      client={task.data.client}
-                      detected={!task.data.clientSetManually}
-                      suggestions={task.data.clientSuggestions}
-                    />
-
-                    <CardMoveField
-                      workspaceId={workspaceId}
-                      taskId={taskId}
-                      listId={task.data.listId}
-                      onArchived={onClose}
-                    />
                   </div>
+                  <details className="border-border border-t pt-3" data-testid="task-more">
+                    <summary className="text-muted-foreground hover:text-foreground cursor-pointer text-sm font-medium">
+                      More options
+                    </summary>
+                    <div className="mt-4 space-y-4">
+                      <div className="grid grid-cols-2 gap-4">
+                        <Field label="Start date">
+                          <Input
+                            type="date"
+                            value={task.data.startDate ?? ""}
+                            onChange={(e) =>
+                              update.mutate({ taskId, startDate: e.target.value || null })
+                            }
+                            className="h-9 text-sm"
+                          />
+                        </Field>
+                        <Field label="Repeats">
+                          <select
+                            data-testid="task-recurrence"
+                            value={
+                              task.data.recurrenceRule?.rrule
+                                ? recurrencePresetFromRule(task.data.recurrenceRule.rrule)
+                                : ""
+                            }
+                            onChange={(e) => {
+                              const value = e.target.value;
+                              if (!value) clearRecurrence.mutate({ taskId });
+                              else
+                                setRecurrence.mutate({ taskId, preset: value as RecurrencePreset });
+                            }}
+                            className={SELECT_CLASS}
+                          >
+                            <option value="">Never</option>
+                            {RECURRENCE_PRESETS.map((p) => (
+                              <option key={p} value={p}>
+                                {RECURRENCE_PRESET_LABELS[p]}
+                              </option>
+                            ))}
+                          </select>
+                        </Field>
+                      </div>
+                      <div className="space-y-2 self-end text-sm">
+                        <label className="flex items-center gap-2">
+                          <input
+                            type="checkbox"
+                            data-testid="task-requires-proof"
+                            checked={task.data.requiresProof}
+                            onChange={(e) =>
+                              update.mutate({ taskId, requiresProof: e.target.checked })
+                            }
+                            className="h-4 w-4"
+                          />
+                          Requires proof photo
+                        </label>
+                        <label className="flex items-center gap-2">
+                          <input
+                            type="checkbox"
+                            data-testid="task-is-milestone"
+                            checked={task.data.isMilestone}
+                            onChange={(e) =>
+                              update.mutate({ taskId, isMilestone: e.target.checked })
+                            }
+                            className="h-4 w-4"
+                          />
+                          Milestone
+                        </label>
+                      </div>
+                      <CollaboratorsField taskId={taskId} members={members.data ?? []} />
+                      <CardMoveField
+                        workspaceId={workspaceId}
+                        taskId={taskId}
+                        listId={task.data.listId}
+                        onArchived={onClose}
+                      />
+                    </div>
+                  </details>
                 </div>
               </PanelSection>
 
@@ -577,7 +583,7 @@ function DescriptionEditor({
     content: (initialContent as object | undefined) ?? "",
     editorProps: {
       attributes: {
-        class: "prose prose-sm dark:prose-invert max-w-none min-h-32 focus:outline-none",
+        class: "prose dark:prose-invert max-w-none min-h-32 focus:outline-none",
         "aria-label": "Description",
       },
     },

@@ -27,7 +27,7 @@ function PendingTile({
   }, [file, previewable]);
 
   return (
-    <li className="w-20 text-[11px]" data-testid={`contract-pending-${file.name}`}>
+    <li className="w-20 text-[12px]" data-testid={`contract-pending-${file.name}`}>
       <div className="border-border bg-muted relative flex h-20 w-20 items-center justify-center overflow-hidden rounded-md border">
         {url ? (
           <img src={url} alt={`Preview of ${file.name}`} className="h-full w-full object-cover" />
