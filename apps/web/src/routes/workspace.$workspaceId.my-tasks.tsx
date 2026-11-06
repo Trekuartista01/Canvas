@@ -5,6 +5,7 @@ import { NotificationToasts } from "@/components/notification-toasts";
 import { isOverdue, type StatusKind } from "@canvas/shared";
 import { formatDue } from "@/lib/format";
 import { useSession } from "@/hooks/use-session";
+import { useOpenTaskPanel } from "@/hooks/use-task-panel";
 import { trpc } from "@/lib/trpc";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { createRoute, Link } from "@tanstack/react-router";
@@ -37,6 +38,7 @@ function MyTasksPage() {
   const { workspaceId } = myTasksRoute.useParams();
   const tasks = trpc.task.listMine.useQuery({ workspaceId });
   const { user } = useSession();
+  const openTask = useOpenTaskPanel();
 
   // The server already sorts by due date; grouping keeps that order. One
   // flat row list (headers + tasks) so the whole page virtualizes as one.
@@ -67,7 +69,7 @@ function MyTasksPage() {
           <CheckSquare className="h-5 w-5" aria-hidden />
         </span>
         <div className="mr-auto">
-          <h1 className="text-lg font-semibold">My Tasks</h1>
+          <h1 className="text-2xl font-bold tracking-tight">My Tasks</h1>
           <p className="text-muted-foreground text-xs">
             Everything assigned to you in this workspace, soonest due first.
           </p>
@@ -107,23 +109,21 @@ function MyTasksPage() {
                   style={{ transform: `translateY(${item.start}px)` }}
                 >
                   {row.type === "header" ? (
-                    <h2 className="text-muted-foreground px-1 pt-3 pb-1 text-xs font-semibold tracking-wide uppercase">
-                      {row.label} <span className="font-normal">· {row.count}</span>
+                    <h2 className="flex items-center gap-2 px-1 pt-4 pb-1.5 text-base font-semibold">
+                      {row.label}
+                      <span className="bg-muted text-muted-foreground rounded-full px-2 py-0.5 text-xs font-medium">
+                        {row.count}
+                      </span>
                     </h2>
                   ) : (
-                    <Link
-                      to="/w/$workspaceId/l/$listId"
-                      params={{ workspaceId, listId: row.task.listId }}
-                      search={{ openTask: row.task.id }}
-                      className="border-border hover:bg-muted flex items-center gap-3 rounded-md border px-3 py-2 text-sm"
+                    <button
+                      type="button"
+                      onClick={() => openTask(row.task.id)}
+                      className="border-border bg-card flex w-full items-center gap-3 rounded-lg border border-l-4 px-3 py-2.5 text-left text-sm shadow-sm transition-shadow hover:shadow-md"
+                      style={{ borderLeftColor: row.task.statusColor }}
+                      title={row.task.statusName}
                       data-testid={`my-task-${row.task.id}`}
                     >
-                      <span
-                        className="h-2.5 w-2.5 shrink-0 rounded-full"
-                        style={{ backgroundColor: row.task.statusColor }}
-                        title={row.task.statusName}
-                        aria-hidden
-                      />
                       <span className="min-w-0 flex-1">
                         <span className="block truncate font-medium">{row.task.title}</span>
                         <span className="text-muted-foreground block truncate text-xs">
@@ -141,13 +141,13 @@ function MyTasksPage() {
                             },
                             new Date(),
                           )
-                            ? "shrink-0 text-xs text-red-600 dark:text-red-400"
+                            ? "bg-status-critical/10 text-status-critical shrink-0 rounded-full px-2 py-0.5 text-xs font-medium"
                             : "text-muted-foreground shrink-0 text-xs"
                         }
                       >
                         {formatDue(row.task.dueDate, row.task.dueTime) ?? "No due date"}
                       </span>
-                    </Link>
+                    </button>
                   )}
                 </div>
               );

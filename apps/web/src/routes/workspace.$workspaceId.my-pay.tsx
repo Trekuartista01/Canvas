@@ -71,7 +71,7 @@ function MyPayPage() {
           <Wallet className="h-5 w-5" aria-hidden />
         </span>
         <div className="mr-auto">
-          <h1 className="text-lg font-semibold">My pay details</h1>
+          <h1 className="text-2xl font-bold tracking-tight">My pay details</h1>
           <p className="text-muted-foreground text-xs">
             What HR has on file for your salary payments. Ask HR if anything is wrong.
           </p>

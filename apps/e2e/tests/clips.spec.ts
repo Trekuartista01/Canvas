@@ -5,7 +5,8 @@ import { createSpaceAndList, createWorkspaceAndOpen, signUp } from "./helpers";
 
 const CLIP_FIXTURE = fileURLToPath(new URL("../fixtures/test-clip.webm", import.meta.url));
 
-test("M4.6 clips: upload a screen-recording clip, play it, reload, and delete", async ({
+// Needs the task panel's Work section, removed 2026-11-06 at the user's request.
+test.skip("M4.6 clips: upload a screen-recording clip, play it, reload, and delete", async ({
   page,
 }) => {
   await signUp(page, "Clips Tester");

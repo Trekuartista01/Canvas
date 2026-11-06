@@ -58,11 +58,11 @@ export function RoleRequests({ workspaceId }: { workspaceId: string }) {
 
   return (
     <section
-      className="border-border max-h-56 space-y-2 overflow-y-auto rounded-md border p-3"
+      className="bg-card shadow-sm border-border max-h-56 space-y-2 overflow-y-auto rounded-md border p-3"
       aria-label="Role requests"
       data-testid="role-requests"
     >
-      <h2 className="text-sm font-semibold">Role requests ({rows.length})</h2>
+      <h2 className="text-base font-semibold">Role requests ({rows.length})</h2>
       <ul className="divide-border divide-y text-sm">
         {rows.map((r) => (
           <li

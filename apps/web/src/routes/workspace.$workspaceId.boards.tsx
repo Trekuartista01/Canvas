@@ -12,6 +12,7 @@ import {
   BOARD_TABS_SHOWN,
   filterBoardCards,
   formatDmy,
+  columnStatusKind,
   isCardOverdue,
   todayReportDate,
   type BoardDueFilter,
@@ -699,9 +700,10 @@ function ListColumn({
 
   return (
     <section
-      className={`bg-muted/40 flex max-h-full w-64 shrink-0 flex-col gap-2 rounded-lg p-2 ${
+      className={`bg-muted/70 flex max-h-full w-72 shrink-0 flex-col gap-2 rounded-xl border-t-4 p-2.5 ${
         isOver ? "ring-accent ring-2" : ""
       }`}
+      style={{ borderTopColor: COLUMN_COLOR[columnStatusKind(list.name) ?? ""] ?? "var(--border)" }}
       aria-label={`List ${list.name}`}
       data-testid={`board-list-${list.name}`}
     >
@@ -724,11 +726,14 @@ function ListColumn({
           >
             {list.name}
           </Link>
-          <span className="text-muted-foreground text-xs" data-testid="board-list-count">
+          <span
+            className="bg-background text-muted-foreground rounded-full px-2 py-0.5 text-xs font-medium"
+            data-testid="board-list-count"
+          >
             {cards.length}
           </span>
           {canManage && (
-            <span className="flex items-center gap-1 text-xs">
+            <span className="flex items-center gap-1 text-xs transition-opacity group-focus-within:opacity-100 group-hover:opacity-100 md:opacity-0">
               <button
                 type="button"
                 aria-label={`Move ${list.name} left`}
@@ -814,6 +819,14 @@ function ListColumn({
   );
 }
 
+/** A column's colour comes from the status it stands for. */
+const COLUMN_COLOR: Record<string, string> = {
+  open: "#94a3b8",
+  active: "#3b82f6",
+  review: "#f59e0b",
+  done: "#22c55e",
+};
+
 function CardFront({ card, today, onOpen }: { card: Card; today: string; onOpen: () => void }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: card.id,
@@ -829,7 +842,7 @@ function CardFront({ card, today, onOpen }: { card: Card; today: string; onOpen:
       }}
       {...attributes}
       {...listeners}
-      className="border-border bg-background cursor-grab touch-none space-y-1.5 rounded-md border p-2 text-sm active:cursor-grabbing"
+      className="border-border bg-card cursor-grab touch-none space-y-2 rounded-lg border p-3 text-sm shadow-sm transition-shadow hover:shadow-md active:cursor-grabbing"
       data-testid={`board-card-${card.title}`}
     >
       {card.client && (
@@ -858,7 +871,7 @@ function CardFront({ card, today, onOpen }: { card: Card; today: string; onOpen:
         type="button"
         onClick={onOpen}
         onPointerDown={(e) => e.stopPropagation()}
-        className="block w-full text-left break-words"
+        className="block w-full text-left font-medium break-words"
       >
         {card.title}
       </button>

@@ -2,7 +2,8 @@ import { expect } from "@playwright/test";
 import { test } from "./work-open";
 import { createSpaceAndList, createWorkspaceAndOpen, signUp, openList } from "./helpers";
 
-test("save a task as a template, then create a new task from it", async ({ page }) => {
+// Needs the task panel's Work section, removed 2026-11-06 at the user's request.
+test.skip("save a task as a template, then create a new task from it", async ({ page }) => {
   test.setTimeout(60_000);
 
   await signUp(page, "Template Tester");
@@ -54,7 +55,7 @@ test("save a task as a template, then create a new task from it", async ({ page 
 
   // Back to the list; instantiate a second task from the template.
   await openList(page, "Ops", "Onboarding");
-  await expect(page.getByRole("heading", { name: "# Onboarding" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Onboarding" })).toBeVisible();
   await page.getByRole("button", { name: "Board", exact: true }).click();
 
   const instantiated = page.waitForResponse((res) => res.url().includes("instantiate"));

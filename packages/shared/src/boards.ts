@@ -19,6 +19,35 @@ export function statusForMove<S extends { id: string; kind: string }>(
   return targetStatuses.find((s) => s.kind === kind) ?? targetStatuses[0] ?? null;
 }
 
+const COLUMN_STATUS_KINDS: Record<string, string> = {
+  "to do": "open",
+  todo: "open",
+  pending: "open",
+  backlog: "open",
+  "in progress": "active",
+  doing: "active",
+  review: "review",
+  "in review": "review",
+  "awaiting approval": "review",
+  done: "done",
+  completed: "done",
+  closed: "done",
+};
+
+/** The status kind a board column stands for, from its name; null for a team's own column. */
+export function columnStatusKind(name: string): string | null {
+  return COLUMN_STATUS_KINDS[name.trim().toLowerCase()] ?? null;
+}
+
+/** The first column for a status kind. Closed shares the Done column. */
+export function columnForStatusKind<L extends { name: string }>(
+  lists: L[],
+  kind: string,
+): L | null {
+  const wanted = kind === "closed" ? "done" : kind;
+  return lists.find((l) => columnStatusKind(l.name) === wanted) ?? null;
+}
+
 /** Red on the card front: past its due date and not finished. */
 export function isCardOverdue(
   card: { dueDate: string | null; statusKind: string },

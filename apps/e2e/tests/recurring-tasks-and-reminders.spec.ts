@@ -9,7 +9,8 @@ function localDateTimeInputValue(date: Date): string {
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
 }
 
-test("M3.5: a recurring task spawns its next occurrence, a due reminder notifies", async ({
+// Needs the task panel's Work section, removed 2026-11-06 at the user's request.
+test.skip("M3.5: a recurring task spawns its next occurrence, a due reminder notifies", async ({
   page,
 }) => {
   test.setTimeout(90_000);

@@ -9,7 +9,8 @@ async function addDependency(page: import("@playwright/test").Page, dependsOnLab
   await panel.getByRole("button", { name: "Add dependency" }).click();
 }
 
-test("M3.4: manage dependencies from the task panel, reject a cycle, mark a milestone", async ({
+// Needs the task panel's Work section, removed 2026-11-06 at the user's request.
+test.skip("M3.4: manage dependencies from the task panel, reject a cycle, mark a milestone", async ({
   page,
 }) => {
   test.setTimeout(60_000);

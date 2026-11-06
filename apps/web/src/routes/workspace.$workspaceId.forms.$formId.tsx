@@ -68,9 +68,9 @@ function FormEditorPage() {
       >
         ← Forms
       </Link>
-      <h1 className="text-lg font-semibold">Edit form</h1>
+      <h1 className="text-2xl font-bold tracking-tight">Edit form</h1>
 
-      <div className="border-border space-y-1 rounded-md border p-3">
+      <div className="bg-card shadow-sm border-border space-y-1 rounded-md border p-3">
         <p className="text-xs font-medium">Public link</p>
         <div className="flex items-center gap-2">
           <Input
@@ -99,7 +99,10 @@ function FormEditorPage() {
         </p>
       </div>
 
-      <div className="border-border space-y-2 rounded-md border p-3" data-testid="form-task-bind">
+      <div
+        className="bg-card shadow-sm border-border space-y-2 rounded-md border p-3"
+        data-testid="form-task-bind"
+      >
         <p className="text-xs font-medium">Bound task</p>
         <p className="text-muted-foreground text-xs">
           Bind this form to one task and it switches to "task completion" mode: the public page

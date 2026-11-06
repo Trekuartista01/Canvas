@@ -66,7 +66,7 @@ test("M4.5 forms: build an intake form, submit it anonymously, and see the task 
   await page.getByRole("link", { name: "All workspaces" }).click();
   await page.getByRole("link", { name: "Open" }).click();
   await openList(page, "Support", "Bug Reports");
-  await expect(page.getByRole("heading", { name: "# Bug Reports" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Bug Reports" })).toBeVisible();
 
   // Board view's card is a single button that opens the detail panel; list
   // view's title cell is an inline-rename button instead (see

@@ -68,7 +68,7 @@ function WorkloadPage() {
             <Users className="h-5 w-5" aria-hidden />
           </span>
           <div>
-            <h1 className="text-lg font-semibold">Workload</h1>
+            <h1 className="text-2xl font-bold tracking-tight">Workload</h1>
             <p className="text-muted-foreground text-xs">
               Who has what due this week, at a glance.
             </p>
@@ -103,7 +103,7 @@ function WorkloadPage() {
 
       {!members.isLoading && memberCounts.length > 0 && (
         <Card className="space-y-2 p-4" data-testid="workload-open-counts">
-          <h2 className="text-sm font-semibold">Current open tasks per person</h2>
+          <h2 className="text-base font-semibold">Current open tasks per person</h2>
           <div className="space-y-1.5">
             {memberCounts.map((m) => (
               <div
@@ -217,7 +217,6 @@ function WorkloadPage() {
           taskId={openTaskId}
           workspaceId={workspaceId}
           onClose={() => setOpenTaskId(null)}
-          onOpenTask={setOpenTaskId}
         />
       )}
     </div>

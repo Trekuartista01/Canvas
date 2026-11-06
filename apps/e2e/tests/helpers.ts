@@ -89,7 +89,7 @@ export async function openList(page: Page, spaceName: string, listName: string) 
   await page.getByRole("link", { name: "Boards", exact: true }).click();
   await page.getByRole("tab", { name: spaceName }).click();
   await page.getByTestId(`board-list-${listName}`).getByRole("link", { name: listName }).click();
-  await expect(page.getByRole("heading", { name: `# ${listName}` })).toBeVisible();
+  await expect(page.getByRole("heading", { name: listName })).toBeVisible();
 }
 
 /** Puts a person on every board in the workspace, as an Ops Manager would. */

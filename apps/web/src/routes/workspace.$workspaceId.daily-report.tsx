@@ -29,7 +29,7 @@ function DailyReportPage() {
           <NotebookPen className="h-5 w-5" aria-hidden />
         </span>
         <div>
-          <h1 className="text-lg font-semibold">Daily report</h1>
+          <h1 className="text-2xl font-bold tracking-tight">Daily report</h1>
           <p className="text-muted-foreground text-xs">
             What you did today, what's next, anything blocking you. Editable until midnight.
           </p>
@@ -80,7 +80,7 @@ function TodayForm({
   return (
     <section className="space-y-3" aria-label="Today's report">
       <div className="flex items-baseline gap-2">
-        <h2 className="text-sm font-semibold">Today · {formatReportDate(reportDate)}</h2>
+        <h2 className="text-base font-semibold">Today · {formatReportDate(reportDate)}</h2>
         <span className="text-muted-foreground text-xs" data-testid="daily-report-status">
           {report
             ? `Submitted at ${formatReportTime(report.submittedAt)}${
@@ -138,7 +138,7 @@ function History({ workspaceId, todayDate }: { workspaceId: string; todayDate?: 
 
   return (
     <section className="flex min-h-0 flex-1 flex-col gap-2" aria-label="Past reports">
-      <h2 className="text-sm font-semibold">Past reports</h2>
+      <h2 className="text-base font-semibold">Past reports</h2>
       {mine.isLoading ? (
         <p className="text-muted-foreground text-sm">Loading…</p>
       ) : past.length === 0 ? (

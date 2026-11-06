@@ -72,9 +72,9 @@ function TaskCompletionForm({
 
   return (
     <>
-      <h1 className="text-lg font-semibold">{name}</h1>
+      <h1 className="text-2xl font-bold tracking-tight">{name}</h1>
 
-      <div className="border-border space-y-1 rounded-md border p-3">
+      <div className="bg-card shadow-sm border-border space-y-1 rounded-md border p-3">
         <p className="text-sm font-medium">{task.title}</p>
         {task.dueDate && (
           <p className="text-muted-foreground text-xs">
@@ -158,7 +158,7 @@ function IntakeForm({
 
   return (
     <>
-      <h1 className="text-lg font-semibold">{name}</h1>
+      <h1 className="text-2xl font-bold tracking-tight">{name}</h1>
 
       <form
         onSubmit={(e) => {

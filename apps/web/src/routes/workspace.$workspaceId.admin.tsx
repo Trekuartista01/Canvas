@@ -42,7 +42,7 @@ function AdminPage() {
           <Gauge className="h-5 w-5" aria-hidden />
         </span>
         <div>
-          <h1 className="text-lg font-semibold">Admin</h1>
+          <h1 className="text-2xl font-bold tracking-tight">Admin</h1>
           <p className="text-muted-foreground text-xs">
             System status, audit log, backups, and your AI quota. Visible to workspace owners and
             admins only.
@@ -66,7 +66,7 @@ function StatusSection({ workspaceId }: { workspaceId: string }) {
     <section className="space-y-2" data-testid="admin-status">
       <div className="flex items-center gap-2">
         <HeartPulse className="text-muted-foreground h-4 w-4" aria-hidden />
-        <h2 className="text-sm font-semibold">Status</h2>
+        <h2 className="text-base font-semibold">Status</h2>
       </div>
       <p className="text-muted-foreground text-xs">
         Same checks as <code className="text-foreground">GET /health</code> (API, Postgres, Redis).
@@ -121,7 +121,7 @@ function AiQuotaSection({ workspaceId }: { workspaceId: string }) {
 
   return (
     <section className="space-y-2" data-testid="admin-ai-quota">
-      <h2 className="text-sm font-semibold">Your AI quota</h2>
+      <h2 className="text-base font-semibold">Your AI quota</h2>
       <ul className="border-border divide-border divide-y rounded-md border text-sm">
         <li className="flex justify-between px-3 py-2">
           <span>Brain messages today</span>
@@ -153,7 +153,7 @@ function BackupSection({ workspaceId }: { workspaceId: string }) {
     <section className="space-y-2" data-testid="admin-backups">
       <div className="flex items-center gap-2">
         <DatabaseBackup className="text-muted-foreground h-4 w-4" aria-hidden />
-        <h2 className="text-sm font-semibold">Backups</h2>
+        <h2 className="text-base font-semibold">Backups</h2>
       </div>
       <p className="text-muted-foreground text-xs">
         How the production database is backed up and restored.
@@ -184,7 +184,7 @@ function ExportSection({ workspaceId }: { workspaceId: string }) {
     <section className="space-y-2" data-testid="admin-export">
       <div className="flex items-center gap-2">
         <Download className="text-muted-foreground h-4 w-4" aria-hidden />
-        <h2 className="text-sm font-semibold">Export data</h2>
+        <h2 className="text-base font-semibold">Export data</h2>
       </div>
       <p className="text-muted-foreground text-xs">
         Download this workspace's tasks as a spreadsheet, or the full task/hierarchy graph as JSON.
@@ -266,7 +266,7 @@ function AuditSection({ workspaceId }: { workspaceId: string }) {
     <section className="space-y-2" data-testid="admin-audit">
       <div className="flex items-center gap-2">
         <Activity className="text-muted-foreground h-4 w-4" aria-hidden />
-        <h2 className="text-sm font-semibold">Audit log</h2>
+        <h2 className="text-base font-semibold">Audit log</h2>
       </div>
       <p className="text-muted-foreground text-xs">Workspace activity, newest first.</p>
 

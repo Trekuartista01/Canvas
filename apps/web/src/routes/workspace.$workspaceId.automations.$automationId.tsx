@@ -102,7 +102,7 @@ function AutomationEditorPage() {
       >
         ← Automations
       </Link>
-      <h1 className="text-lg font-semibold">Edit automation</h1>
+      <h1 className="text-2xl font-bold tracking-tight">Edit automation</h1>
 
       <form onSubmit={handleSave} className="space-y-3">
         <p className="text-muted-foreground text-xs">
@@ -204,7 +204,7 @@ function AutomationEditorPage() {
       </form>
 
       <div>
-        <h2 className="mb-1 text-sm font-semibold">Runs</h2>
+        <h2 className="mb-1 text-base font-semibold">Runs</h2>
         {(runs.data?.length ?? 0) === 0 ? (
           <p className="text-muted-foreground text-sm">No runs yet.</p>
         ) : (

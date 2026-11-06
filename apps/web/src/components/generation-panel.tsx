@@ -282,7 +282,7 @@ export function GenerationPanel({
           </ReferenceAttachZone>
 
           <div
-            className="space-y-2 rounded-md border border-dashed p-3"
+            className="bg-card shadow-sm space-y-2 rounded-md border border-dashed p-3"
             data-testid="generation-clarify"
           >
             <p className="text-xs font-medium">A few details before we generate</p>

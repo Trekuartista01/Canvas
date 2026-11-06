@@ -310,7 +310,7 @@ function CopywriterWorkspacePage() {
           <p className="text-accent text-xs font-semibold tracking-wide uppercase">
             {brandKit.data?.name ?? "…"}
           </p>
-          <h1 className="text-lg font-semibold">Generate copy</h1>
+          <h1 className="text-2xl font-bold tracking-tight">Generate copy</h1>
         </div>
       </div>
 

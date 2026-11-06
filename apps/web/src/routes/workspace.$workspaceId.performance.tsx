@@ -52,7 +52,7 @@ function PerformancePage() {
           <TrendingUp className="h-5 w-5" aria-hidden />
         </span>
         <div className="mr-auto">
-          <h1 className="text-lg font-semibold">Performance</h1>
+          <h1 className="text-2xl font-bold tracking-tight">Performance</h1>
           <p className="text-muted-foreground text-xs">
             On time = finished by the due date and time (Kosovo time). Overdue = still open past it.
           </p>
@@ -197,7 +197,7 @@ function EmployeeDetail({
       className="border-border min-h-0 space-y-4 overflow-auto rounded-md border p-4"
       data-testid="performance-detail"
     >
-      <h2 className="text-sm font-semibold">{row.name}</h2>
+      <h2 className="text-base font-semibold">{row.name}</h2>
       <DonutChart data={donut} centerLabel="Tasks" centerValue={String(row.total)} />
       {detail.data && detail.data.weeks.length > 0 && (
         <div className="space-y-1">

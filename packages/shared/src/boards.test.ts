@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { filterBoardCards, isCardOverdue, statusForMove } from "./boards";
+import {
+  columnForStatusKind,
+  columnStatusKind,
+  filterBoardCards,
+  isCardOverdue,
+  statusForMove,
+} from "./boards";
 
 const TODAY = "2026-11-04";
 
@@ -91,5 +97,25 @@ describe("filterBoardCards", () => {
 
   it("needs every filter to match", () => {
     expect(filterBoardCards(cards, { assigneeId: "sam", tagId: "red" }, TODAY)).toEqual([]);
+  });
+});
+
+describe("status and board columns", () => {
+  const columns = [
+    { name: "Design" },
+    { name: "To Do" },
+    { name: "in progress" },
+    { name: "Done" },
+  ];
+
+  it("reads a column's meaning from its name, not for a team's own column", () => {
+    expect(columnStatusKind(" To Do ")).toBe("open");
+    expect(columnStatusKind("Awaiting approval")).toBe("review");
+    expect(columnStatusKind("Design")).toBeNull();
+  });
+  it("finds the column for a status; closed shares Done", () => {
+    expect(columnForStatusKind(columns, "active")?.name).toBe("in progress");
+    expect(columnForStatusKind(columns, "closed")?.name).toBe("Done");
+    expect(columnForStatusKind(columns, "review")).toBeNull();
   });
 });

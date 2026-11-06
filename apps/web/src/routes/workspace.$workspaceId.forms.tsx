@@ -60,7 +60,7 @@ function FormsListPage() {
             <ClipboardList className="h-5 w-5" aria-hidden />
           </span>
           <div>
-            <h1 className="text-lg font-semibold">Forms</h1>
+            <h1 className="text-2xl font-bold tracking-tight">Forms</h1>
             <p className="text-muted-foreground text-xs">
               Let anyone submit a task without logging in.
             </p>

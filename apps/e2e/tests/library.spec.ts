@@ -11,7 +11,8 @@ import {
 
 const IMAGE_FIXTURE = fileURLToPath(new URL("../fixtures/test-image.png", import.meta.url));
 
-test("Library: a generated image is saved in Canvas, searchable/filterable, and deletable", async ({
+// Needs the task panel's Work section, removed 2026-11-06 at the user's request.
+test.skip("Library: a generated image is saved in Canvas, searchable/filterable, and deletable", async ({
   page,
 }) => {
   test.setTimeout(60_000);
@@ -177,7 +178,8 @@ test("Library: folders organize saved images, and the detail panel can download 
   await expect(grid.locator("[data-testid^='library-item-']")).toHaveCount(1);
 });
 
-test("Generate panel: images can be saved directly into a chosen folder", async ({ page }) => {
+// Needs the task panel's Work section, removed 2026-11-06 at the user's request.
+test.skip("Generate panel: images can be saved directly into a chosen folder", async ({ page }) => {
   test.setTimeout(60_000);
 
   await signUp(page, "Generate Folder Tester");

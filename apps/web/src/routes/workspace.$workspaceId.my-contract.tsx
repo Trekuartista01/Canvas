@@ -46,7 +46,7 @@ function MyContractPage() {
           <FileSignature className="h-5 w-5" aria-hidden />
         </span>
         <div>
-          <h1 className="text-lg font-semibold">My contract</h1>
+          <h1 className="text-2xl font-bold tracking-tight">My contract</h1>
           <p className="text-muted-foreground text-xs">
             Your employment contract and its annexes. Only you and HR can see these.
           </p>

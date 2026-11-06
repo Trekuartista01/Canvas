@@ -7,7 +7,8 @@ import {
   fillGenerationContext,
 } from "./helpers";
 
-test("M2.7: pick image engine, generate, see auto alt-text/tags", async ({ page }) => {
+// Needs the task panel's Work section, removed 2026-11-06 at the user's request.
+test.skip("M2.7: pick image engine, generate, see auto alt-text/tags", async ({ page }) => {
   test.setTimeout(90_000);
 
   await signUp(page, "Engine Tester");

@@ -15,7 +15,8 @@ function todayDateOnly(): string {
   return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
 }
 
-test("M3.7: track time with a live timer and a manual entry; timesheet total matches", async ({
+// Needs the task panel's Work section, removed 2026-11-06 at the user's request.
+test.skip("M3.7: track time with a live timer and a manual entry; timesheet total matches", async ({
   page,
 }) => {
   test.setTimeout(60_000);

@@ -11,6 +11,7 @@ import { WorkspaceNav } from "@/components/workspace-nav";
 import { useModalA11y } from "@/hooks/use-modal-a11y";
 import { useRealtime } from "@/hooks/use-realtime";
 import { useSession } from "@/hooks/use-session";
+import { TaskPanelProvider } from "@/hooks/use-task-panel";
 import { Avatar } from "@/lib/avatar";
 import { trpc } from "@/lib/trpc";
 import {
@@ -194,10 +195,12 @@ function WorkspaceShell() {
           </Button>
         </div>
       </aside>
-      <main className="flex-1 overflow-y-auto">
-        <Outlet />
-      </main>
-      {workspaceId && <LoginSummaryPanel workspaceId={workspaceId} />}
+      <TaskPanelProvider workspaceId={workspaceId}>
+        <main className="flex-1 overflow-y-auto">
+          <Outlet />
+        </main>
+        {workspaceId && <LoginSummaryPanel workspaceId={workspaceId} />}
+      </TaskPanelProvider>
       {brainOpen && workspaceId && (
         <BrainChatPanel
           workspaceId={workspaceId}

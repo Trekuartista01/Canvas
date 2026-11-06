@@ -10,7 +10,8 @@ function localDateTimeInputValue(date: Date): string {
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
 }
 
-test("M5.2 dashboards: task counts, burndown, and time-tracked widgets reflect real workspace data", async ({
+// Needs the task panel's Work section, removed 2026-11-06 at the user's request.
+test.skip("M5.2 dashboards: task counts, burndown, and time-tracked widgets reflect real workspace data", async ({
   page,
 }) => {
   test.setTimeout(60_000);

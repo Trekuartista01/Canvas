@@ -2,7 +2,10 @@ import { expect } from "@playwright/test";
 import { test } from "./work-open";
 import { createSpaceAndList, createWorkspaceAndOpen, signUp } from "./helpers";
 
-test("Brain tools: generate image via chat, show status, then attach to task", async ({ page }) => {
+// Needs the task panel's Work section, removed 2026-11-06 at the user's request.
+test.skip("Brain tools: generate image via chat, show status, then attach to task", async ({
+  page,
+}) => {
   test.setTimeout(90_000);
 
   await signUp(page, "Brain Tools Tester");

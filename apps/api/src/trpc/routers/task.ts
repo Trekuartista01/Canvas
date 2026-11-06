@@ -48,6 +48,7 @@ import {
 } from "../../lib/notify";
 import { getMembershipRole } from "../../lib/membership";
 import { nextOrderKey } from "../../lib/order";
+import { columnMoveForStatus, moveSubtasksWithCard } from "../../lib/task-column";
 import { loadBoard } from "../../lib/board-data";
 import { cardText, clientForNewCard, detectClients } from "../../lib/client-detect";
 import {
@@ -569,6 +570,8 @@ export const taskRouter = router({
         status.kind,
       );
       justCompleted = isDoneKind(status.kind) && !isDoneKind(previousStatus?.kind ?? "open");
+      // The card follows its status to that status's column on the board.
+      moveTo = (await columnMoveForStatus(task, status.kind)) ?? undefined;
     }
 
     // An explicit orderKey (e.g. from a board drag-and-drop drop) wins; a
@@ -630,29 +633,7 @@ export const taskRouter = router({
     if (!updated) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
 
     if (moveTo) {
-      // Subtasks stay with their card.
-      const subtasks = await db
-        .select({ id: schema.tasks.id, kind: schema.statuses.kind })
-        .from(schema.tasks)
-        .innerJoin(schema.statuses, eq(schema.statuses.id, schema.tasks.statusId))
-        .where(and(eq(schema.tasks.parentTaskId, task.id), isNull(schema.tasks.deletedAt)));
-      if (subtasks.length > 0) {
-        const targetStatuses = await db
-          .select({ id: schema.statuses.id, kind: schema.statuses.kind })
-          .from(schema.statuses)
-          .where(eq(schema.statuses.listId, moveTo.listId))
-          .orderBy(asc(schema.statuses.orderKey));
-        for (const subtask of subtasks) {
-          await db
-            .update(schema.tasks)
-            .set({
-              listId: moveTo.listId,
-              statusId: statusForMove(targetStatuses, subtask.kind)!.id,
-              updatedAt: new Date(),
-            })
-            .where(eq(schema.tasks.id, subtask.id));
-        }
-      }
+      await moveSubtasksWithCard(task.id, moveTo.listId);
       await logActivity(workspaceId, ctx.user.id, "task", task.id, "task.moved", {
         taskId: task.id,
         fromListId: task.listId,
@@ -787,6 +768,7 @@ export const taskRouter = router({
         completedAt: schema.tasks.completedAt,
         createdBy: schema.tasks.createdBy,
         requiresProof: schema.tasks.requiresProof,
+        parentTaskId: schema.tasks.parentTaskId,
       })
       .from(schema.tasks)
       .where(
@@ -848,12 +830,21 @@ export const taskRouter = router({
     for (const row of rows) {
       const orderKey = orderKeyByTaskId?.get(row.id);
       const statusChanged = input.statusId !== undefined && row.statusId !== input.statusId;
+      const columnMove =
+        statusChanged && newStatusKind !== undefined
+          ? await columnMoveForStatus(
+              { listId: input.listId, parentTaskId: row.parentTaskId },
+              newStatusKind,
+            )
+          : null;
       await db
         .update(schema.tasks)
         .set({
           ...buildTaskUpdateFields({
             statusId: statusChanged ? input.statusId : undefined,
-            orderKey,
+            orderKey: columnMove
+              ? nextOrderKey(await lastTaskOrderKey(columnMove.listId, columnMove.statusId))
+              : orderKey,
             priority: input.priority,
             startDate: input.startDate,
             dueDate: input.dueDate,
@@ -862,9 +853,19 @@ export const taskRouter = router({
                 ? computeCompletedAt(newStatusKind, row.completedAt, updatedAt)
                 : undefined,
           }),
+          ...(columnMove ?? {}),
           updatedAt,
         })
         .where(eq(schema.tasks.id, row.id));
+      if (columnMove) {
+        await moveSubtasksWithCard(row.id, columnMove.listId);
+        await publish(workspaceId, {
+          entity: "task",
+          id: row.id,
+          listId: columnMove.listId,
+          kind: "updated",
+        });
+      }
       // Same per-task "task.updated" row a single task.update call writes —
       // without this, a task edited via bulk update never shows the edit in
       // its own activity feed (activity.list is scoped to entityType="task").

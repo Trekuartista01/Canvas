@@ -100,7 +100,7 @@ function TermsForm({
       className="border-border space-y-3 rounded-md border p-4"
       data-testid="person-terms-form"
     >
-      <h2 className="text-sm font-semibold">Employment and pay</h2>
+      <h2 className="text-base font-semibold">Employment and pay</h2>
       <fieldset disabled={self || save.isPending} className="grid gap-3 sm:grid-cols-2">
         <Field id="conf-personal-number" label="Personal number">
           <Input
@@ -204,9 +204,9 @@ function TermsForm({
 
 function BankDetails({ workspaceId, data }: { workspaceId: string; data: Confidential }) {
   return (
-    <section className="border-border space-y-2 rounded-md border p-4">
+    <section className="bg-card shadow-sm border-border space-y-2 rounded-md border p-4">
       <div className="flex items-center">
-        <h2 className="mr-auto text-sm font-semibold">Bank details</h2>
+        <h2 className="mr-auto text-base font-semibold">Bank details</h2>
         <Link
           to="/w/$workspaceId/payroll"
           params={{ workspaceId }}
@@ -242,10 +242,10 @@ function Allowances({
 
   return (
     <section
-      className="border-border space-y-2 rounded-md border p-4"
+      className="bg-card shadow-sm border-border space-y-2 rounded-md border p-4"
       data-testid="person-allowances"
     >
-      <h2 className="text-sm font-semibold">Annual leave allowance</h2>
+      <h2 className="text-base font-semibold">Annual leave allowance</h2>
       <p className="text-muted-foreground text-xs">
         Working days per year. Empty = the days for their time here. Balance = allowed + carried
         over − approved − pending.

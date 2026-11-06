@@ -68,7 +68,7 @@ function AutomationsListPage() {
             <Zap className="h-5 w-5" aria-hidden />
           </span>
           <div>
-            <h1 className="text-lg font-semibold">Automations</h1>
+            <h1 className="text-2xl font-bold tracking-tight">Automations</h1>
             <p className="text-muted-foreground text-xs">
               Run actions automatically when tasks change.
             </p>

@@ -2,7 +2,8 @@ import { expect } from "@playwright/test";
 import { test } from "./work-open";
 import { createSpaceAndList, createWorkspaceAndOpen, signUp } from "./helpers";
 
-test("add a tag and custom fields to a task, and verify both persist", async ({ page }) => {
+// Needs the task panel's Work section, removed 2026-11-06 at the user's request.
+test.skip("add a tag and custom fields to a task, and verify both persist", async ({ page }) => {
   await signUp(page, "Tag Tester");
   await createWorkspaceAndOpen(page, "Tag Workspace");
   await createSpaceAndList(page, "Design", "Sprint");

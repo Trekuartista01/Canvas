@@ -95,7 +95,7 @@ function RolesPage() {
           <ShieldCheck className="h-5 w-5" aria-hidden />
         </span>
         <div>
-          <h1 className="text-lg font-semibold">Roles &amp; permissions</h1>
+          <h1 className="text-2xl font-bold tracking-tight">Roles &amp; permissions</h1>
           <p className="text-muted-foreground text-xs">
             Build a custom role by starting from a base role and adjusting individual permissions,
             or override one permission for everything inside a single space.

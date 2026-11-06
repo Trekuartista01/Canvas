@@ -78,7 +78,7 @@ function EngagementsPage() {
           <Activity className="h-5 w-5" aria-hidden />
         </span>
         <div className="mr-auto">
-          <h1 className="text-lg font-semibold">Engagements</h1>
+          <h1 className="text-2xl font-bold tracking-tight">Engagements</h1>
           <p className="text-muted-foreground text-xs">What everyone is working on right now.</p>
         </div>
         <Input
@@ -136,7 +136,7 @@ function EngagementCard({ workspaceId, card }: { workspaceId: string; card: Card
   const status = STATUS[card.status];
   return (
     <article
-      className="border-border space-y-2 rounded-md border p-3 text-sm"
+      className="bg-card shadow-sm border-border space-y-2 rounded-md border p-3 text-sm"
       data-testid={`engagement-${card.name}`}
     >
       <div className="flex items-start gap-2">

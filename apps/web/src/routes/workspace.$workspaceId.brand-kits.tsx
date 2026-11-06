@@ -42,7 +42,7 @@ function BrandKitsPage() {
           <Palette className="h-5 w-5" aria-hidden />
         </span>
         <div>
-          <h1 className="text-lg font-semibold">Brand Kits</h1>
+          <h1 className="text-2xl font-bold tracking-tight">Brand Kits</h1>
           <p className="text-muted-foreground text-xs">
             Save a palette, tone, and image style for each client or brand — assign one to a Space
             to apply it there automatically.

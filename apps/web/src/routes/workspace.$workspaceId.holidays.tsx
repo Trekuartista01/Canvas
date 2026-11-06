@@ -24,7 +24,9 @@ function HolidaysPage() {
         <span className="bg-accent-soft text-accent flex h-9 w-9 items-center justify-center rounded-md">
           <CalendarDays className="h-5 w-5" aria-hidden />
         </span>
-        <h1 className="mr-auto text-lg font-semibold">Festat zyrtare / Official holidays</h1>
+        <h1 className="mr-auto text-2xl font-bold tracking-tight">
+          Festat zyrtare / Official holidays
+        </h1>
         {access.data?.canManage && (
           <Link
             to="/w/$workspaceId/leave-approvals"

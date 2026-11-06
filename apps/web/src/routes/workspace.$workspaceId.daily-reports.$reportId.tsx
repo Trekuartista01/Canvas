@@ -39,7 +39,7 @@ function DailyReportViewPage() {
         >
           ← {data.isMine ? "My daily reports" : "Team reports"}
         </Link>
-        <h1 className="mt-1 text-lg font-semibold">
+        <h1 className="mt-1 text-2xl font-bold tracking-tight">
           {data.isMine ? "Your report" : data.authorName} · {formatReportDate(data.reportDate)}
         </h1>
         <p className="text-muted-foreground text-xs">
@@ -59,12 +59,12 @@ function DailyReportViewPage() {
         </p>
       </div>
 
-      <article className="border-border rounded-md border p-4">
+      <article className="bg-card shadow-sm border-border rounded-md border p-4">
         <DailyReportBody content={data.bodyJson} editable={false} />
       </article>
 
       <section aria-label="Read by" data-testid="daily-report-readers">
-        <h2 className="text-sm font-semibold">Read by</h2>
+        <h2 className="text-base font-semibold">Read by</h2>
         {data.readers.length === 0 ? (
           <p className="text-muted-foreground text-sm">Nobody has opened it yet.</p>
         ) : (

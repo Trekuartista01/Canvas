@@ -64,7 +64,7 @@ function CopywriterHistoryPage() {
       </Link>
 
       <div>
-        <h1 className="text-lg font-semibold">Generated copy</h1>
+        <h1 className="text-2xl font-bold tracking-tight">Generated copy</h1>
         <p className="text-muted-foreground text-xs">
           Everything you've generated, most recent first.
         </p>

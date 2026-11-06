@@ -84,7 +84,7 @@ function ListPage() {
             </Link>
             {folder ? ` / ${folder.name}` : ""}
           </p>
-          <h1 className="text-lg font-semibold"># {list.name}</h1>
+          <h1 className="text-2xl font-bold tracking-tight">{list.name}</h1>
         </div>
         <div className="flex items-center gap-3 text-sm">
           <Button size="sm" onClick={() => setCreatingTask(true)} data-testid="new-task-button">
@@ -110,7 +110,7 @@ function ListPage() {
               ))}
             </select>
           )}
-          <div className="flex gap-1">
+          <div className="bg-muted flex gap-0.5 rounded-lg p-0.5">
             {(
               [
                 ["list", "List"],
@@ -119,19 +119,17 @@ function ListPage() {
                 ["table", "Table"],
                 ["gantt", "Gantt"],
               ] as const
-            ).map(([id, label], i) => (
-              <span key={id} className="contents">
-                {i > 0 && <span className="text-muted-foreground">·</span>}
-                <button
-                  type="button"
-                  onClick={() => setView(id)}
-                  className={
-                    view === id ? "font-medium" : "text-muted-foreground hover:text-foreground"
-                  }
-                >
-                  {label}
-                </button>
-              </span>
+            ).map(([id, label]) => (
+              <button
+                key={id}
+                type="button"
+                onClick={() => setView(id)}
+                className={`rounded-md px-2.5 py-1 text-xs font-medium transition-colors ${
+                  view === id ? "bg-card shadow-sm" : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                {label}
+              </button>
             ))}
           </div>
         </div>
@@ -166,7 +164,6 @@ function ListPage() {
             // one-time deep link from a notification.
             if (openTask) void navigate({ search: { openTask: undefined } });
           }}
-          onOpenTask={setOpenTaskId}
         />
       )}
     </div>

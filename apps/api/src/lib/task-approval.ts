@@ -24,6 +24,7 @@ import {
   assertTaskApprover,
   getAssigneeIds,
 } from "./task-transition";
+import { columnMoveForStatus, moveSubtasksWithCard } from "./task-column";
 import { buildTaskUpdateFields, computeCompletedAt, isDoneKind } from "./task-update";
 
 type Task = Awaited<ReturnType<typeof requireTask>>;
@@ -82,16 +83,29 @@ async function moveToStatus(
   actorId: string,
 ) {
   const completedAt = computeCompletedAt(status.kind, task.completedAt, new Date());
-  const orderKey = nextOrderKey(await lastTaskOrderKey(task.listId, status.id));
+  const columnMove = await columnMoveForStatus(task, status.kind);
+  const orderKey = nextOrderKey(
+    await lastTaskOrderKey(columnMove?.listId ?? task.listId, columnMove?.statusId ?? status.id),
+  );
   const [updated] = await db
     .update(schema.tasks)
     .set({
       ...buildTaskUpdateFields({ statusId: status.id, orderKey, completedAt }),
+      ...(columnMove ?? {}),
       updatedAt: new Date(),
     })
     .where(eq(schema.tasks.id, task.id))
     .returning();
   if (!updated) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+  if (columnMove) {
+    await moveSubtasksWithCard(task.id, columnMove.listId);
+    await publish(workspaceId, {
+      entity: "task",
+      id: task.id,
+      listId: columnMove.listId,
+      kind: "updated",
+    });
+  }
 
   await logActivity(workspaceId, actorId, "task", task.id, "task.updated");
   if (isDoneKind(status.kind) && !isDoneKind(fromKind)) {

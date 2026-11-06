@@ -73,7 +73,7 @@ test("M7.2 approval: manager assigns with proof required → staff submits with 
   await summary.getByRole("button", { name: "Close", exact: true }).click();
   const myTask = staff
     .getByTestId("my-tasks-list")
-    .getByRole("link", { name: /Photograph the shelf display/ });
+    .getByRole("button", { name: /Photograph the shelf display/ });
   await expect(myTask).toContainText("14:30");
   await myTask.click();
 

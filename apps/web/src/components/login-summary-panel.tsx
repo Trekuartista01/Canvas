@@ -55,7 +55,7 @@ export function LoginSummaryPanel({ workspaceId }: { workspaceId: string }) {
               <Sparkles className="h-4 w-4" aria-hidden />
             </span>
             <div>
-              <h2 className="text-sm font-semibold">Welcome back</h2>
+              <h2 className="text-base font-semibold">Welcome back</h2>
               <p className="text-muted-foreground text-xs">Urgent and assigned to you</p>
             </div>
           </div>

@@ -64,7 +64,7 @@ export function TaskCalendarView({
   return (
     <div data-testid="task-calendar-view" className="space-y-4 px-6 py-4">
       <div className="flex items-center justify-between">
-        <h2 className="text-sm font-semibold">{monthLabel(year, monthIndex)}</h2>
+        <h2 className="text-base font-semibold">{monthLabel(year, monthIndex)}</h2>
         <div className="flex gap-2">
           <button
             type="button"

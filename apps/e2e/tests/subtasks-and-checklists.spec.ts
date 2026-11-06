@@ -2,7 +2,8 @@ import { expect } from "@playwright/test";
 import { test } from "./work-open";
 import { createSpaceAndList, createWorkspaceAndOpen, signUp } from "./helpers";
 
-test("add a subtask and a checklist to a task, and verify both persist", async ({ page }) => {
+// Needs the task panel's Work section, removed 2026-11-06 at the user's request.
+test.skip("add a subtask and a checklist to a task, and verify both persist", async ({ page }) => {
   await signUp(page, "Subtask Tester");
   await createWorkspaceAndOpen(page, "Subtask Workspace");
   await createSpaceAndList(page, "Marketing", "Sprint");

@@ -24,7 +24,7 @@ function SemanticSearchPage() {
         <span className="bg-accent-soft text-accent flex h-9 w-9 items-center justify-center rounded-md">
           <Sparkles className="h-5 w-5" aria-hidden />
         </span>
-        <h1 className="text-lg font-semibold">Smart search</h1>
+        <h1 className="text-2xl font-bold tracking-tight">Smart search</h1>
       </div>
 
       <GlobalSearch workspaceId={workspaceId} />

@@ -43,7 +43,7 @@ function TimesheetPage() {
             <Clock className="h-5 w-5" aria-hidden />
           </span>
           <div>
-            <h1 className="text-lg font-semibold">Timesheet</h1>
+            <h1 className="text-2xl font-bold tracking-tight">Timesheet</h1>
             <p className="text-muted-foreground text-xs">Logged time by day, for this week.</p>
           </div>
         </div>
@@ -129,7 +129,6 @@ function TimesheetPage() {
           taskId={openTaskId}
           workspaceId={workspaceId}
           onClose={() => setOpenTaskId(null)}
-          onOpenTask={setOpenTaskId}
         />
       )}
     </div>

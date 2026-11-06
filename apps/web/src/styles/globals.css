@@ -4,14 +4,14 @@
 @custom-variant dark (&:is(.dark *));
 
 :root {
-  --background: #f9f9f7;
+  --background: #f2f2ee;
   --foreground: #0b0b0b;
-  --card: #fcfcfb;
+  --card: #ffffff;
   --card-foreground: #0b0b0b;
-  --border: #e1e0d9;
+  --border: #dcdbd3;
   --primary: oklch(0.205 0 0);
   --primary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.97 0 0);
+  --muted: #e9e8e2;
   --muted-foreground: #52514e;
   --accent: #2a78d6;
   --accent-foreground: #fcfcfb;
@@ -86,6 +86,34 @@
   --color-status-serious: var(--status-serious);
   --color-status-critical: var(--status-critical);
   --radius-md: var(--radius);
+}
+
+@keyframes panel-slide-in {
+  from {
+    transform: translateX(2.5rem);
+    opacity: 0;
+  }
+}
+
+@keyframes panel-fade-in {
+  from {
+    opacity: 0;
+  }
+}
+
+.panel-slide {
+  animation: panel-slide-in 180ms ease-out;
+}
+
+.panel-backdrop {
+  animation: panel-fade-in 180ms ease-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .panel-slide,
+  .panel-backdrop {
+    animation: none;
+  }
 }
 
 @layer base {

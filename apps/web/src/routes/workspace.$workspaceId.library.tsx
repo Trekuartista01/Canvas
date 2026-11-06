@@ -223,7 +223,7 @@ function LibraryPage() {
             <Images className="h-5 w-5" aria-hidden />
           </span>
           <div>
-            <h1 className="text-lg font-semibold">Library</h1>
+            <h1 className="text-2xl font-bold tracking-tight">Library</h1>
             <p className="text-muted-foreground text-xs">
               Every image you've generated or uploaded, saved here in Canvas — not just on your
               device.
@@ -594,7 +594,7 @@ function LibraryCopyItemDetailPanel({
         className="border-border bg-background relative flex h-full w-full max-w-md flex-col border-l shadow-xl outline-none"
       >
         <div className="border-border flex items-center justify-between border-b px-4 py-3">
-          <h2 className="text-sm font-semibold">{item.label}</h2>
+          <h2 className="text-base font-semibold">{item.label}</h2>
           <Button
             type="button"
             variant="ghost"
@@ -699,7 +699,7 @@ function LibraryDetailPanel({
         className="border-border bg-background relative flex h-full w-full max-w-md flex-col border-l shadow-xl outline-none"
       >
         <div className="border-border flex items-center justify-between border-b px-4 py-3">
-          <h2 className="text-sm font-semibold">Image</h2>
+          <h2 className="text-base font-semibold">Image</h2>
           <Button
             type="button"
             variant="ghost"

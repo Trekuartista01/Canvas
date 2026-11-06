@@ -96,7 +96,7 @@ export function LeaveMonthCalendar({
       </div>
 
       <section aria-label="Leave this month" className="space-y-1">
-        <h2 className="text-sm font-semibold">This month</h2>
+        <h2 className="text-base font-semibold">This month</h2>
         {inMonth.length === 0 ? (
           <p className="text-muted-foreground text-sm">Nobody is off.</p>
         ) : (

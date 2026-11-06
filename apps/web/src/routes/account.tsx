@@ -123,7 +123,7 @@ function AccountPage() {
             />
           </div>
           <div className="min-w-0 flex-1">
-            <h1 className="truncate text-lg font-semibold">{user.name}</h1>
+            <h1 className="truncate text-2xl font-bold tracking-tight">{user.name}</h1>
             <p className="text-muted-foreground truncate text-sm">{user.email}</p>
           </div>
         </div>
@@ -298,7 +298,7 @@ function WorkProfile({
   return (
     <Card className="space-y-4 p-4" data-testid="work-profile">
       <div>
-        <h2 className="text-sm font-semibold">Your profile in {workspaceName}</h2>
+        <h2 className="text-base font-semibold">Your profile in {workspaceName}</h2>
         <p className="text-muted-foreground text-xs">HR keeps the details that aren't editable.</p>
       </div>
       {profile.isLoading && <p className="text-muted-foreground text-sm">Loading…</p>}

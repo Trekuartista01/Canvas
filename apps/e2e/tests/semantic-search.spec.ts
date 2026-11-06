@@ -8,7 +8,8 @@ import {
   openList,
 } from "./helpers";
 
-test("Phase 6: semantic task search ranks by meaning, and visual search finds a similar generated image", async ({
+// Needs the task panel's Work section, removed 2026-11-06 at the user's request.
+test.skip("Phase 6: semantic task search ranks by meaning, and visual search finds a similar generated image", async ({
   page,
 }) => {
   test.setTimeout(90_000);

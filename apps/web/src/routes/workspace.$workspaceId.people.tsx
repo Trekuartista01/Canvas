@@ -71,7 +71,7 @@ function PeopleDirectoryPage() {
           <Contact className="h-5 w-5" aria-hidden />
         </span>
         <div className="mr-auto">
-          <h1 className="text-lg font-semibold">People</h1>
+          <h1 className="text-2xl font-bold tracking-tight">People</h1>
           <p className="text-muted-foreground text-xs">Everyone in this workspace.</p>
         </div>
         {canManage && !adding && (
@@ -198,7 +198,7 @@ function AddStaffForm({ workspaceId, onDone }: { workspaceId: string; onDone: ()
       data-testid="add-staff-form"
     >
       <div>
-        <h2 className="text-sm font-semibold">Add staff</h2>
+        <h2 className="text-base font-semibold">Add staff</h2>
         <p className="text-muted-foreground text-xs">
           Creates their account. Share the email and initial password with them — they sign in with
           it right away. Someone who already has an account should be invited instead.

@@ -1,6 +1,6 @@
 import { useCompleteHighlightTask } from "@/hooks/use-task-mutations";
+import { useOpenTaskPanel } from "@/hooks/use-task-panel";
 import type { AppRouter } from "@canvas/api";
-import { Link } from "@tanstack/react-router";
 import type { inferRouterOutputs } from "@trpc/server";
 import { Check } from "lucide-react";
 
@@ -23,28 +23,32 @@ export function TaskHighlightRow({
   task: HighlightTask;
   workspaceId: string;
   memberNamesById: Map<string, string>;
-  /** Fires when the row is clicked, in addition to the link navigation —
-   * lets an overlay (e.g. LoginSummaryPanel) close itself on click-through. */
+  /** Fires when the row is clicked, before the task opens — lets an overlay
+   * (e.g. LoginSummaryPanel) close itself on click-through. */
   onNavigate?: () => void;
 }) {
   const assigneeNames = task.assigneeIds.map((id) => memberNamesById.get(id) ?? "Someone");
   const complete = useCompleteHighlightTask(workspaceId);
+  const openTask = useOpenTaskPanel();
+  const open = () => {
+    onNavigate?.();
+    openTask(task.id);
+  };
 
   return (
-    <Link
-      to="/w/$workspaceId/l/$listId"
-      params={{ workspaceId, listId: task.listId }}
-      search={{ openTask: task.id }}
-      onClick={onNavigate}
+    <div
+      role="button"
+      tabIndex={0}
+      onClick={open}
+      onKeyDown={(e) => {
+        if (e.target === e.currentTarget && (e.key === "Enter" || e.key === " ")) {
+          e.preventDefault();
+          open();
+        }
+      }}
       data-testid={`task-highlight-${task.id}`}
-      // An explicit label, rather than the row's full nested text (title +
-      // assignees + space/list breadcrumb), keeps this link's accessible
-      // name from accidentally substring-matching an unrelated same-named
-      // list/space link elsewhere on the page in `getByRole("link", {name})`
-      // lookups — the breadcrumb text is still visible, just not part of
-      // the accessible name.
       aria-label={`Open ${task.title}`}
-      className="border-border hover:bg-muted flex items-center gap-2 rounded-md border px-3 py-2 text-sm transition-colors"
+      className="border-border bg-card flex cursor-pointer items-center gap-2 rounded-lg border px-3 py-2.5 text-sm shadow-sm transition-shadow hover:shadow-md"
     >
       <button
         type="button"
@@ -77,6 +81,6 @@ export function TaskHighlightRow({
       <span className="text-muted-foreground shrink-0 truncate text-xs">
         {task.spaceName} / {task.listName}
       </span>
-    </Link>
+    </div>
   );
 }

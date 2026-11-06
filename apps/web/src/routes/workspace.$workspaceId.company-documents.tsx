@@ -66,7 +66,7 @@ function CompanyDocumentsPage() {
           <FolderOpen className="h-5 w-5" aria-hidden />
         </span>
         <div>
-          <h1 className="text-lg font-semibold">Company documents</h1>
+          <h1 className="text-2xl font-bold tracking-tight">Company documents</h1>
           <p className="text-muted-foreground text-xs">
             Policies, handbooks and forms for everyone.
           </p>
@@ -342,7 +342,7 @@ function ManageBar({
   }
 
   return (
-    <div className="border-border space-y-3 rounded-md border p-3">
+    <div className="bg-card shadow-sm border-border space-y-3 rounded-md border p-3">
       <form
         className="flex flex-wrap items-center gap-2"
         onSubmit={submit}

@@ -7,7 +7,8 @@ import {
   fillGenerationContext,
 } from "./helpers";
 
-test("M2.5 iterative edit: generate → edit ×3 → attach", async ({ page }) => {
+// Needs the task panel's Work section, removed 2026-11-06 at the user's request.
+test.skip("M2.5 iterative edit: generate → edit ×3 → attach", async ({ page }) => {
   test.setTimeout(120_000);
 
   await signUp(page, "Edit Loop Tester");

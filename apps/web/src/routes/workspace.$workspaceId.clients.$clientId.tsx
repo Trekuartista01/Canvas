@@ -92,7 +92,7 @@ function ClientFolderPage() {
               Clients
             </Link>
           </p>
-          <h1 className="truncate text-lg font-semibold">
+          <h1 className="truncate text-2xl font-bold tracking-tight">
             {client.name}
             {client.archivedAt && (
               <span className="text-muted-foreground ml-2 text-xs font-normal">Archived</span>

@@ -40,7 +40,7 @@ function TeamReportsPage() {
           <ClipboardCheck className="h-5 w-5" aria-hidden />
         </span>
         <div className="mr-auto">
-          <h1 className="text-lg font-semibold">Team reports</h1>
+          <h1 className="text-2xl font-bold tracking-tight">Team reports</h1>
           <p className="text-muted-foreground text-xs">
             {formatReportDate(reportDate)}
             {team.data && ` · ${submitted} of ${rows.length} submitted`}

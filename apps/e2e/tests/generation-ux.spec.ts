@@ -8,7 +8,8 @@ import {
   openList,
 } from "./helpers";
 
-test("Generation UX: set brand palette, generate variants, promote one, attach to task", async ({
+// Needs the task panel's Work section, removed 2026-11-06 at the user's request.
+test.skip("Generation UX: set brand palette, generate variants, promote one, attach to task", async ({
   page,
 }) => {
   test.setTimeout(90_000);
@@ -67,7 +68,10 @@ test("Generation UX: set brand palette, generate variants, promote one, attach t
   await expect(panel.getByText(/Attachments \(1\)/)).toBeVisible({ timeout: 10_000 });
 });
 
-test("Brand Kits: a space's assigned kit wins over the workspace default", async ({ page }) => {
+// Needs the task panel's Work section, removed 2026-11-06 at the user's request.
+test.skip("Brand Kits: a space's assigned kit wins over the workspace default", async ({
+  page,
+}) => {
   test.setTimeout(60_000);
 
   await signUp(page, "Brand Kit Tester");

@@ -159,7 +159,7 @@ function ContractsPage() {
         <span className="bg-accent-soft text-accent flex h-9 w-9 items-center justify-center rounded-md">
           <FileSignature className="h-5 w-5" aria-hidden />
         </span>
-        <h1 className="mr-auto text-lg font-semibold">Contracts</h1>
+        <h1 className="mr-auto text-2xl font-bold tracking-tight">Contracts</h1>
         <Input
           placeholder="Search people"
           aria-label="Search people"
@@ -378,7 +378,7 @@ function ContractCard({
 
   return (
     <div
-      className="border-border space-y-3 rounded-md border p-3 text-sm"
+      className="bg-card shadow-sm border-border space-y-3 rounded-md border p-3 text-sm"
       data-testid={`contract-row-${c.title}`}
     >
       <div className="flex flex-wrap items-center gap-x-2 gap-y-1">

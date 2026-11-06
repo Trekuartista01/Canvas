@@ -77,7 +77,7 @@ export function MyDetailsEditor({
       data-testid="my-details-editor"
     >
       <div>
-        <h2 className="text-sm font-semibold">My details</h2>
+        <h2 className="text-base font-semibold">My details</h2>
         <p className="text-muted-foreground text-xs">
           Everyone can see your position and department. Only you and HR can see the rest.
         </p>
@@ -178,8 +178,11 @@ export function MyDetailsEditor({
 export function ResetMyPassword({ email }: { email: string }) {
   const reset = trpc.auth.requestPasswordReset.useMutation();
   return (
-    <div className="border-border space-y-2 rounded-md border p-4" data-testid="reset-my-password">
-      <h2 className="text-sm font-semibold">Password</h2>
+    <div
+      className="bg-card shadow-sm border-border space-y-2 rounded-md border p-4"
+      data-testid="reset-my-password"
+    >
+      <h2 className="text-base font-semibold">Password</h2>
       <p className="text-muted-foreground text-xs">
         We'll email {email} a link to choose a new password. Changing it logs you out everywhere.
       </p>

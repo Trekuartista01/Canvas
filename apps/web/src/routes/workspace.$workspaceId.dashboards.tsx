@@ -39,7 +39,7 @@ function DashboardsListPage() {
   return (
     <div className="space-y-4 p-6" data-testid="dashboards-list-page">
       <div className="flex items-center justify-between">
-        <h1 className="text-lg font-semibold">Dashboards</h1>
+        <h1 className="text-2xl font-bold tracking-tight">Dashboards</h1>
         {!creating && (
           <Button
             size="sm"

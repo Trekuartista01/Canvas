@@ -47,7 +47,7 @@ function DocsListPage() {
             <FileText className="h-5 w-5" aria-hidden />
           </span>
           <div>
-            <h1 className="text-lg font-semibold">Docs</h1>
+            <h1 className="text-2xl font-bold tracking-tight">Docs</h1>
             <p className="text-muted-foreground text-xs">
               Write and collaborate in real time, linked to your tasks.
             </p>

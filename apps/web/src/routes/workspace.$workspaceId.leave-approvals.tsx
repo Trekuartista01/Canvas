@@ -109,7 +109,7 @@ function LeaveApprovalsPage() {
         <span className="bg-accent-soft text-accent flex h-9 w-9 items-center justify-center rounded-md">
           <ClipboardCheck className="h-5 w-5" aria-hidden />
         </span>
-        <h1 className="mr-auto text-lg font-semibold">Leave approvals</h1>
+        <h1 className="mr-auto text-2xl font-bold tracking-tight">Leave approvals</h1>
       </div>
       <div className="flex flex-wrap gap-1" role="tablist">
         {tabs.map((t) => (
@@ -424,7 +424,10 @@ function RecordLeave({ workspaceId }: { workspaceId: string }) {
   const [userId, setUserId] = useState("");
   const [saved, setSaved] = useState(false);
   return (
-    <section className="border-border space-y-3 rounded-md border p-4" aria-label="Record leave">
+    <section
+      className="bg-card shadow-sm border-border space-y-3 rounded-md border p-4"
+      aria-label="Record leave"
+    >
       <p className="text-muted-foreground text-xs">
         For leave someone couldn't request themselves (a sick day phoned in). It's approved straight
         away and the person is notified.
@@ -479,7 +482,7 @@ function TenureRules({ workspaceId, rules }: { workspaceId: string; rules: Vacat
 
   return (
     <section
-      className="border-border shrink-0 space-y-2 rounded-md border p-3 text-sm"
+      className="bg-card shadow-sm border-border shrink-0 space-y-2 rounded-md border p-3 text-sm"
       data-testid="tenure-rules"
     >
       <h2 className="font-semibold">Days by time at the company</h2>

@@ -2,7 +2,8 @@ import { expect } from "@playwright/test";
 import { test } from "./work-open";
 import { createSpaceAndList, createWorkspaceAndOpen, signUp, openList } from "./helpers";
 
-test("M5.1 automations: status → Done runs a tag + comment action, gated by a priority condition, and logs a run", async ({
+// Needs the task panel's Work section, removed 2026-11-06 at the user's request.
+test.skip("M5.1 automations: status → Done runs a tag + comment action, gated by a priority condition, and logs a run", async ({
   page,
 }) => {
   test.setTimeout(60_000);

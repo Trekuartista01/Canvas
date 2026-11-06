@@ -213,7 +213,7 @@ export function WorkspaceNav({ workspaceId }: { workspaceId: string }) {
                   className={cn(
                     "flex items-center gap-2.5 rounded-md px-2 py-1.5 text-sm transition-colors",
                     active
-                      ? "bg-accent-soft text-accent font-medium"
+                      ? "bg-accent text-accent-foreground font-semibold shadow-sm"
                       : "text-muted-foreground hover:bg-muted hover:text-foreground",
                   )}
                 >

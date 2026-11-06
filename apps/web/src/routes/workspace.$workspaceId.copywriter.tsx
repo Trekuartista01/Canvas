@@ -23,7 +23,7 @@ function CopywriterListPage() {
             <PenSquare className="h-5 w-5" aria-hidden />
           </span>
           <div>
-            <h1 className="text-lg font-semibold">Copywriter</h1>
+            <h1 className="text-2xl font-bold tracking-tight">Copywriter</h1>
             <p className="text-muted-foreground text-xs">
               Pick a brand kit, upload a design, get on-brand copy instantly.
             </p>

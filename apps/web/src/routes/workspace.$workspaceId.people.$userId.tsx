@@ -64,7 +64,7 @@ function PersonProfilePage() {
       <div className="flex items-center gap-3">
         <Avatar name={p.name} avatarUrl={p.avatarUrl} className="h-12 w-12 text-base" />
         <div className="min-w-0 flex-1">
-          <h1 className="truncate text-lg font-semibold">{p.name}</h1>
+          <h1 className="truncate text-2xl font-bold tracking-tight">{p.name}</h1>
           <p className="text-muted-foreground truncate text-xs">{p.email}</p>
         </div>
         <span className="bg-accent-soft text-accent rounded-full px-2 py-0.5 text-xs font-medium">
@@ -175,10 +175,10 @@ function RoleAndManagerEditor({ workspaceId, profile }: { workspaceId: string; p
 
   return (
     <section
-      className="border-border space-y-3 rounded-md border p-4"
+      className="bg-card shadow-sm border-border space-y-3 rounded-md border p-4"
       data-testid="person-role-editor"
     >
-      <h2 className="text-sm font-semibold">Role & reporting</h2>
+      <h2 className="text-base font-semibold">Role & reporting</h2>
       <div className="grid gap-3 sm:grid-cols-2">
         {profile.canAssignRoles && (
           <div className="space-y-1">
@@ -277,7 +277,7 @@ function ProfileEditor({ workspaceId, profile }: { workspaceId: string; profile:
       className="border-border space-y-3 rounded-md border p-4"
       data-testid="person-profile-editor"
     >
-      <h2 className="text-sm font-semibold">Edit profile</h2>
+      <h2 className="text-base font-semibold">Edit profile</h2>
       <EmployeeProfileFields draft={draft} onChange={setDraft} idPrefix="profile" />
       {update.error && (
         <p className="text-sm text-red-600 dark:text-red-400" role="alert">
@@ -319,8 +319,11 @@ function ArchiveEditor({ workspaceId, profile }: { workspaceId: string; profile:
   const target = { workspaceId, userId: profile.userId };
 
   return (
-    <section className="border-border space-y-2 rounded-md border p-4" data-testid="person-archive">
-      <h2 className="text-sm font-semibold">{archived ? "Archived" : "Remove"}</h2>
+    <section
+      className="bg-card shadow-sm border-border space-y-2 rounded-md border p-4"
+      data-testid="person-archive"
+    >
+      <h2 className="text-base font-semibold">{archived ? "Archived" : "Remove"}</h2>
       <p className="text-muted-foreground text-xs">
         {archived
           ? "They can't open this workspace and don't appear in lists. Their contracts, payroll and leave history are kept."

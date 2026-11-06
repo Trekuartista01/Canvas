@@ -72,7 +72,8 @@ test("M5.6 integrations: Slack notify automation posts a message on status chang
   }
 });
 
-test("M5.6 integrations: attach a Google Drive file from a task", async ({ page }) => {
+// Needs the task panel's Work section, removed 2026-11-06 at the user's request.
+test.skip("M5.6 integrations: attach a Google Drive file from a task", async ({ page }) => {
   test.setTimeout(60_000);
 
   await signUp(page, "Task Integrations Owner");

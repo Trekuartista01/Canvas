@@ -54,7 +54,7 @@ function PayrollPage() {
           <Banknote className="h-5 w-5" aria-hidden />
         </span>
         <div className="mr-auto">
-          <h1 className="text-lg font-semibold">Payroll</h1>
+          <h1 className="text-2xl font-bold tracking-tight">Payroll</h1>
           <p className="text-muted-foreground text-xs">
             Confidential. Every view, change and export is recorded.
           </p>

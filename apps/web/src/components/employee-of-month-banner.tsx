@@ -48,7 +48,7 @@ export function EmployeeOfMonthBanner({ workspaceId }: { workspaceId: string }) 
       )}
       {showRanking && data.ranking && (
         <section
-          className="border-border space-y-2 rounded-md border p-3"
+          className="bg-card shadow-sm border-border space-y-2 rounded-md border p-3"
           aria-label="Employee of the Month ranking"
           data-testid="eom-ranking"
         >

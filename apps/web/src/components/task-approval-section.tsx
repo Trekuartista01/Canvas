@@ -54,7 +54,7 @@ export function TaskApprovalSection({
 
   return (
     <section
-      className="border-border space-y-3 rounded-md border p-3"
+      className="bg-card shadow-sm border-border space-y-3 rounded-md border p-3"
       data-testid="task-approval"
       aria-label="Approval"
     >

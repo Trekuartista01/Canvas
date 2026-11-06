@@ -7,7 +7,8 @@ import {
   fillGenerationContext,
 } from "./helpers";
 
-test("M4.4 image proofing: pin a comment on a version, switch versions, pin survives, and Brain critiques", async ({
+// Needs the task panel's Work section, removed 2026-11-06 at the user's request.
+test.skip("M4.4 image proofing: pin a comment on a version, switch versions, pin survives, and Brain critiques", async ({
   page,
 }) => {
   test.setTimeout(90_000);

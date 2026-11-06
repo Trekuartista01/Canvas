@@ -31,7 +31,7 @@ function LeavePage() {
           <Plane className="h-5 w-5" aria-hidden />
         </span>
         <div className="mr-auto">
-          <h1 className="text-lg font-semibold">My leave</h1>
+          <h1 className="text-2xl font-bold tracking-tight">My leave</h1>
           <p className="text-muted-foreground text-xs">
             Working days only — weekends and public holidays don't count.
           </p>
@@ -49,7 +49,7 @@ function LeavePage() {
 
       <section aria-label="Vacation balance" className="space-y-2">
         <div className="flex items-center gap-1">
-          <h2 className="mr-auto text-sm font-semibold">Vacation balance</h2>
+          <h2 className="mr-auto text-base font-semibold">Vacation balance</h2>
           <Button
             size="sm"
             variant="ghost"
@@ -79,8 +79,11 @@ function LeavePage() {
         </div>
       </section>
 
-      <section aria-label="Request leave" className="border-border space-y-3 rounded-md border p-4">
-        <h2 className="text-sm font-semibold">Request leave</h2>
+      <section
+        aria-label="Request leave"
+        className="bg-card shadow-sm border-border space-y-3 rounded-md border p-4"
+      >
+        <h2 className="text-base font-semibold">Request leave</h2>
         <LeaveForm workspaceId={workspaceId} />
       </section>
 
@@ -125,7 +128,7 @@ function MyRequests({ requests }: { requests: MyRequest[] }) {
 
   return (
     <section aria-label="My requests" className="flex min-h-64 flex-1 flex-col gap-2">
-      <h2 className="text-sm font-semibold">My requests</h2>
+      <h2 className="text-base font-semibold">My requests</h2>
       {requests.length === 0 ? (
         <p className="text-muted-foreground text-sm">No leave requested yet.</p>
       ) : (

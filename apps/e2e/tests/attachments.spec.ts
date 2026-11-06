@@ -6,7 +6,8 @@ import { createSpaceAndList, createWorkspaceAndOpen, signUp } from "./helpers";
 const IMAGE_FIXTURE = fileURLToPath(new URL("../fixtures/test-image.png", import.meta.url));
 const DOC_FIXTURE = fileURLToPath(new URL("../fixtures/test-doc.txt", import.meta.url));
 
-test("upload an image and a file to a task, open the lightbox, reload, and delete", async ({
+// Needs the task panel's Work section, removed 2026-11-06 at the user's request.
+test.skip("upload an image and a file to a task, open the lightbox, reload, and delete", async ({
   page,
 }) => {
   await signUp(page, "Attachment Tester");
