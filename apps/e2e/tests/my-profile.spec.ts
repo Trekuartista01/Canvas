@@ -9,6 +9,53 @@ import {
   workspaceIdFrom,
 } from "./helpers";
 
+test("the account page shows and saves work details, separately for each workspace", async ({
+  page,
+}) => {
+  await signUp(page, "Asha Account");
+  await createWorkspaceAndOpen(page, "Account First");
+  await page.getByRole("link", { name: "All workspaces" }).click();
+  await page.getByRole("link", { name: "New workspace" }).click();
+  await page.getByLabel("Workspace name").fill("Account Second");
+  await page.getByRole("button", { name: "Create workspace" }).click();
+  await page.getByRole("link", { name: "Open" }).first().click();
+  await expect(page.getByRole("link", { name: "Account settings" })).toBeVisible();
+
+  // From the bottom left of a workspace.
+  await page.getByRole("link", { name: "Account settings" }).click();
+  await expect(page).toHaveURL(/\/account$/);
+
+  const first = page
+    .getByTestId("work-profile")
+    .filter({ hasText: "Your profile in Account First" });
+  const second = page
+    .getByTestId("work-profile")
+    .filter({ hasText: "Your profile in Account Second" });
+  await first.getByLabel("Position").fill("Art Director");
+  await first.getByLabel("Department").fill("Creative");
+  await first.getByLabel("Birthday").fill("1990-07-21");
+  const saved = page.waitForResponse((res) => res.url().includes("people.updateMyProfile"));
+  await first.getByRole("button", { name: "Save my details" }).click();
+  expect((await saved).ok()).toBe(true);
+  await expect(first.getByText("Saved")).toBeVisible();
+
+  await page.reload();
+  await expect(first.getByLabel("Position")).toHaveValue("Art Director");
+  await expect(first.getByLabel("Department")).toHaveValue("Creative");
+  await expect(first.getByLabel("Birthday")).toHaveValue("1990-07-21");
+  await expect(second.getByLabel("Position")).toHaveValue("");
+
+  await page.getByRole("button", { name: "Email me a reset link" }).click();
+  await expect(page.getByTestId("reset-my-password").getByRole("status")).toContainText(
+    "Check your email",
+  );
+
+  // From the workspaces page too.
+  await page.getByRole("link", { name: "← Back" }).click();
+  await page.getByRole("link", { name: "Account settings" }).click();
+  await expect(first.getByLabel("Position")).toHaveValue("Art Director");
+});
+
 test("people set their own position, department and birthday, and can email themselves a reset link", async ({
   page,
   browser,

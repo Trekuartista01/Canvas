@@ -3299,3 +3299,11 @@ Requested after Phase 8, outside the spec. The user has about 20 staff and contr
 - e2e: `invite-with-role`, `my-profile`. The pending list isn't virtualized (newest 50 only; few at any time).
 - A `pnpm dev` already on ports 3001/5183 makes Playwright reuse it without the test settings: nearly every test then fails at sign-up. Stop it first.
 - TODO: restart test; restore test; remove temporary sudo; `DEPLOYMENT.md` office path; `phase7.smoke.ts` rework; confirm the other email wordings arrive (password reset, invite, leave).
+
+## 2026-11-06 Profiles in Account
+
+- `/account` now has a "Your profile in <workspace>" card per workspace: Role, Reports to, Employment start, Phone, Address and Emergency contact to read; position, department and birthday to change. The password reset button is there too. These details belong to a membership, so someone in two workspaces has a set for each.
+- Everyone gets the editor on Account, including HR and owners, who only have the HR editor on the person page. Phone, address and emergency contact stay HR's to change (the spec lists address and phone as confidential fields).
+- Shared components moved to `components/my-profile.tsx`. No API or schema change.
+- `users.title` ("Title" on Account) is shown nowhere else, and now sits next to Position. Left in place.
+- `account-deletion.spec` scoped its text checks: the workspace name now also appears in the profile card heading.

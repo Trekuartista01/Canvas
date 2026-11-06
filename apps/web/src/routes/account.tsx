@@ -1,3 +1,4 @@
+import { Detail, formatDate, MyDetailsEditor, ResetMyPassword } from "@/components/my-profile";
 import { RequireAuth } from "@/components/require-auth";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -6,6 +7,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { useSession } from "@/hooks/use-session";
 import { Avatar } from "@/lib/avatar";
 import { trpc } from "@/lib/trpc";
+import { PEOPLE_ROLE_LABELS } from "@canvas/shared";
 import { createRoute, Link, useNavigate } from "@tanstack/react-router";
 import { Camera, TriangleAlert } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
@@ -196,6 +198,10 @@ function AccountPage() {
         </form>
       </Card>
 
+      <WorkProfiles userId={user.id} />
+
+      <ResetMyPassword email={user.email} />
+
       <Card className="border-status-critical/30 p-4" data-testid="danger-zone-section">
         <CardHeader className="p-0 pb-3">
           <div className="flex items-center gap-2">
@@ -273,5 +279,71 @@ function AccountPage() {
         </CardContent>
       </Card>
     </main>
+  );
+}
+
+// These details belong to a person's place in a workspace, not to their login,
+// so someone in two workspaces has a set for each.
+function WorkProfiles({ userId }: { userId: string }) {
+  const workspaces = trpc.workspace.listMine.useQuery();
+  return (
+    <>
+      {workspaces.data?.map(({ workspace }) => (
+        <WorkProfile
+          key={workspace.id}
+          workspaceId={workspace.id}
+          workspaceName={workspace.name}
+          userId={userId}
+        />
+      ))}
+    </>
+  );
+}
+
+function WorkProfile({
+  workspaceId,
+  workspaceName,
+  userId,
+}: {
+  workspaceId: string;
+  workspaceName: string;
+  userId: string;
+}) {
+  const profile = trpc.people.profile.useQuery({ workspaceId, userId });
+  const p = profile.data;
+
+  return (
+    <Card className="space-y-4 p-4" data-testid="work-profile">
+      <div>
+        <h2 className="text-sm font-semibold">Your profile in {workspaceName}</h2>
+        <p className="text-muted-foreground text-xs">HR keeps the details that aren't editable.</p>
+      </div>
+      {profile.isLoading && <p className="text-muted-foreground text-sm">Loading…</p>}
+      {profile.error && (
+        <p className="text-status-critical text-xs" role="alert">
+          We couldn't load this profile. Refresh the page to try again.
+        </p>
+      )}
+      {p && (
+        <>
+          <dl className="grid gap-x-6 gap-y-3 text-sm sm:grid-cols-2">
+            <Detail label="Role" value={PEOPLE_ROLE_LABELS[p.peopleRole]} />
+            <Detail label="Reports to" value={p.managerName} />
+            <Detail label="Employment start" value={formatDate(p.employmentStartDate)} />
+            <Detail label="Phone" value={p.personal?.phone ?? null} />
+            <Detail label="Address" value={p.personal?.address ?? null} />
+            <Detail
+              label="Emergency contact"
+              value={
+                [p.personal?.emergencyContactName, p.personal?.emergencyContactPhone]
+                  .filter(Boolean)
+                  .join(" · ") || null
+              }
+            />
+          </dl>
+          <MyDetailsEditor workspaceId={workspaceId} profile={p} />
+        </>
+      )}
+    </Card>
   );
 }

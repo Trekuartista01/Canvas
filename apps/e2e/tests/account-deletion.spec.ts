@@ -7,7 +7,7 @@ test("Account deletion: a user who owns no workspace can delete their account", 
   const email = await signUp(page, "Deletable User");
 
   await page.getByRole("link", { name: "Account settings" }).click();
-  await expect(page.getByText(email)).toBeVisible();
+  await expect(page.getByText(email, { exact: true })).toBeVisible();
 
   await page.getByTestId("delete-account-start").click();
   await page.getByTestId("delete-account-confirm-email").fill(email);
@@ -35,8 +35,9 @@ test("Account deletion: blocked while the user owns a workspace with the reason 
   await page.getByTestId("delete-account-confirm-email").fill(email);
   await page.getByTestId("delete-account-confirm").click();
 
-  await expect(page.getByText(/Owned Workspace/)).toBeVisible();
-  await expect(page.getByText(/make someone else the owner/)).toBeVisible();
+  const dangerZone = page.getByTestId("danger-zone-section");
+  await expect(dangerZone.getByText(/Owned Workspace/)).toBeVisible();
+  await expect(dangerZone.getByText(/make someone else the owner/)).toBeVisible();
   // Still logged in — the deletion never happened.
   await expect(page).toHaveURL(/\/account$/);
 });
